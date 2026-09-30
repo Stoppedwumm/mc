@@ -151,14 +151,14 @@ public final class ItemTextureGen {
                     return sq(u / 3.6) + sq(v / 2.6) < 1;
                 }, c[0], c[1], c[2]);
             }
-            case 3 -> { // sword
+            case 3 -> { // sword: blade along x + y = 16 from the guard up to the tip
                 shape((x, y) -> {
-                    double u = ((x - 9.5) - (6.5 - y)) / 1.414; // along blade
-                    double v = ((x - 9.5) + (6.5 - y)) / 1.414;
-                    return Math.abs(v) < 1.1 && u > -3.5 && u < 6.5 && !(u > 5.5 && Math.abs(v) > 0.4);
+                    double along = ((x - 9.5) - (y - 6.5)) / 1.414;
+                    double perp = ((x - 9.5) + (y - 6.5)) / 1.414;
+                    return Math.abs(perp) < 1.1 && along > -5.4 && along < 6.3 && !(along > 5.3 && Math.abs(perp) > 0.4);
                 }, c[0], c[1], c[2]);
-                for (int i = -2; i <= 2; i++) set(4 + i, 11 + i, 0x4a3520);
-                handle(1, 14, 3, 12);
+                for (int i = -2; i <= 2; i++) set(5 + i, 11 + i, 0x4a3520);
+                handle(1, 15, 4, 12);
             }
             default -> { // hoe
                 handle(2, 14, 11, 5);

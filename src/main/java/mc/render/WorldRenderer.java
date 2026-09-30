@@ -378,9 +378,9 @@ public final class WorldRenderer {
         } else if (useType == 2) {
             m.rotateY((float) Math.toRadians(170)).rotateZ((float) Math.toRadians(-45)).scale(0.7f);
         } else {
-            m.rotateY((float) Math.toRadians(-sw * 20)).rotateZ((float) Math.toRadians(-sw * 30)).rotateX((float) Math.toRadians(-sw * 40));
-            m.translate(0.05f, 0.12f, 0).rotateY((float) Math.toRadians(155)).rotateZ((float) Math.toRadians(item.handheld ? 5 : 0));
-            m.scale(item.handheld ? 0.85f : 0.55f);
+            // First-person item pose: handle at the lower right, tip pointing up towards the crosshair
+            m.rotateY((float) Math.toRadians(-sw * 20)).rotateZ((float) Math.toRadians(-sw * 20)).rotateX((float) Math.toRadians(-sw * 50));
+            m.translate(-0.05f, 0.3f, 0).rotateY((float) Math.toRadians(170)).scale(item.handheld ? 0.5f : 0.4f);
         }
         setupBasic(m, true, 0, 0.3f);
         basicShader.set("uLight", light);

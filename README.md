@@ -16,25 +16,39 @@ All textures and sounds are generated procedurally at startup, so no Mojang asse
 
 ## Features
 
-**World generation**
-- Infinite terrain from continentalness / erosion / peaks noise, a 3D density field for cliffs and overhangs, and river valleys. It's sampled on a coarse grid and interpolated, like modern Minecraft.
-- Biomes: plains, forest, birch forest, taiga, snowy taiga, desert, badlands, mountains, snowy peaks, beaches, rivers, oceans and frozen oceans, with smooth biome grass and foliage tints.
-- Spaghetti and cheese caves, lava lakes near bedrock, and ore veins (coal, iron, gold, diamond) plus granite, diorite, andesite, dirt and gravel pockets.
-- Oak, big oak, birch and spruce trees, plus tall grass, ferns, flowers, cactus, dead bushes, sugar cane and pumpkins. These are placed in a separate decoration pass so they can cross chunk borders.
+**Graphics (shader-pack style renderer)**
+- HDR rendering with ACES filmic tonemapping, bloom, vignette and automatic eye adaptation (caves and nights adapt, stepping into daylight is briefly bright)
+- Real-time sun/moon shadows (stabilised 2048² shadow map with soft PCF filtering) plus Minecraft-style smooth lighting and ambient occlusion
+- Atmospheric sky: blue zenith-to-horizon gradient, sunrise/sunset glow, round sun with halo, cratered moon, twinkling stars and soft drifting procedural clouds; distance fog uses the sky colour
+- Reflective water with procedural waves, Fresnel reflections of the sky, sun glints and depth-based colour absorption (shallow water is clear, deep water turns blue)
+- Swaying leaves and grass, glowing lava and torches, warm torch light, underwater fog and distortion
+- Rain and snow with overcast skies and rain ambience; damage flash, view bobbing, FOV changes when sprinting, flying or drawing a bow
 
-**Rendering**
-- Chunk meshes built on worker threads, with face culling, frustum culling and front-to-back sorting.
-- Sky light and block light flood-filled over each chunk's 3×3 neighbourhood, with Minecraft-style smooth lighting and ambient occlusion.
-- Day/night cycle: square sun and moon, stars, sunrise and sunset glow, distance fog, and "fancy" 3D clouds.
-- Translucent water and ice, cutout leaves, glass and plants, and lava and torches that emit light.
-- View bobbing, sprint and fly FOV changes, held-block rendering with a swing animation, block-breaking cracks and break particles, and an underwater fog and tint.
+**Survival gameplay**
+- Items and a 36-slot inventory, drops, and dropped items you can pick up (Q to drop)
+- Crafting (2×2 in the inventory, 3×3 on a crafting table) with 60+ recipes: planks, sticks, tools, torches, furnace, chest, bread, bow, arrows, bucket, TNT, bricks and more
+- Furnace smelting with fuel (ores, sand→glass, food, logs→charcoal…) and chests; both keep their contents in the save
+- Tools with wood/stone/iron/gold/diamond tiers: Minecraft's mining-speed formula, harvest levels (for example, diamond ore needs an iron pickaxe) and durability
+- Health, hunger, saturation and exhaustion, natural regeneration, fall damage, drowning (air bubbles), lava, fire and cactus damage, death screen and respawn
+- Combat: melee with critical hits and knockback, bows with charge-up and arrows you can pick back up
+- Eating, buckets (water/lava), farming (hoe → farmland → seeds → wheat, which grows over time), saplings that grow into trees, bone meal, flint & steel with TNT
 
-**Gameplay**
-- Player physics at 20 ticks per second using Minecraft's constants: 0.42 jump velocity, 0.08 gravity, 0.98 drag, 0.546 ground friction, sprinting and sneaking (you can't walk off edges while sneaking), 0.6-block step-up and swimming.
-- **Survival mode** (breaking takes time based on block hardness) and **Creative mode** (instant breaking, double-tap Space to fly).
-- Simple block updates: unsupported plants and torches pop off, sand and gravel fall, and water flows into gaps.
-- A creative block inventory, 9-slot hotbar, pick-block, a chat with commands, an F3 debug screen, a pause menu with options, screenshots and fullscreen.
-- Worlds are saved automatically: compressed chunk files plus `level.json`.
+**Mobs**
+- Pigs, cows, sheep (in colours) and chickens (which lay eggs) spawn on grass. They wander, panic when hit and drop meat, leather, wool and feathers.
+- Zombies, skeletons, creepers and spiders spawn in the dark:
+  - Zombies chase you and hit you.
+  - Skeletons keep their distance and shoot arrows.
+  - Creepers hiss, swell and explode, breaking blocks.
+  - Spiders climb walls and leap at you, and are neutral in daylight.
+  - Zombies and skeletons burn in sunlight.
+- Cuboid models with procedurally painted skins, walk animations, head tracking, hurt flashes and death animations.
+
+**World**
+- Infinite terrain from continentalness/erosion/peaks noise with 3D overhangs, rivers, 13 biomes, caves, ores and trees
+- Flowing water and lava with levels (water spreads 7 blocks, lava 3, both seek the nearest drop), infinite water sources, and lava + water → obsidian/cobblestone
+- Falling sand and gravel, TNT and creeper explosions that chain-react
+- Random ticks: grass spreads, crops grow, saplings grow into trees, leaves decay, sugar cane and cactus grow
+- Weather cycle with rain and snow
 
 ## Build & run
 
@@ -67,11 +81,12 @@ Command-line options:
 | Left Shift | sneak / descend while flying |
 | Left Ctrl or double-tap W | sprint |
 | Mouse | look |
-| Left click (hold) | break block |
-| Right click | place block |
+| Left click (hold) | break block / attack |
+| Right click | place block, use item (eat, draw bow, bucket, hoe, seeds…), open crafting table / furnace / chest |
 | Middle click | pick block |
 | 1–9 / mouse wheel | select hotbar slot |
-| E | block inventory |
+| Q / Ctrl+Q | drop one item / the whole stack |
+| E | inventory (creative: all items) |
 | T or / | chat / commands |
 | Esc | pause menu (settings, Save and Quit) |
 | F1 | hide HUD |
@@ -85,7 +100,9 @@ Command-line options:
 ```
 /time set <day|noon|sunset|night|midnight|sunrise|ticks>   /time add <ticks>
 /gamemode <creative|survival>     /tp <x> <y> <z>   (~ relative coordinates work)
-/give <block_name>                /setblock <x> <y> <z> <block>
+/give <item_name> [count]         /setblock <x> <y> <z> <block>
+/summon <pig|cow|sheep|chicken|zombie|skeleton|creeper|spider> [x y z]
+/kill [@e]   /weather <clear|rain>   /heal   /clear   /spawnpoint
 /fill <x1> <y1> <z1> <x2> <y2> <z2> <block>
 /fly   /seed   /rd <chunks>   /help
 ```
@@ -94,12 +111,29 @@ Command-line options:
 
 ```
 mc/Main.java                 entry point, arguments, macOS relaunch
-mc/client/                   Game loop, Window (GLFW), Input, Sound (OpenAL), Options (Gson)
-mc/entity/Player.java        movement physics and collision
-mc/world/                    Block registry, Chunk, World (chunk streaming + worker pool), WorldStorage
+mc/client/                   Game loop, Interaction (mining/combat/items), Screens (containers, menus), Hud,
+                             Commands, Weather, Window (GLFW), Input, Sound (OpenAL), Options (Gson)
+mc/entity/                   Entity physics, LivingEntity (health/damage), Player (hunger), Mob AI, items, arrows, TNT
+mc/item/                     Item registry, ItemStack, Inventory, Recipes (crafting + smelting)
+mc/world/                    Block registry, Chunk, World (streaming, ticks, explosions), Liquids, Drops,
+                             BlockEntity (furnace/chest), MobSpawner, WorldStorage
 mc/world/gen/                Noise, TerrainGenerator, Decorator (trees/plants), Biome
-mc/render/                   ChunkMesher (lighting + meshing), WorldRenderer, TextureGen, GUI, Font, Particles
-src/main/resources/shaders/  GLSL 330 shaders (chunk, sky, basic)
+mc/render/                   ChunkMesher, WorldRenderer (shadows/sky/water), PostProcess (HDR/bloom), MobModel,
+                             EntityRenderer, ItemRenderer, TextureGen/ItemTextureGen, Gui, Font, Particles
+src/main/resources/shaders/  GLSL 330 shaders (chunk lighting & water, shadow, sky, post-processing)
 ```
 
-Run the tests with `mvn test`. They check the player physics against Minecraft's values, plus collisions, sneaking, swimming and raycasting.
+Run the tests with `mvn test`. They check:
+- player physics against Minecraft's values, plus collisions, sneaking, swimming and raycasting
+- crafting and smelting
+- water flow, draining, infinite sources and lava + water
+- harvest rules, falling sand, explosions, zombie AI, mob loot, hunger and fall damage
+
+## Not implemented
+
+The real game is far larger than this project. Missing so far:
+- the Nether and the End, redstone, villages and structures
+- enchanting, brewing, armour, beds, doors and slabs
+- multiplayer
+
+Mobs and dropped items are not saved; mobs respawn naturally.

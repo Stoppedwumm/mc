@@ -36,9 +36,9 @@ public final class Weather {
     private void makeTextures() {
         int[] rain = new int[16 * 64], snow = new int[16 * 64];
         Random r = new Random(3);
-        for (int i = 0; i < 26; i++) {
-            int x = r.nextInt(16), y = r.nextInt(64), len = 3 + r.nextInt(6);
-            for (int k = 0; k < len; k++) rain[((y + k) & 63) * 16 + x] = 0xB0C8D8F0;
+        for (int i = 0; i < 14; i++) {
+            int x = r.nextInt(16), y = r.nextInt(64), len = 5 + r.nextInt(8);
+            for (int k = 0; k < len; k++) rain[((y + k) & 63) * 16 + x] = (int) (0x70 * (0.4 + 0.6 * k / (double) len)) << 24 | 0xC0D0E8;
         }
         for (int i = 0; i < 30; i++) {
             int x = r.nextInt(15), y = r.nextInt(63);
@@ -70,7 +70,7 @@ public final class Weather {
         for (int pass = 0; pass < 2; pass++) {
             boolean snowPass = pass == 1;
             wr.setupBasic(wr.projView, true, 0, 0.02f);
-            wr.basicShader.set("uLight", Math.max(0.15f, wr.daylight) * 1.3f);
+            wr.basicShader.set("uLight", Math.max(0.05f, wr.daylight) * 0.9f);
             glActiveTexture(GL_TEXTURE0);
             (snowPass ? snowTex : rainTex).bind();
             glEnable(GL_BLEND);
@@ -97,7 +97,7 @@ public final class Weather {
                     // Plane through the column centre, facing the camera
                     float nx = (float) (-dz / Math.max(dist, 0.01)) * 0.5f, nz = (float) (dx / Math.max(dist, 0.01)) * 0.5f;
                     float px = (float) dx, pz = (float) dz;
-                    int a = (int) (Math.min(1, (1 - dist / radius) * 1.5) * lvl * 255);
+                    int a = (int) (Math.min(1, (1 - dist / radius) * 1.5) * lvl * (snow ? 255 : 170));
                     int col = a << 24 | 0xFFFFFF;
                     float ya = (float) (y0 - wr.camY), yb = (float) (y1 - wr.camY);
                     wr.batch.quad(px - nx, yb, pz - nz, sway, -v1, px - nx, ya, pz - nz, sway, -v0,

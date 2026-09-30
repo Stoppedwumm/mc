@@ -62,11 +62,11 @@ public final class Liquids {
                 int below = w.getBlock(x, y - 1, z);
                 boolean solidBelow = Block.get(below).solid || (below == id && isSource(w.getMeta(x, y - 1, z)));
                 if (!lava && sources >= 2 && solidBelow) best = 0;
+                if (best > 7) {
+                    w.setBlock(x, y, z, 0);
+                    return;
+                }
                 newMeta = best;
-            }
-            if (newMeta != 8 && newMeta > 7) {
-                w.setBlock(x, y, z, 0);
-                return;
             }
             if (newMeta != meta) {
                 w.setBlock(x, y, z, id, newMeta, true);
