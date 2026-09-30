@@ -11,6 +11,7 @@ public final class Input {
     public double mouseX, mouseY, dx, dy, scroll;
     private double lastX, lastY;
     private boolean first = true;
+    private final int[] winW = new int[1], winH = new int[1], fbW = new int[1], fbH = new int[1];
     public boolean resized, focusLost, focusGained;
     public final StringBuilder typed = new StringBuilder();
 
@@ -30,7 +31,12 @@ public final class Input {
             dx += x - lastX;
             dy += y - lastY;
             lastX = x; lastY = y;
-            mouseX = x; mouseY = y;
+            // The cursor is reported in window points, but the GUI is laid out in framebuffer pixels; on HiDPI
+            // screens (Retina) these differ, so convert to pixels
+            glfwGetWindowSize(win, winW, winH);
+            glfwGetFramebufferSize(win, fbW, fbH);
+            mouseX = winW[0] > 0 ? x * fbW[0] / winW[0] : x;
+            mouseY = winH[0] > 0 ? y * fbH[0] / winH[0] : y;
         });
         glfwSetScrollCallback(w.handle, (win, x, y) -> scroll += y);
         glfwSetFramebufferSizeCallback(w.handle, (win, x, y) -> resized = true);
