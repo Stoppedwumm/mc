@@ -78,6 +78,15 @@ public final class Gui {
         text(s, cx - font.width(s) / 2f, y, argb);
     }
 
+    public void centered(String s, float cx, float y, int argb, boolean shadow) {
+        shader(ortho, true, 0.02f);
+        glActiveTexture(GL_TEXTURE0);
+        font.bind();
+        batch.begin(GL_TRIANGLES);
+        font.draw(batch, s, cx - font.width(s) / 2f, y, 1, argb, shadow);
+        batch.end();
+    }
+
     public int textWidth(String s) { return font.width(s); }
 
     /** Draws the crosshair with an inverting blend, like Minecraft. */
@@ -123,6 +132,20 @@ public final class Gui {
     }
 
     public ItemRenderer items;
+
+    /** Draws a 3D model (e.g. the player preview) in GUI space with depth testing; emit fills the batch. */
+    public void model(Texture tex, Matrix4f model, java.util.function.Consumer<Batch> emit) {
+        glActiveTexture(GL_TEXTURE0);
+        tex.bind();
+        shader(new Matrix4f(ortho).mul(model), true, 0.1f);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
+        batch.begin(GL_TRIANGLES);
+        emit.accept(batch);
+        batch.end();
+        glDisable(GL_DEPTH_TEST);
+    }
 
     /** Draws a HUD icon from the item atlas (hearts, food...) at size w x h. */
     public void hudIcon(int tile, float x, float y, float w, float h) {

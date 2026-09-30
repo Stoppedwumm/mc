@@ -48,7 +48,24 @@ final class Hud {
         for (int i = 0; i < 9; i++) gui.stack(p.inventory.slots[i], x + 3 + i * 20, y + 3);
 
         if (!p.creative) {
-            float top = y - 10;
+            // Experience bar and level
+            gui.fill(x, y - 7, w, 5, 0xFF101010);
+            gui.fill(x + 1, y - 6, (w - 2) * Math.min(1, p.xpProgress), 3, 0xFF80FF20);
+            if (p.xpLevel > 0) {
+                String lv = String.valueOf(p.xpLevel);
+                float lx = gui.width / 2f;
+                for (int[] o : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) gui.centered(lv, lx + o[0], y - 17 + o[1], 0xFF000000, false);
+                gui.centered(lv, lx, y - 17, 0xFF80FF20, false);
+            }
+            float top = y - 17;
+            // Armor
+            int armor = p.armorValue();
+            if (armor > 0) {
+                for (int i = 0; i < 10; i++) {
+                    int v = armor - i * 2;
+                    gui.hudIcon(v >= 2 ? ItemTextureGen.ARMOR : v >= 1 ? ItemTextureGen.ARMOR_HALF : ItemTextureGen.ARMOR_EMPTY, x + i * 8, top - 10, 9, 9);
+                }
+            }
             // Hearts
             if (p.health < lastHealth) healthFlashUntil = g.ticks + 10;
             lastHealth = p.health;
@@ -81,7 +98,7 @@ final class Hud {
         long age = g.ticks - nameShownAt;
         if (!ItemStack.isEmpty(held) && age < 50) {
             int a = (int) (Math.min(1, (50 - age) / 10f) * 255);
-            gui.centered(held.item.name, gui.width / 2, y - (p.creative ? 12 : 34), a << 24 | 0xFFFFFF);
+            gui.centered(held.item.name, gui.width / 2, y - (p.creative ? 12 : p.armorValue() > 0 ? 50 : 40), a << 24 | 0xFFFFFF);
         }
         if (g.showDebug) renderDebug(gui);
         renderChat(gui);

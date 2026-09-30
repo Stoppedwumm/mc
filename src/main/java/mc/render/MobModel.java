@@ -21,6 +21,8 @@ public final class MobModel {
         final float x0, y0, z0, w, h, d;
         final Painter painter;
         int u, v;
+        /** Armor slot this box belongs to (armor models only), -1 otherwise. */
+        int slot = -1;
 
         Box(float x0, float y0, float z0, float w, float h, float d, Painter painter) {
             this.x0 = x0; this.y0 = y0; this.z0 = z0; this.w = w; this.h = h; this.d = d;
@@ -40,6 +42,13 @@ public final class MobModel {
 
         Part box(float x0, float y0, float z0, float w, float h, float d, Painter p) {
             boxes.add(new Box(x0, y0, z0, w, h, d, p));
+            return this;
+        }
+
+        Part armorBox(int slot, float x0, float y0, float z0, float w, float h, float d, Painter p) {
+            Box b = new Box(x0, y0, z0, w, h, d, p);
+            b.slot = slot;
+            boxes.add(b);
             return this;
         }
     }
@@ -98,11 +107,31 @@ public final class MobModel {
 
     /** Appends the model's triangles to the batch with the given transform (model units = pixels). */
     public void render(Batch batch, Matrix4f base, int tint) {
+        render(batch, base, tint, -1);
+    }
+
+    /** Transform of a part (its pivot and rotation) under the model transform. */
+    public Matrix4f partMatrix(Matrix4f base, String name) {
+        Part p = get(name);
+        return new Matrix4f(base).translate(p.px, p.py, p.pz).rotateY(p.ry).rotateX(p.rx).rotateZ(p.rz);
+    }
+
+    /** Copies part rotations from another model with the same part names (armor follows the body). */
+    public void copyPose(MobModel from) {
+        for (Part p : parts) {
+            Part o = from.get(p.name);
+            if (o != null) { p.rx = o.rx; p.ry = o.ry; p.rz = o.rz; }
+        }
+    }
+
+    /** Renders only armor boxes whose slot bit is set in slotMask (-1 renders everything). */
+    public void render(Batch batch, Matrix4f base, int tint, int slotMask) {
         Matrix4f m = new Matrix4f();
         float iw = 1f / texW, ih = 1f / texH;
         for (Part p : parts) {
             m.set(base).translate(p.px, p.py, p.pz).rotateY(p.ry).rotateX(p.rx).rotateZ(p.rz);
             for (Box b : p.boxes) {
+                if (slotMask != -1 && (b.slot < 0 || (slotMask & (1 << b.slot)) == 0)) continue;
                 float x0 = b.x0, y0 = b.y0, z0 = b.z0, x1 = b.x0 + b.w, y1 = b.y0 + b.h, z1 = b.z0 + b.d;
                 Vector3f[] c = tmp;
                 m.transformPosition(c[0].set(x0, y0, z0)); m.transformPosition(c[1].set(x1, y0, z0));
@@ -254,6 +283,58 @@ public final class MobModel {
         }
         m.bake(type.ordinal() * 1337L);
         return m;
+    }
+
+    /** Steve-like player model: biped with skin, hair, shirt and trousers. */
+    public static MobModel createPlayer() {
+        MobModel m = new MobModel();
+        int skin = 0xc8906a, hair = 0x3a2616, shirt = 0x2aa8b8, pants = 0x3040a0, shoes = 0x4a4a4a;
+        Painter head = (f, x, y, w, h, r) -> {
+            if (f == TOP) return noise(hair, r, 0.1);
+            if (f == BOTTOM) return noise(skin, r, 0.06);
+            if (y < 2 || (f != FRONT && y < 4) || (f == BACK)) return noise(hair, r, 0.12);
+            if (f == FRONT) {
+                if (y == 4 && (x == 1 || x == 6)) return 0xFFffffff;
+                if (y == 4 && (x == 2 || x == 5)) return 0xFF4a3aa0;
+                if (y == 6 && x >= 3 && x <= 4) return 0xFF8a5a40;
+                if (y == 7 && x >= 2 && x <= 5) return 0xFF6a3a2a;
+            }
+            return noise(skin, r, 0.06);
+        };
+        Painter body = (f, x, y, w, h, r) -> noise(y < 10 ? shirt : pants, r, 0.08);
+        Painter arm = (f, x, y, w, h, r) -> noise(y < 4 ? shirt : skin, r, 0.07);
+        Painter leg = (f, x, y, w, h, r) -> noise(y < 10 ? pants : shoes, r, 0.08);
+        biped(m, 4, head, body, arm, leg);
+        m.bake(4242);
+        return m;
+    }
+
+    /**
+     * Armor overlay for biped models: helmet, chestplate (body + arms), leggings (waist + legs) and boots, slightly
+     * larger than the body parts they cover.
+     */
+    public static MobModel createArmor(int material, int color) {
+        MobModel m = new MobModel();
+        boolean chain = material == 1;
+        Painter p = (f, x, y, w, h, r) -> {
+            if (chain && (x + y) % 2 == 0 && y > 0 && y < h - 1) return 0;
+            int c = noise(color, r, 0.1);
+            if (y == 0 || x == 0 || x == w - 1 || y == h - 1) c = noise(scaleRgb(color, 0.7), r, 0.05);
+            return c;
+        };
+        Painter helmet = (f, x, y, w, h, r) -> f == FRONT && y >= 3 && y <= 8 && x >= 2 && x <= 7 ? 0 : p.color(f, x, y, w, h, r);
+        m.part("head", 0, 24, 0).armorBox(0, -5, -1, -5, 10, 10, 10, helmet);
+        m.part("body", 0, 12, 0).armorBox(1, -5, -1, -3, 10, 14, 6, p).armorBox(2, -4.5f, -0.5f, -2.5f, 9, 6, 5, p);
+        m.part("armL", -6, 22, 0).armorBox(1, -3, -8, -3, 6, 10, 6, p);
+        m.part("armR", 6, 22, 0).armorBox(1, -3, -8, -3, 6, 10, 6, p);
+        m.part("legL", -2, 12, 0).armorBox(2, -2.5f, -9, -2.5f, 5, 9.5f, 5, p).armorBox(3, -3, -13, -3, 6, 6, 6, p);
+        m.part("legR", 2, 12, 0).armorBox(2, -2.5f, -9, -2.5f, 5, 9.5f, 5, p).armorBox(3, -3, -13, -3, 6, 6, 6, p);
+        m.bake(9000 + material);
+        return m;
+    }
+
+    private static int scaleRgb(int c, double f) {
+        return (int) ((c >> 16 & 255) * f) << 16 | (int) ((c >> 8 & 255) * f) << 8 | (int) ((c & 255) * f);
     }
 
     private static void legs4(MobModel m, float xo, float legTop, float zo, float size, float length, Painter p) {

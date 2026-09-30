@@ -74,19 +74,46 @@ public final class WorldRenderer {
         fogEnd = renderDistance * 16f;
     }
 
-    public void setupCamera(Player p, float pt, float fov, int width, int height, int renderDistance, boolean bobbing) {
+    /** Camera orientation (degrees) for billboards; differs from the player's in front third-person view. */
+    public float camYaw, camPitch;
+
+    /**
+     * perspective: 0 first person, 1 third person behind, 2 third person in front (looking back at the player).
+     * Third-person cameras back off along the view ray until they would hit a block.
+     */
+    public void setupCamera(Player p, float pt, float fov, int width, int height, int renderDistance, boolean bobbing,
+                            int perspective, mc.world.World world) {
         this.width = width;
         this.height = height;
         camX = p.interpX(pt);
         camY = p.interpY(pt) + p.prevEyeHeight + (p.eyeHeight - p.prevEyeHeight) * pt;
         camZ = p.interpZ(pt);
+        float yaw = p.yaw, pitch = p.pitch;
+        if (perspective == 2) { yaw += 180; pitch = -pitch; }
+        camYaw = yaw;
+        camPitch = pitch;
+        if (perspective != 0) {
+            double ry = Math.toRadians(yaw), rp = Math.toRadians(pitch);
+            double dx = Math.sin(ry) * Math.cos(rp), dy = Math.sin(rp), dz = -Math.cos(ry) * Math.cos(rp);
+            double dist = 4;
+            // Test a few rays around the camera so the near plane doesn't clip into walls
+            for (int i = 0; i < 8; i++) {
+                double ox = ((i & 1) * 2 - 1) * 0.1, oy = ((i >> 1 & 1) * 2 - 1) * 0.1, oz = ((i >> 2 & 1) * 2 - 1) * 0.1;
+                mc.util.RayCast.Hit h = mc.util.RayCast.cast(world, camX + ox, camY + oy, camZ + oz, dx, dy, dz, dist);
+                if (h != null && Block.get(world.getBlock(h.x, h.y, h.z)).solid) dist = Math.min(dist, h.distance);
+            }
+            camX += dx * dist;
+            camY += dy * dist;
+            camZ += dz * dist;
+            bobbing = false;
+        }
         far = Math.max(256f, renderDistance * 16f * 2f);
         projection.setPerspective((float) Math.toRadians(fov), (float) width / height, near, far);
         view.identity();
         float tilt = p.prevTilt + (p.tilt - p.prevTilt) * pt;
-        view.rotateX((float) Math.toRadians(tilt));
+        if (perspective == 0) view.rotateX((float) Math.toRadians(tilt));
         float hurt = p.hurtTime > 0 ? (p.hurtTime - pt) / 10f : 0;
-        if (hurt > 0) view.rotateZ((float) Math.toRadians(Math.sin(hurt * hurt * hurt * hurt * Math.PI) * 14));
+        if (hurt > 0 && perspective == 0) view.rotateZ((float) Math.toRadians(Math.sin(hurt * hurt * hurt * hurt * Math.PI) * 14));
         if (bobbing) {
             float wd = p.walkDist - p.prevWalkDist;
             float walk = -(p.walkDist + wd * pt);
@@ -95,8 +122,8 @@ public final class WorldRenderer {
             view.rotateZ((float) Math.toRadians(Math.sin(walk * Math.PI) * bob * 3));
             view.rotateX((float) Math.toRadians(Math.abs(Math.cos(walk * Math.PI - 0.2) * bob) * 5));
         }
-        view.rotateX((float) Math.toRadians(p.pitch));
-        view.rotateY((float) Math.toRadians(p.yaw + 180));
+        view.rotateX((float) Math.toRadians(pitch));
+        view.rotateY((float) Math.toRadians(yaw + 180));
         projection.mul(view, projView);
         frustum.set(projView);
     }
@@ -321,7 +348,7 @@ public final class WorldRenderer {
         atlas.bind();
         glDisable(GL_CULL_FACE);
         batch.begin(GL_TRIANGLES);
-        particles.render(batch, camX, camY, camZ, p.yaw, p.pitch, pt, false);
+        particles.render(batch, camX, camY, camZ, camYaw, camPitch, pt, false);
         batch.end();
         white.bind();
         basicShader.set("uAlphaCut", 0.01f);
@@ -330,7 +357,7 @@ public final class WorldRenderer {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glDepthMask(false);
         batch.begin(GL_TRIANGLES);
-        particles.render(batch, camX, camY, camZ, p.yaw, p.pitch, pt, true);
+        particles.render(batch, camX, camY, camZ, camYaw, camPitch, pt, true);
         batch.end();
         glDepthMask(true);
         glDisable(GL_BLEND);

@@ -27,6 +27,12 @@ public final class Item {
     public float saturation;
     public int fuelTicks;
     public boolean handheld;
+    /** Armor: slot 0 helmet, 1 chestplate, 2 leggings, 3 boots (-1 = not armor). */
+    public int armorSlot = -1;
+    public int armorPoints;
+    public float toughness;
+    /** Armor material index (see ARMOR_MATERIALS) for rendering. */
+    public int armorMaterial = -1;
 
     private Item(int id, String name, Block block, int icon) {
         this.id = id;
@@ -147,6 +153,30 @@ public final class Item {
     public static final Item IRON_HOE = tool(322, "Iron Hoe", 62, Tool.HOE, 2, 250, 1, 1);
     public static final Item GOLDEN_HOE = tool(323, "Golden Hoe", 63, Tool.HOE, 0, 32, 1, 1);
     public static final Item DIAMOND_HOE = tool(324, "Diamond Hoe", 64, Tool.HOE, 3, 1561, 1, 1);
+
+    // Armor: id = 330 + material * 4 + slot, icon = 65 + material * 4 + slot
+    public static final String[] ARMOR_MATERIALS = {"Leather", "Chainmail", "Iron", "Golden", "Diamond"};
+    private static final int[][] ARMOR_POINTS = {{1, 3, 2, 1}, {2, 5, 4, 1}, {2, 6, 5, 2}, {2, 5, 3, 1}, {3, 8, 6, 3}};
+    private static final int[] ARMOR_DURABILITY = {5, 15, 15, 7, 33}, SLOT_DURABILITY = {11, 16, 15, 13};
+    private static final String[] ARMOR_PIECES = {"Helmet", "Chestplate", "Leggings", "Boots"};
+
+    static {
+        for (int m = 0; m < 5; m++)
+            for (int s = 0; s < 4; s++) {
+                String name = ARMOR_MATERIALS[m] + " " + (m == 0 && s == 0 ? "Cap" : m == 0 && s == 1 ? "Tunic" : m == 0 && s == 2 ? "Pants" : ARMOR_PIECES[s]);
+                Item i = new Item(330 + m * 4 + s, name, null, 65 + m * 4 + s);
+                i.maxStack = 1;
+                i.armorSlot = s;
+                i.armorMaterial = m;
+                i.armorPoints = ARMOR_POINTS[m][s];
+                i.toughness = m == 4 ? 2 : 0;
+                i.maxDamage = ARMOR_DURABILITY[m] * SLOT_DURABILITY[s];
+            }
+    }
+
+    public static Item armor(int material, int slot) { return BY_ID[330 + material * 4 + slot]; }
+
+    public boolean isArmor() { return armorSlot >= 0; }
 
     static {
         for (int i = 300; i <= 324; i++) if (BY_ID[i].tier == 0 && !BY_ID[i].name.startsWith("Golden")) BY_ID[i].fuelTicks = 200;

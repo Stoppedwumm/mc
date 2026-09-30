@@ -61,6 +61,9 @@ public final class Options {
         public int selected;
         /** Inventory as [id, count, damage] triples (null entries for empty slots). */
         public int[][] inventory;
+        public int[][] armor;
+        public int xpLevel, xpTotal;
+        public float xpProgress;
         public float health = 20;
         public int food = 20;
         public float saturation = 5;

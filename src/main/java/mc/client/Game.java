@@ -36,7 +36,7 @@ public final class Game implements World.Listener {
     PostProcess post;
     private Gui gui;
     private ItemRenderer itemRenderer;
-    private final EntityRenderer entityRenderer = new EntityRenderer();
+    final EntityRenderer entityRenderer = new EntityRenderer();
     final Weather weather = new Weather();
     final Particles particles = new Particles();
     World world;
@@ -161,6 +161,15 @@ public final class Game implements World.Listener {
             } else if (level.hotbar != null) {
                 for (int i = 0; i < 9 && i < level.hotbar.length; i++) if (Item.get(level.hotbar[i]) != null) player.inventory.slots[i] = new ItemStack(Item.get(level.hotbar[i]), 64);
             }
+            if (level.armor != null) {
+                for (int i = 0; i < Math.min(4, level.armor.length); i++) {
+                    int[] e = level.armor[i];
+                    if (e != null && Item.get(e[0]) != null) player.inventory.armor[i] = new ItemStack(Item.get(e[0]), e[1], e[2]);
+                }
+            }
+            player.xpLevel = level.xpLevel;
+            player.xpProgress = level.xpProgress;
+            player.xpTotal = level.xpTotal;
             player.inventory.selected = Math.max(0, Math.min(8, level.selected));
             if (level.blockEntities != null) loadBlockEntities(level.blockEntities);
         } else {
@@ -222,6 +231,10 @@ public final class Game implements World.Listener {
         level.flying = player.flying;
         level.creative = player.creative;
         level.inventory = saveSlots(player.inventory.slots);
+        level.armor = saveSlots(player.inventory.armor);
+        level.xpLevel = player.xpLevel;
+        level.xpProgress = player.xpProgress;
+        level.xpTotal = player.xpTotal;
         level.hotbar = null;
         level.selected = player.inventory.selected;
         level.health = player.isDead() ? player.maxHealth : player.health;
@@ -344,6 +357,8 @@ public final class Game implements World.Listener {
 
     /** Ticks spent in bed (0 = awake). After 100 ticks the night is skipped. */
     int sleepTicks;
+    /** Camera: 0 first person, 1 third person behind, 2 third person in front. */
+    int perspective;
     private double bedX, bedY, bedZ;
 
     void sleep(int x, int y, int z) {
@@ -405,6 +420,15 @@ public final class Game implements World.Listener {
                 world.addEntity(e);
                 player.inventory.slots[i] = null;
             }
+            for (int i = 0; i < 4; i++) {
+                ItemStack s = player.inventory.armor[i];
+                if (s != null) world.spawnItem(player.x, player.y + 1, player.z, s);
+                player.inventory.armor[i] = null;
+            }
+            XpOrbEntity.spawn(world, player.x, player.y + 0.5, player.z, Math.min(100, player.xpLevel * 7));
+            player.xpLevel = 0;
+            player.xpProgress = 0;
+            player.xpTotal = 0;
         }
         hud.chat("Player " + (player.deathCause == null ? "died" : player.deathCause.message));
         setScreen(Screen.DEATH);
@@ -420,6 +444,12 @@ public final class Game implements World.Listener {
                 ItemStack left = player.inventory.add(it.stack);
                 if (left.count < before) sound.play("pop", e.x, e.y, e.z, 0.2f, (random.nextFloat() - random.nextFloat()) * 1.4f * 0.7f + 2f);
                 if (left.count <= 0) it.remove();
+            } else if (e instanceof XpOrbEntity orb && orb.pickupDelay == 0 && box.intersects(e.box())) {
+                orb.remove();
+                int before = player.xpLevel;
+                player.addXp(orb.value);
+                if (player.xpLevel > before && player.xpLevel % 5 == 0) sound.play("levelup", player.x, player.y, player.z, 0.75f, 1);
+                else sound.play("orb", player.x, player.y, player.z, 0.1f, 0.5f + random.nextFloat() * 0.9f);
             } else if (e instanceof ArrowEntity a && a.tryPickup(player)) {
                 sound.play("pop", e.x, e.y, e.z, 0.2f, 1.6f);
             }
@@ -551,7 +581,7 @@ public final class Game implements World.Listener {
         renderer.clouds = options.clouds;
         float rain = weather.rain(pt);
         renderer.updateEnvironment(world, pt, underwater, inLava, options.renderDistance, rain);
-        renderer.setupCamera(player, pt, fovNow, window.width, window.height, options.renderDistance, options.viewBobbing);
+        renderer.setupCamera(player, pt, fovNow, window.width, window.height, options.renderDistance, options.viewBobbing, perspective, world);
         sound.listener(renderer.camX, renderer.camY, renderer.camZ, player.yaw, player.pitch);
         int ex = (int) Math.floor(renderer.camX), ey = (int) Math.floor(renderer.camY), ez = (int) Math.floor(renderer.camZ);
         float skyAtEye = world.getSkyLight(ex, ey, ez) / 15f, blkAtEye = world.getBlockLight(ex, ey, ez) / 15f;
@@ -572,13 +602,19 @@ public final class Game implements World.Listener {
         renderer.renderSky();
         renderer.renderOpaque(world);
         entityRenderer.render(world, renderer, pt, this::lightValue);
+        if (perspective != 0 && sleepTicks == 0) {
+            float sw = interaction.prevSwing + (interaction.swing - interaction.prevSwing) * pt;
+            ItemStack heldStack = player.inventory.held();
+            entityRenderer.renderPlayer(player, renderer, pt, lightValue(player.x, player.y + 1, player.z), sw,
+                    ItemStack.isEmpty(heldStack) ? null : heldStack.item);
+        }
         renderer.renderParticles(particles, player, pt);
         weather.render(renderer, world, pt);
         if (!hideGui) renderer.renderSelection(world, interaction.hit, interaction.breakProgress);
         post.copyDepth();
         renderer.renderTranslucent(post.depthCopy.depth);
 
-        if (!hideGui && !player.isDead()) {
+        if (!hideGui && !player.isDead() && perspective == 0) {
             float sw = interaction.prevSwing + (interaction.swing - interaction.prevSwing) * pt;
             float eq = interaction.prevEquip + (interaction.equip - interaction.prevEquip) * pt;
             float br = lightValue(renderer.camX, renderer.camY, renderer.camZ);
@@ -684,6 +720,7 @@ public final class Game implements World.Listener {
         if (input.pressed(GLFW_KEY_Q)) interaction.drop(input.down(GLFW_KEY_LEFT_CONTROL));
         if (input.pressed(GLFW_KEY_F3)) showDebug = !showDebug;
         if (input.pressed(GLFW_KEY_F1)) hideGui = !hideGui;
+        if (input.pressed(GLFW_KEY_F5)) perspective = (perspective + 1) % 3;
         if (input.pressed(GLFW_KEY_F4)) setCreative(!player.creative);
         if (input.pressed(GLFW_KEY_SPACE) && player.creative) {
             if (ticks - lastSpaceTap < 7) { player.flying = !player.flying; lastSpaceTap = -100; }

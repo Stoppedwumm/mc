@@ -3,6 +3,8 @@ package mc.item;
 /** Player inventory: slots 0-8 are the hotbar, 9-35 the main inventory. */
 public final class Inventory {
     public final ItemStack[] slots = new ItemStack[36];
+    /** Worn armor: 0 helmet, 1 chestplate, 2 leggings, 3 boots. */
+    public final ItemStack[] armor = new ItemStack[4];
     public int selected;
 
     public ItemStack held() { return slots[selected]; }
@@ -39,9 +41,11 @@ public final class Inventory {
 
     public void cleanup() {
         for (int i = 0; i < slots.length; i++) if (slots[i] != null && slots[i].count <= 0) slots[i] = null;
+        for (int i = 0; i < 4; i++) if (armor[i] != null && armor[i].count <= 0) armor[i] = null;
     }
 
     public void clear() {
         java.util.Arrays.fill(slots, null);
+        java.util.Arrays.fill(armor, null);
     }
 }

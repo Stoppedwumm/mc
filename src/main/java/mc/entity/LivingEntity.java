@@ -1,5 +1,6 @@
 package mc.entity;
 
+import mc.item.ItemStack;
 import mc.world.Block;
 
 /** Entities with health: damage, knockback, drowning, burning, fall damage and movement physics. */
@@ -34,6 +35,7 @@ public abstract class LivingEntity extends Entity {
             invulnerableTime = 20;
             hurtTime = 10;
         }
+        amount = applyArmor(source, amount);
         health -= amount;
         lastHurtAge = age;
         lastAttacker = attacker;
@@ -47,6 +49,35 @@ public abstract class LivingEntity extends Entity {
             onDeath(source);
         }
         return true;
+    }
+
+    /** Worn armor (helmet, chestplate, leggings, boots) or null. */
+    public ItemStack[] armorSlots() { return null; }
+
+    public int armorValue() {
+        ItemStack[] a = armorSlots();
+        int v = 0;
+        if (a != null) for (ItemStack s : a) if (!ItemStack.isEmpty(s)) v += s.item.armorPoints;
+        return v;
+    }
+
+    /** Minecraft's armor formula; worn pieces lose durability. */
+    protected float applyArmor(DamageSource source, float amount) {
+        ItemStack[] a = armorSlots();
+        if (a == null || source.bypassesArmor) return amount;
+        int def = 0;
+        float tough = 0;
+        for (ItemStack s : a) if (!ItemStack.isEmpty(s)) { def += s.item.armorPoints; tough += s.item.toughness; }
+        if (def == 0) return amount;
+        int wear = Math.max(1, (int) (amount / 4));
+        for (int i = 0; i < 4; i++) {
+            if (!ItemStack.isEmpty(a[i]) && a[i].damageTool(wear)) {
+                a[i] = null;
+                if (world != null) world.playSound("hit", x, y + 1, z, 1, 0.5f);
+            }
+        }
+        float reduction = Math.min(20, Math.max(def / 5f, def - amount / (2 + tough / 4))) / 25f;
+        return amount * (1 - reduction);
     }
 
     public void knockback(double strength, double dx, double dz) {

@@ -15,6 +15,14 @@ public final class Mob extends LivingEntity {
     public int sheepColor;
     private int eggTimer;
     public boolean aggressive;
+    public final ItemStack[] armor = new ItemStack[4];
+    public boolean sheared, tamed;
+    /** Negative while a baby (counts up to 0), positive during the breeding cooldown. */
+    public int growingAge;
+
+    public void setGrowingAge(int age) { growingAge = age; }
+
+    public boolean isBaby() { return growingAge < 0; }
 
     public Mob(MobType type) {
         this.type = type;
@@ -23,6 +31,15 @@ public final class Mob extends LivingEntity {
         height = type.height;
         stepHeight = 0.6f;
         eggTimer = 6000 + random.nextInt(6000);
+        if ((type == MobType.ZOMBIE || type == MobType.SKELETON) && random.nextFloat() < 0.1f) {
+            // Like Minecraft: a random material, pieces from the boots upwards
+            float r = random.nextFloat();
+            int mat = r < 0.37f ? 0 : r < 0.86f ? 3 : r < 0.96f ? 1 : r < 0.99f ? 2 : 4;
+            for (int slot = 3; slot >= 0; slot--) {
+                armor[slot] = new ItemStack(Item.armor(mat, slot), 1);
+                if (random.nextFloat() < 0.25f) break;
+            }
+        }
         if (type == MobType.SHEEP) {
             int r = random.nextInt(100);
             sheepColor = r < 82 ? 0 : r < 87 ? 1 : r < 92 ? 2 : r < 97 ? 3 : 4;
@@ -31,6 +48,9 @@ public final class Mob extends LivingEntity {
 
     @Override
     public double eyeY() { return y + height * 0.85; }
+
+    @Override
+    public ItemStack[] armorSlots() { return armor; }
 
     @Override
     protected double gravity() {
@@ -63,6 +83,13 @@ public final class Mob extends LivingEntity {
         world.playSound(type.name().toLowerCase() + "_death", x, y + 1, z, 1, pitch());
         boolean byPlayer = lastAttacker instanceof Player || (lastAttacker instanceof ArrowEntity a && a.shooter instanceof Player);
         dropLoot(fireTicks > 0, byPlayer);
+        if (byPlayer) XpOrbEntity.spawn(world, x, y + 0.5, z, type.hostile ? 5 + armorPieces() * (1 + random.nextInt(3)) : 1 + random.nextInt(3));
+    }
+
+    private int armorPieces() {
+        int n = 0;
+        for (ItemStack s : armor) if (s != null) n++;
+        return n;
     }
 
     private void drop(Item item, int min, int max) {
@@ -82,6 +109,13 @@ public final class Mob extends LivingEntity {
             case SPIDER -> drop(Item.STRING, 0, 2);
         }
         if (type.hostile && byPlayer && random.nextInt(40) == 0) drop(Item.IRON_INGOT, 1, 1);
+        for (ItemStack a : armor) {
+            if (a != null && byPlayer && random.nextFloat() < 0.085f) {
+                ItemStack d = a.copy();
+                d.damage = random.nextInt(Math.max(1, a.item.maxDamage * 3 / 4));
+                world.spawnItem(x, y + 0.5, z, d);
+            }
+        }
     }
 
     private boolean canSee(Entity e) {
@@ -101,7 +135,7 @@ public final class Mob extends LivingEntity {
         if (jumpCooldown > 0) jumpCooldown--;
 
         // Undead burn in daylight
-        if ((type == MobType.ZOMBIE || type == MobType.SKELETON) && world.isDaytime() && !inWater
+        if ((type == MobType.ZOMBIE || type == MobType.SKELETON) && world.isDaytime() && !inWater && armor[0] == null
                 && world.getSkyLight((int) Math.floor(x), (int) Math.floor(eyeY()), (int) Math.floor(z)) >= 15 && random.nextInt(20) == 0) {
             fireTicks = Math.max(fireTicks, 160);
         }

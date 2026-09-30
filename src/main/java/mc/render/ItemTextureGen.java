@@ -9,7 +9,10 @@ import java.util.function.BiPredicate;
  */
 public final class ItemTextureGen {
     public static final int HEART = 96, HEART_HALF = 97, HEART_EMPTY = 98, FOOD = 99, FOOD_HALF = 100, FOOD_EMPTY = 101,
-            BUBBLE = 102, FLAME = 103, PROGRESS = 104, PROGRESS_FULL = 105, BUBBLE_POP = 106, HEART_HURT = 107;
+            BUBBLE = 102, FLAME = 103, PROGRESS = 104, PROGRESS_FULL = 105, BUBBLE_POP = 106, HEART_HURT = 107,
+            ARMOR = 108, ARMOR_HALF = 109, ARMOR_EMPTY = 110, XP_ORB = 111;
+    /** Base colour per armor material (leather, chainmail, iron, gold, diamond). */
+    public static final int[] ARMOR_COLORS = {0xa0653a, 0x8a8a8a, 0xd8d8d8, 0xf8d840, 0x4ae0d8};
     private final int[] px = new int[256 * 256];
     private int tile;
     private Random r;
@@ -66,6 +69,15 @@ public final class ItemTextureGen {
                 final int t = type, m = mat;
                 tile(40 + type * 5 + mat, () -> tool(t, m));
             }
+        for (int m = 0; m < 5; m++)
+            for (int slot = 0; slot < 4; slot++) {
+                final int mm = m, ss = slot;
+                tile(65 + m * 4 + slot, () -> armorPiece(mm, ss));
+            }
+        tile(ARMOR, () -> armorIcon(1));
+        tile(ARMOR_HALF, () -> armorIcon(0.5));
+        tile(ARMOR_EMPTY, () -> armorIcon(0));
+        tile(XP_ORB, this::xpOrb);
         tile(HEART, () -> heart(0xe01818, true, 1));
         tile(HEART_HALF, () -> heart(0xe01818, true, 0.5));
         tile(HEART_EMPTY, () -> heart(0x000000, false, 0));
@@ -330,6 +342,50 @@ public final class ItemTextureGen {
                 boolean shaft = x < 9 && y >= 6 && y <= 9;
                 boolean head = x >= 9 && Math.abs(y - 7.5) <= 14 - x - 0.5;
                 if (shaft || head) set(x, y, color);
+            }
+    }
+
+    private static BiPredicate<Integer, Integer> armorShape(int slot) {
+        return switch (slot) {
+            case 0 -> (x, y) -> x >= 3 && x <= 12 && y >= 4 && y <= 11 && (y <= 6 || x <= 5 || x >= 10);
+            case 1 -> (x, y) -> (y >= 2 && y <= 5 && x >= 1 && x <= 14 && !(y <= 3 && x >= 6 && x <= 9))
+                    || (y >= 2 && y <= 14 && x >= 4 && x <= 11 && !(y <= 3 && x >= 6 && x <= 9));
+            case 2 -> (x, y) -> (y >= 2 && y <= 5 && x >= 3 && x <= 12) || (y >= 6 && y <= 14 && ((x >= 3 && x <= 6) || (x >= 9 && x <= 12)));
+            default -> (x, y) -> y >= 7 && y <= 13 && ((x >= 1 && x <= 5) || (x >= 10 && x <= 14) || (y >= 11 && (x == 0 || x == 15)));
+        };
+    }
+
+    private static int scaleColor(int c, double f) {
+        int r = Math.min(255, (int) ((c >> 16 & 255) * f)), g = Math.min(255, (int) ((c >> 8 & 255) * f)), b = Math.min(255, (int) ((c & 255) * f));
+        return r << 16 | g << 8 | b;
+    }
+
+    private void armorPiece(int material, int slot) {
+        int c = ARMOR_COLORS[material];
+        shape(armorShape(slot), c, scaleColor(c, 0.45), scaleColor(c, 1.3));
+        if (material == 1) {
+            // Chainmail: holes in a checker pattern
+            BiPredicate<Integer, Integer> in = armorShape(slot);
+            for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) if (in.test(x, y) && (x + y) % 2 == 0 && in.test(x - 1, y) && in.test(x + 1, y)) set(x, y, 0x505050);
+        }
+    }
+
+    private void armorIcon(double fraction) {
+        BiPredicate<Integer, Integer> in = armorShape(1);
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                if (!in.test(x, y)) continue;
+                boolean edge = !in.test(x - 1, y) || !in.test(x + 1, y) || !in.test(x, y - 1) || !in.test(x, y + 1);
+                boolean full = x < 16 * fraction;
+                set(x, y, edge ? 0x101010 : full ? ((x < 7 && y < 6) ? 0xffffff : 0xc8c8c8) : 0x303030);
+            }
+    }
+
+    private void xpOrb() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                double d = dist(x, y, 7.5, 7.5);
+                if (d < 6.5) set(x, y, d > 5 ? 0x3a7a10 : d > 3 ? 0x9ae02a : 0xf0ff90);
             }
     }
 }

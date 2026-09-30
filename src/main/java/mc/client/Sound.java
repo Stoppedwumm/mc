@@ -187,6 +187,7 @@ public final class Sound {
         named("bucket", voice(200, 0.35, 0.8, 0, 8, 0.3, 0, 0.3, 42));
         named("door_open", voice(140, 0.45, 0.75, 0.02, 0, 0.4, 12, 0.25, 43), voice(160, 0.4, 0.75, 0.02, 0, 0.5, 14, 0.25, 44));
         named("door_close", voice(110, 0.25, 0.85, 0, 0, -0.3, 0, 0.35, 45));
+        named("armor", voice(700, 0.18, 0.85, 0, 20, -0.2, 0, 0.5, 46));
         named("levelup", chime(new double[]{523, 659, 784, 1046}, 0.9));
         named("orb", chime(new double[]{1320, 1760}, 0.18));
     }

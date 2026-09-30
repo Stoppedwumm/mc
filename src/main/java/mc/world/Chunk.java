@@ -31,6 +31,10 @@ public final class Chunk {
     public int lightHeight;
     /** Highest non-air y + 1 in this chunk. */
     public int maxY;
+    /** Saved entities read by the loader thread, spawned on the main thread. */
+    public volatile String entityJson;
+    /** Whether an entity file exists on disk for this chunk (so an empty save must clear it). */
+    public boolean hasEntityFile;
 
     public Chunk(int cx, int cz) {
         this(cx, cz, new byte[VOLUME]);

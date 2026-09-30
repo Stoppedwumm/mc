@@ -282,7 +282,12 @@ public final class World implements Shapes.Getter {
         }
         if ((ox != x || oy != y || oz != z) && getBlock(ox, oy, oz) == id) setBlock(ox, oy, oz, 0, 0, false);
         setBlock(x, y, z, 0);
-        if (drop) for (ItemStack s : Drops.of(b, meta, tool)) spawnItem(x + 0.5, y + 0.5, z + 0.5, s);
+        if (drop) {
+            List<ItemStack> drops = Drops.of(b, meta, tool);
+            for (ItemStack s : drops) spawnItem(x + 0.5, y + 0.5, z + 0.5, s);
+            int xp = drops.isEmpty() ? 0 : b == Block.COAL_ORE ? random.nextInt(3) : b == Block.DIAMOND_ORE ? 3 + random.nextInt(5) : 0;
+            if (xp > 0) XpOrbEntity.spawn(this, x + 0.5, y + 0.5, z + 0.5, xp);
+        }
     }
 
     public void spawnItem(double x, double y, double z, ItemStack stack) {
@@ -374,14 +379,14 @@ public final class World implements Shapes.Getter {
         pendingEntities.clear();
         for (Iterator<Entity> it = entities.iterator(); it.hasNext(); ) {
             Entity e = it.next();
-            if (!e.removed) {
-                if (!isLoaded((int) Math.floor(e.x), (int) Math.floor(e.z))) { e.remove(); }
-                else if (e instanceof Mob m && m.type.hostile && player != null) {
+            boolean frozen = !isLoaded((int) Math.floor(e.x), (int) Math.floor(e.z));
+            if (!e.removed && !frozen) {
+                if (e instanceof Mob m && m.type.hostile && player != null) {
                     double d = m.distanceSq(player.x, player.y, player.z);
                     if (d > 128 * 128 || (d > 40 * 40 && random.nextInt(800) == 0)) m.remove();
                 }
             }
-            if (!e.removed) e.tick();
+            if (!e.removed && !frozen) e.tick();
             if (e.removed) it.remove();
         }
         entities.addAll(pendingEntities);
@@ -603,6 +608,7 @@ public final class World implements Shapes.Getter {
             int dx = g.cx - pcx, dz = g.cz - pcz;
             if (dx * dx + dz * dz > (unloadR + 1) * (unloadR + 1)) continue;
             chunks.put(g.key(), g);
+            spawnSavedEntities(g);
         }
 
         // 2. Request generation, nearest first
@@ -680,7 +686,47 @@ public final class World implements Shapes.Getter {
         }
     }
 
+    private void spawnSavedEntities(Chunk c) {
+        String json = c.entityJson;
+        if (json == null) return;
+        c.entityJson = null;
+        for (Entity e : EntityCodec.readAll(json)) addEntity(e);
+    }
+
+    /** Groups persistent entities (including ones waiting to be added) by chunk key. */
+    private Long2ObjectOpenHashMap<List<Entity>> entitiesByChunk() {
+        Long2ObjectOpenHashMap<List<Entity>> map = new Long2ObjectOpenHashMap<>();
+        for (List<Entity> list : List.of(entities, pendingEntities))
+            for (Entity e : list) {
+                if (!EntityCodec.persistent(e)) continue;
+                long key = Chunk.key((int) Math.floor(e.x) >> 4, (int) Math.floor(e.z) >> 4);
+                map.computeIfAbsent(key, k -> new ArrayList<>()).add(e);
+            }
+        return map;
+    }
+
+    private void saveEntities(Chunk c, List<Entity> list) {
+        boolean empty = list == null || list.isEmpty();
+        if (empty && !c.hasEntityFile) return;
+        storage.saveEntities(c.cx, c.cz, empty ? "" : EntityCodec.writeAll(list), empty);
+        c.hasEntityFile = !empty;
+    }
+
     private void unload(Chunk c) {
+        // Entities go to disk with their chunk
+        List<Entity> inside = new ArrayList<>();
+        for (List<Entity> list : List.of(entities, pendingEntities))
+            for (Iterator<Entity> it = list.iterator(); it.hasNext(); ) {
+                Entity e = it.next();
+                if (((int) Math.floor(e.x) >> 4) != c.cx || ((int) Math.floor(e.z) >> 4) != c.cz) continue;
+                if (EntityCodec.persistent(e)) inside.add(e);
+                it.remove();
+            }
+        saveEntities(c, inside);
+        if (c.entityJson != null) {
+            // Never spawned: keep the file as it is
+            c.entityJson = null;
+        }
         if (c.touched) storage.save(c);
         if (c.mesh != null) {
             c.mesh.delete();
@@ -730,6 +776,8 @@ public final class World implements Shapes.Getter {
             generator.computeBiomeData(c);
             c.state = data[0];
             c.recomputeMaxY();
+            c.entityJson = storage.loadEntities(cx, cz);
+            c.hasEntityFile = c.entityJson != null;
             return c;
         }
         Chunk c = new Chunk(cx, cz);
@@ -741,7 +789,11 @@ public final class World implements Shapes.Getter {
     public void loadAreaBlocking(int cx, int cz, int radius) {
         for (int dx = -radius - 1; dx <= radius + 1; dx++)
             for (int dz = -radius - 1; dz <= radius + 1; dz++)
-                chunks.computeIfAbsent(Chunk.key(cx + dx, cz + dz), k -> loadOrGenerate((int) (k >> 32), (int) k));
+                if (!chunks.containsKey(Chunk.key(cx + dx, cz + dz))) {
+                    Chunk c = loadOrGenerate(cx + dx, cz + dz);
+                    chunks.put(c.key(), c);
+                    spawnSavedEntities(c);
+                }
         for (int dx = -radius; dx <= radius; dx++)
             for (int dz = -radius; dz <= radius; dz++) {
                 Chunk c = chunks.get(Chunk.key(cx + dx, cz + dz));
@@ -751,12 +803,20 @@ public final class World implements Shapes.Getter {
 
     /** Saves every modified chunk; called on exit. */
     public void saveAll() {
+        Long2ObjectOpenHashMap<List<Entity>> byChunk = entitiesByChunk();
+        for (Chunk c : chunks.values()) if (c.entityJson == null) saveEntities(c, byChunk.get(c.key()));
         for (Chunk c : chunks.values()) {
             if (c.touched) {
                 storage.save(c);
                 c.touched = false;
             }
         }
+    }
+
+    /** Adds pending entities to the live list immediately (tests and loading). */
+    public void flushPendingEntities() {
+        entities.addAll(pendingEntities);
+        pendingEntities.clear();
     }
 
     public void shutdown() {

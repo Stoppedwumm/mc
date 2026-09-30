@@ -25,7 +25,7 @@ final class Screens {
     private final List<Item> creativeItems = new ArrayList<>();
 
     /** Slot kinds */
-    private static final int NORMAL = 0, CRAFT_OUT = 1, FURNACE_OUT = 2, CREATIVE = 3;
+    private static final int NORMAL = 0, CRAFT_OUT = 1, FURNACE_OUT = 2, CREATIVE = 3, ARMOR = 4;
 
     private record Slot(ItemStack[] arr, int index, float x, float y, int kind, int group) { }
 
@@ -106,6 +106,7 @@ final class Screens {
         for (int i = 0; i < 9; i++) slots.add(new Slot(inv, i, px + 8 + i * 18, py + 142, NORMAL, 0));
         switch (screen) {
             case INVENTORY -> {
+                for (int i = 0; i < 4; i++) slots.add(new Slot(g.player.inventory.armor, i, px + 8, py + 8 + i * 18, ARMOR, 4));
                 for (int i = 0; i < 4; i++) slots.add(new Slot(craft, (i / 2) * 2 + i % 2, px + 98 + (i % 2) * 18, py + 18 + (float) (i / 2) * 18, NORMAL, 3));
                 slots.add(new Slot(result, 0, px + 154, py + 28, CRAFT_OUT, 3));
             }
@@ -193,6 +194,16 @@ final class Screens {
             if (ItemStack.isEmpty(in)) return;
             if (ItemStack.isEmpty(cursor)) { cursor = in; s.arr[s.index] = null; }
             else if (cursor.canMerge(in) && cursor.count + in.count <= cursor.item.maxStack) { cursor.count += in.count; s.arr[s.index] = null; }
+            else return;
+            payFurnaceXp();
+            return;
+        }
+        if (s.kind == ARMOR) {
+            // Only the matching armor piece fits
+            if (!ItemStack.isEmpty(cursor) && cursor.item.armorSlot != s.index) return;
+            s.arr[s.index] = cursor;
+            cursor = in;
+            if (s.arr[s.index] != null) g.sound.play("armor", g.player.x, g.player.y + 1, g.player.z, 0.6f, 1);
             return;
         }
         if (button == 0) {
@@ -224,7 +235,10 @@ final class Screens {
         var inv = g.player.inventory;
         if (s.group <= 1) {
             // From the player's inventory into the open container, or between hotbar and main inventory
-            if (screen == Game.Screen.CHEST) {
+            if (stack.item.isArmor() && inv.armor[stack.item.armorSlot] == null && (screen == Game.Screen.INVENTORY || screen == Game.Screen.CREATIVE)) {
+                inv.armor[stack.item.armorSlot] = stack;
+                stack = null;
+            } else if (screen == Game.Screen.CHEST) {
                 stack = insert(chest.slots, 0, 27, stack);
             } else if (screen == Game.Screen.FURNACE) {
                 if (Recipes.smelting(stack.item) != null) stack = insert(furnace.slots, 0, 1, stack);
@@ -236,7 +250,14 @@ final class Screens {
         } else {
             ItemStack left = inv.add(stack);
             s.arr[s.index] = left.count > 0 ? left : null;
+            if (s.kind == FURNACE_OUT) payFurnaceXp();
         }
+    }
+
+    private void payFurnaceXp() {
+        if (furnace == null) return;
+        int xp = furnace.takeXp();
+        if (xp > 0) mc.entity.XpOrbEntity.spawn(g.world, g.player.x, g.player.y + 0.5, g.player.z, xp);
     }
 
     private static ItemStack insert(ItemStack[] arr, int from, int to, ItemStack stack) {
@@ -279,7 +300,7 @@ final class Screens {
             // Player preview box
             gui.fill(px + 25, py + 7, 51, 72, 0xFF000000);
             gui.fill(px + 26, py + 8, 49, 70, 0xFF8B8B8B);
-            gui.hudIcon(mc.render.ItemTextureGen.HEART, px + 40, py + 30, 20, 20);
+            g.entityRenderer.renderPlayerGui(gui, g.player, px + 51, py + 75, 60, (float) (px + 51 - mx), (float) (py + 25 - my));
             gui.hudIcon(mc.render.ItemTextureGen.PROGRESS, px + 134, py + 29, 16, 16);
         } else if (screen == Game.Screen.CRAFTING) {
             gui.hudIcon(mc.render.ItemTextureGen.PROGRESS, px + 90, py + 35, 22, 16);

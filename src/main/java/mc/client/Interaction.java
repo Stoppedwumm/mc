@@ -334,6 +334,17 @@ final class Interaction {
             if (fresh && (p.creative || p.inventory.count(Item.ARROW) > 0)) { useType = 2; useTicks = 0; }
             return;
         }
+        if (item.isArmor()) {
+            if (fresh) {
+                // Swap with whatever is worn in that slot
+                ItemStack worn = p.inventory.armor[item.armorSlot];
+                p.inventory.armor[item.armorSlot] = h;
+                p.inventory.setHeld(worn);
+                g.sound.play("armor", p.x, p.y + 1, p.z, 0.6f, 1);
+                startSwing();
+            }
+            return;
+        }
         if (item == Item.BUCKET) { if (fresh) fillBucket(h); return; }
         if (item == Item.WATER_BUCKET || item == Item.LAVA_BUCKET) { if (fresh) emptyBucket(h, item == Item.WATER_BUCKET ? Block.WATER : Block.LAVA); return; }
         if (hit == null) return;

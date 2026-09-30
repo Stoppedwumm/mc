@@ -77,6 +77,42 @@ public final class WorldStorage {
         }
     }
 
+    private final ConcurrentHashMap<Long, String> pendingEntities = new ConcurrentHashMap<>();
+
+    private Path entityFile(int cx, int cz) {
+        return chunkDir.resolve("e." + cx + "." + cz + ".json");
+    }
+
+    /** Writes a chunk's entities as JSON; an empty list deletes the file. */
+    public void saveEntities(int cx, int cz, String json, boolean empty) {
+        long key = Chunk.key(cx, cz);
+        String value = empty ? "" : json;
+        pendingEntities.put(key, value);
+        io.execute(() -> {
+            Path f = entityFile(cx, cz);
+            try {
+                if (value.isEmpty()) Files.deleteIfExists(f);
+                else Files.writeString(f, value);
+            } catch (IOException e) {
+                System.err.println("Failed to save entities " + cx + "," + cz + ": " + e);
+            }
+            pendingEntities.remove(key, value);
+        });
+    }
+
+    /** JSON of a chunk's saved entities, or null. Safe to call from worker threads. */
+    public String loadEntities(int cx, int cz) {
+        String p = pendingEntities.get(Chunk.key(cx, cz));
+        if (p != null) return p.isEmpty() ? null : p;
+        Path f = entityFile(cx, cz);
+        if (!Files.exists(f)) return null;
+        try {
+            return Files.readString(f);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
     public void flush() {
         io.shutdown();
         try {

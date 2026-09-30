@@ -28,6 +28,16 @@ public abstract class BlockEntity {
     public static final class Furnace extends BlockEntity {
         public int burnTime, burnTotal, cookTime;
         public static final int COOK_TOTAL = 200;
+        /** Experience earned by smelting, paid out when the output is taken. */
+        public float storedXp;
+
+        /** Whole experience points to award now (the fraction is rounded randomly like Minecraft). */
+        public int takeXp() {
+            int whole = (int) storedXp;
+            if (Math.random() < storedXp - whole) whole++;
+            storedXp = 0;
+            return whole;
+        }
 
         public Furnace(int x, int y, int z) {
             super(x, y, z, 3);
@@ -55,6 +65,7 @@ public abstract class BlockEntity {
                 if (++cookTime >= COOK_TOTAL) {
                     cookTime = 0;
                     ItemStack result = Recipes.smelting(slots[0].item);
+                    storedXp += Recipes.smeltingXp(slots[0].item);
                     if (ItemStack.isEmpty(slots[2])) slots[2] = result;
                     else slots[2].count += result.count;
                     if (--slots[0].count <= 0) slots[0] = null;

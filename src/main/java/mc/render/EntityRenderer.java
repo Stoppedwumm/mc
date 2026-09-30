@@ -22,6 +22,124 @@ public final class EntityRenderer {
         return models.computeIfAbsent(t, MobModel::create);
     }
 
+    private MobModel playerModel;
+    private final MobModel[] armorModels = new MobModel[5];
+
+    private MobModel armorModel(int material) {
+        if (armorModels[material] == null) armorModels[material] = MobModel.createArmor(material, ItemTextureGen.ARMOR_COLORS[material]);
+        return armorModels[material];
+    }
+
+    /** Draws worn armor over a biped model that has already been posed. */
+    private void renderArmor(mc.item.ItemStack[] armor, MobModel body, Matrix4f mat, WorldRenderer wr, int tint) {
+        if (armor == null) return;
+        for (int slot = 0; slot < 4; slot++) {
+            if (mc.item.ItemStack.isEmpty(armor[slot])) continue;
+            MobModel am = armorModel(armor[slot].item.armorMaterial);
+            am.copyPose(body);
+            glActiveTexture(GL_TEXTURE0);
+            am.skin.bind();
+            wr.batch.begin(GL_TRIANGLES);
+            am.render(wr.batch, mat, tint, 1 << slot);
+            wr.batch.end();
+        }
+    }
+
+    /** An item held in the right hand of a posed biped. */
+    private void renderHandItem(Item item, MobModel body, Matrix4f mat, WorldRenderer wr) {
+        if (item == null) return;
+        // Models face +Z, so their right hand is the -X arm ("armL"). Sprites stand in the arm's y-z plane with the
+        // handle in the fist and the tip pointing forward and up.
+        Matrix4f hand = body.partMatrix(mat, "armL").translate(0, -11, 0);
+        if (ItemRenderer.isCube(item)) hand.translate(0, 0, -1).scale(6f);
+        else hand.rotateY((float) Math.toRadians(-90)).scale(10f).translate(0.3f, 0.3f, 0);
+        items.bindFor(item, wr);
+        wr.batch.begin(GL_TRIANGLES);
+        items.emit(wr.batch, hand, item, ItemRenderer.tint(item));
+        wr.batch.end();
+    }
+
+    /** The local player in third-person view. swing = attack swing progress 0-1. */
+    public void renderPlayer(Player p, WorldRenderer wr, float pt, float light, float swing, Item held) {
+        if (playerModel == null) playerModel = MobModel.createPlayer();
+        MobModel model = playerModel;
+        double ex = p.interpX(pt) - wr.camX, ey = p.interpY(pt) - wr.camY, ez = p.interpZ(pt) - wr.camZ;
+        float yaw = lerpAngle(p.prevYaw, p.yaw, pt);
+        float s = p.limbSwing - p.limbSwingAmount * (1 - pt);
+        float amount = Math.min(1, p.prevLimbSwingAmount + (p.limbSwingAmount - p.prevLimbSwingAmount) * pt);
+        float legA = (float) Math.cos(s * 0.6662) * 1.4f * amount, legB = (float) Math.cos(s * 0.6662 + Math.PI) * 1.4f * amount;
+        for (MobModel.Part part : model.parts) part.rx = part.ry = part.rz = 0;
+        model.get("head").rx = (float) Math.toRadians(p.prevPitch + (p.pitch - p.prevPitch) * pt);
+        model.get("legL").rx = legA;
+        model.get("legR").rx = legB;
+        model.get("armR").rx = legB * 0.8f;
+        model.get("armL").rx = legA * 0.8f - (float) Math.sin(swing * Math.PI) * 1.4f - (held != null ? 0.3f : 0);
+        model.get("armL").rz = -0.05f;
+        model.get("armR").rz = 0.05f;
+        if (p.sneaking) {
+            model.get("body").rx = 0.5f;
+            model.get("head").rx += 0.3f;
+        }
+        Matrix4f mat = new Matrix4f().translate((float) ex, (float) ey - (p.sneaking ? 0.2f : 0), (float) ez)
+                .rotateY((float) Math.toRadians(-yaw));
+        if (p.deathTime > 0) mat.rotateZ((float) (Math.min(1, Math.sqrt((p.deathTime + pt - 1) / 20f * 1.6f)) * Math.PI / 2));
+        mat.scale(1 / 16f * 0.9375f);
+        int tint = p.hurtTime > 0 || p.isDead() ? 0xFF8080 : 0xFFFFFF;
+        wr.setupBasic(wr.projView, true, 0, 0.1f);
+        wr.basicShader.set("uLight", light);
+        glDisable(GL_CULL_FACE);
+        glActiveTexture(GL_TEXTURE0);
+        model.skin.bind();
+        wr.batch.begin(GL_TRIANGLES);
+        model.render(wr.batch, mat, tint);
+        wr.batch.end();
+        renderArmor(p.inventory.armor, model, mat, wr, tint);
+        renderHandItem(held, model, mat, wr);
+        glEnable(GL_CULL_FACE);
+    }
+
+    /** Inventory preview: the player (with armor) turned towards the mouse. Size is the model height in GUI pixels. */
+    public void renderPlayerGui(Gui gui, Player p, float cx, float bottom, float size, float lookX, float lookY) {
+        if (playerModel == null) playerModel = MobModel.createPlayer();
+        MobModel model = playerModel;
+        for (MobModel.Part part : model.parts) part.rx = part.ry = part.rz = 0;
+        model.get("head").ry = (float) Math.atan(lookX / 40f) * -0.8f;
+        model.get("head").rx = (float) Math.atan(lookY / 40f) * 0.6f;
+        model.get("armL").rz = -0.1f;
+        model.get("armR").rz = 0.1f;
+        float s = size / 32f;
+        Matrix4f m = new Matrix4f().translate(cx, bottom, 50).scale(s, -s, s)
+                .rotateY((float) Math.atan(lookX / 40f) * -0.4f).rotateX((float) Math.atan(lookY / 40f) * 0.2f);
+        gui.model(model.skin, m, b -> model.render(b, new Matrix4f(), 0xFFFFFF));
+        for (int slot = 0; slot < 4; slot++) {
+            if (mc.item.ItemStack.isEmpty(p.inventory.armor[slot])) continue;
+            MobModel am = armorModel(p.inventory.armor[slot].item.armorMaterial);
+            am.copyPose(model);
+            int mask = 1 << slot;
+            gui.model(am.skin, m, b -> am.render(b, new Matrix4f(), 0xFFFFFF, mask));
+        }
+    }
+
+    private void renderOrb(XpOrbEntity o, WorldRenderer wr, float pt, double ex, double ey, double ez) {
+        float t = o.age + pt + o.phase;
+        float size = 0.12f + Math.min(0.2f, (float) Math.log(o.value + 1) * 0.05f);
+        float g = (float) (Math.sin(t * 0.5) + 1) * 0.5f;
+        int color = 0xFF000000 | (int) (128 + g * 127) << 16 | 0xFF << 8 | (int) (g * 60);
+        wr.setupBasic(wr.projView, true, 0, 0.1f);
+        wr.basicShader.set("uLight", 2.5f);
+        glActiveTexture(GL_TEXTURE0);
+        items.itemAtlas.bind();
+        Matrix4f m = new Matrix4f().translate((float) ex, (float) ey + 0.15f + (float) Math.sin(t * 0.1) * 0.05f, (float) ez)
+                .rotateY((float) Math.toRadians(-wr.camYaw + 180)).rotateX((float) Math.toRadians(-wr.camPitch)).scale(size);
+        int tile = ItemTextureGen.XP_ORB;
+        float u0 = (tile & 15) / 16f, v0 = (tile >> 4) / 16f, u1 = u0 + 1 / 16f, v1 = v0 + 1 / 16f;
+        org.joml.Vector3f a = m.transformPosition(new org.joml.Vector3f(-1, 1, 0)), b = m.transformPosition(new org.joml.Vector3f(-1, -1, 0));
+        org.joml.Vector3f c = m.transformPosition(new org.joml.Vector3f(1, -1, 0)), d = m.transformPosition(new org.joml.Vector3f(1, 1, 0));
+        wr.batch.begin(GL_TRIANGLES);
+        wr.batch.quad(a.x, a.y, a.z, u0, v0, b.x, b.y, b.z, u0, v1, c.x, c.y, c.z, u1, v1, d.x, d.y, d.z, u1, v0, color);
+        wr.batch.end();
+    }
+
     public void render(World world, WorldRenderer wr, float pt, LightFn light) {
         glDisable(GL_CULL_FACE);
         for (Entity e : world.entities()) {
@@ -31,6 +149,7 @@ public final class EntityRenderer {
             if (e.fireTicks > 0) l = Math.max(l, 1.5f);
             if (e instanceof Mob m) renderMob(m, wr, pt, ex, ey, ez, l);
             else if (e instanceof ItemEntity it) renderItem(it, wr, pt, ex, ey, ez, l);
+            else if (e instanceof XpOrbEntity o) renderOrb(o, wr, pt, ex, ey, ez);
             else if (e instanceof FallingBlockEntity fb) renderBlock(Block.get(fb.blockId), wr, ex, ey + 0.49, ez, 0.98f, l, 0xFFFFFF);
             else if (e instanceof TntEntity tnt) {
                 float s = tnt.fuse < 10 ? 1 + (10 - tnt.fuse) * 0.02f : 1;
@@ -129,6 +248,10 @@ public final class EntityRenderer {
         wr.batch.begin(GL_TRIANGLES);
         model.render(wr.batch, mat, tint);
         wr.batch.end();
+        if (m.type == MobType.ZOMBIE || m.type == MobType.SKELETON) {
+            renderArmor(m.armor, model, mat, wr, tint);
+            if (m.type == MobType.SKELETON) renderHandItem(Item.BOW, model, mat, wr);
+        }
     }
 
     private void renderItem(ItemEntity it, WorldRenderer wr, float pt, double ex, double ey, double ez, float light) {

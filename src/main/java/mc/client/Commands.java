@@ -66,6 +66,8 @@ final class Commands {
                 }
                 case "look" -> { p.yaw = Float.parseFloat(a[1]); p.pitch = Float.parseFloat(a[2]); }
                 case "debug" -> g.showDebug = !g.showDebug;
+                case "perspective" -> g.perspective = Integer.parseInt(a[1]) % 3;
+                case "xp" -> { p.addXp(Integer.parseInt(a[1])); chat("Gave " + a[1] + " experience points"); }
                 case "screen" -> {
                     switch (a[1]) {
                         case "pause" -> g.setScreen(Game.Screen.PAUSE);
@@ -87,6 +89,11 @@ final class Commands {
                     if (left.count > 0) world.spawnItem(p.x, p.y + 1, p.z, left);
                     chat("Gave " + count + " [" + it.name + "] to Player");
                 }
+                case "armor" -> {
+                    int mat = java.util.Arrays.asList("leather", "chainmail", "iron", "golden", "diamond").indexOf(a[1]);
+                    for (int i = 0; i < 4; i++) p.inventory.armor[i] = mat < 0 ? null : new ItemStack(Item.armor(mat, i), 1);
+                    chat(mat < 0 ? "Removed armor" : "Equipped " + a[1] + " armor");
+                }
                 case "clear" -> { p.inventory.clear(); chat("Cleared the inventory"); }
                 case "summon" -> {
                     MobType t = MobType.valueOf(a[1].replace("minecraft:", "").toUpperCase());
@@ -94,6 +101,10 @@ final class Commands {
                     double x = a.length > 4 ? coord(a[2], p.x) : p.x + 3, y = a.length > 4 ? coord(a[3], p.y) : p.y, z = a.length > 4 ? coord(a[4], p.z) : p.z;
                     m.setPos(x, y, z);
                     m.yaw = m.bodyYaw = m.headYaw = (float) Math.random() * 360;
+                    if (a.length > 5) {
+                        int mat = java.util.Arrays.asList("leather", "chainmail", "iron", "golden", "diamond").indexOf(a[5]);
+                        if (mat >= 0) for (int i = 0; i < 4; i++) m.armor[i] = new ItemStack(Item.armor(mat, i), 1);
+                    }
                     world.addEntity(m);
                     chat("Summoned new " + t.displayName);
                 }

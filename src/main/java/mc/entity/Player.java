@@ -22,6 +22,9 @@ public final class Player extends LivingEntity {
     private int foodTimer;
     public double spawnX, spawnY = -1, spawnZ;
     public DamageSource deathCause;
+    public int xpLevel, xpTotal;
+    /** Progress towards the next level, 0-1. */
+    public float xpProgress;
 
     public Player() {
         width = 0.6f;
@@ -31,11 +34,43 @@ public final class Player extends LivingEntity {
     @Override
     public double eyeY() { return y + eyeHeight; }
 
+    /** Experience needed to go from `level` to the next one. */
+    public static int xpBarCap(int level) {
+        return level >= 30 ? 112 + (level - 30) * 9 : level >= 15 ? 37 + (level - 15) * 5 : 7 + level * 2;
+    }
+
+    /** Adds experience points; returns true if a level was gained. */
+    public boolean addXp(int amount) {
+        int before = xpLevel;
+        xpTotal += amount;
+        xpProgress += (float) amount / xpBarCap(xpLevel);
+        while (xpProgress >= 1) {
+            xpProgress = (xpProgress - 1) * xpBarCap(xpLevel);
+            xpLevel++;
+            xpProgress /= xpBarCap(xpLevel);
+        }
+        return xpLevel > before;
+    }
+
+    /** Spends levels (enchanting). */
+    public void removeLevels(int levels) {
+        xpLevel = Math.max(0, xpLevel - levels);
+        if (xpLevel == 0 && levels > 0) xpProgress = 0;
+    }
+
     @Override
     protected boolean avoidsEdges() { return sneaking; }
 
     @Override
     protected boolean holdsOnLadder() { return sneaking; }
+
+    @Override
+    public mc.item.ItemStack[] armorSlots() { return inventory.armor; }
+
+    @Override
+    protected float applyArmor(DamageSource source, float amount) {
+        return creative ? amount : super.applyArmor(source, amount);
+    }
 
     @Override
     protected boolean isInvulnerable() { return creative; }

@@ -68,6 +68,12 @@ public final class Recipes {
             shaped(Item.get(315 + k), 1, new String[]{"X", "X", "S"}, 'X', mat, 'S', Item.STICK);
             shaped(Item.get(320 + k), 1, new String[]{"XX", " S", " S"}, 'X', mat, 'S', Item.STICK);
         }
+        Item[][] armorMats = {{Item.LEATHER}, null, {Item.IRON_INGOT}, {Item.GOLD_INGOT}, {Item.DIAMOND}};
+        String[][] armorShapes = {{"XXX", "X X"}, {"X X", "XXX", "XXX"}, {"XXX", "X X", "X X"}, {"X X", "X X"}};
+        for (int m = 0; m < 5; m++) {
+            if (armorMats[m] == null) continue;
+            for (int slot = 0; slot < 4; slot++) shaped(Item.armor(m, slot), 1, armorShapes[slot], 'X', armorMats[m]);
+        }
         shaped(Item.BREAD, 1, new String[]{"WWW"}, 'W', Item.WHEAT);
         shaped(Item.BUCKET, 1, new String[]{"I I", " I "}, 'I', Item.IRON_INGOT);
         shaped(Item.BOW, 1, new String[]{" TS", "T S", " TS"}, 'T', Item.STICK, 'S', Item.STRING);
@@ -189,6 +195,15 @@ public final class Recipes {
     private static boolean contains(Item[] arr, Item it) {
         for (Item a : arr) if (a == it) return true;
         return false;
+    }
+
+    /** Experience per item smelted (Minecraft's values). */
+    public static float smeltingXp(Item input) {
+        if (input == Item.of(Block.DIAMOND_ORE) || input == Item.of(Block.GOLD_ORE)) return 1f;
+        if (input == Item.of(Block.IRON_ORE)) return 0.7f;
+        if (input == Item.RAW_BEEF || input == Item.RAW_PORKCHOP || input == Item.RAW_CHICKEN) return 0.35f;
+        if (input == Item.CLAY_BALL || input == Item.of(Block.CLAY) || input == Item.of(Block.CACTUS)) return 0.3f;
+        return 0.1f;
     }
 
     public static ItemStack smelting(Item input) {
