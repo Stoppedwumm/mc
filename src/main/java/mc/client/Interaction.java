@@ -11,6 +11,7 @@ import mc.world.Chunk;
 import mc.world.Liquids;
 import mc.world.Shapes;
 import mc.world.Portal;
+import mc.world.Redstone;
 import mc.world.World;
 
 import java.util.Random;
@@ -241,6 +242,7 @@ final class Interaction {
             breakProgress = 0;
         }
         startSwing();
+        if (b == Block.REDSTONE_ORE) w().setBlock(hit.x, hit.y, hit.z, Block.LIT_REDSTONE_ORE.id, 0, false);
         if (p.creative) {
             ItemStack h = held();
             if (!ItemStack.isEmpty(h) && h.item.tool == Item.Tool.SWORD) return;
@@ -323,6 +325,16 @@ final class Interaction {
         if (hit != null && !p.sneaking && fresh) {
             int id = w().getBlock(hit.x, hit.y, hit.z);
             if (id == Block.CRAFTING_TABLE.id) { g.screens.openCrafting(); startSwing(); return; }
+            if (id == Block.LEVER.id) { Redstone.toggleLever(w(), hit.x, hit.y, hit.z); startSwing(); return; }
+            if (Block.get(id).shape == Block.Shape.BUTTON) { Redstone.pressButton(w(), hit.x, hit.y, hit.z); startSwing(); return; }
+            if (id == Block.REPEATER.id || id == Block.POWERED_REPEATER.id) {
+                int m = w().getMeta(hit.x, hit.y, hit.z);
+                w().setBlock(hit.x, hit.y, hit.z, id, (m & 3) | ((((m >> 2) + 1) & 3) << 2), false);
+                g.sound.play("click", hit.x + 0.5, hit.y + 0.5, hit.z + 0.5, 0.3f, 0.55f);
+                startSwing();
+                return;
+            }
+            if (id == Block.IRON_DOOR.id) return;
             if (toggle(hit.x, hit.y, hit.z)) return;
             if (id == Block.BED.id && w().dimension == mc.world.Dimension.NETHER) {
                 w().breakBlock(hit.x, hit.y, hit.z, null, false);
@@ -414,6 +426,20 @@ final class Interaction {
                 consume(h);
                 startSwing();
             }
+            return;
+        }
+        if (item == Item.REDSTONE) {
+            if (hit == null) return;
+            Block t = Block.get(target);
+            int x = hit.x, y = hit.y, z = hit.z;
+            if (!t.replaceable) { x += hit.nx; y += hit.ny; z += hit.nz; }
+            if (!Block.get(w().getBlock(x, y, z)).replaceable || !w().sturdyTop(x, y - 1, z)) return;
+            w().setBlock(x, y, z, Block.REDSTONE_WIRE.id, 0, true);
+            g.sound.dig(Block.STONE, x + 0.5, y, z + 0.5);
+            consume(h);
+            startSwing();
+            lastUseWasPlace = true;
+            placeDelay = 4;
             return;
         }
         if (item == Item.BONE_MEAL) {
@@ -580,12 +606,12 @@ final class Interaction {
         Block below = Block.get(w().getBlock(x, y - 1, z));
         boolean upperHalf = hit.ny == -1 || (hit.ny == 0 && frac(hit.py) > 0.5);
         int meta = 0;
-        if (b == Block.TORCH) {
+        if (b == Block.TORCH || b == Block.REDSTONE_TORCH) {
             if (hit.ny == 1 || (hit.ny == 0 && hit.nx == 0 && hit.nz == 0)) {
-                if (!below.opaque) return false;
+                if (!w().sturdyTop(x, y - 1, z)) return false;
             } else if (hit.ny == 0) {
                 int wall = Shapes.facingOf(-hit.nx, -hit.nz);
-                if (!Block.get(w().getBlock(x + Shapes.DX[wall], y, z + Shapes.DZ[wall])).opaque) return false;
+                if (!w().sturdy(x + Shapes.DX[wall], y, z + Shapes.DZ[wall])) return false;
                 meta = wall + 1;
             } else return false;
         }
@@ -613,9 +639,26 @@ final class Interaction {
                 if (!Block.get(w().getBlock(x + Shapes.DX[meta], y, z + Shapes.DZ[meta])).opaque) return false;
             }
             case CARPET -> { if (below == Block.AIR || below.isLiquid()) return false; }
+            case LEVER, BUTTON -> {
+                int sx = x - hit.nx, sy = y - hit.ny, sz = z - hit.nz;
+                if (!(hit.ny == 1 ? w().sturdyTop(sx, sy, sz) : w().sturdy(sx, sy, sz))) return false;
+                if (hit.ny == 1) meta = 0;
+                else if (hit.ny == -1) meta = 5;
+                else meta = Shapes.facingOf(-hit.nx, -hit.nz) + 1;
+            }
+            case PLATE -> { if (!below.solid || below.isLiquid()) return false; }
+            case REPEATER -> {
+                if (!w().sturdyTop(x, y - 1, z)) return false;
+                meta = Shapes.opposite(facingToPlayer());
+            }
+            case PISTON -> {
+                if (p.pitch > 50) meta = 1;
+                else if (p.pitch < -50) meta = 0;
+                else meta = Shapes.H_TO_6[facingToPlayer()];
+            }
             case SNOW_LAYER -> { if (!below.opaque) return false; }
             case DOOR -> {
-                if (!below.opaque || !replaceableAt(x, y + 1, z) || !fitsEntities(x, y + 1, z)) return false;
+                if (!w().sturdyTop(x, y - 1, z) || !replaceableAt(x, y + 1, z) || !fitsEntities(x, y + 1, z)) return false;
                 int f = facingToPlayer();
                 // Pair with a door on the left to form a double door
                 int left = (f + 1) & 3;

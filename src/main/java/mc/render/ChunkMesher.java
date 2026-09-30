@@ -86,6 +86,17 @@ public final class ChunkMesher {
         }
     };
 
+    private int b0Meta(int x, int y, int z) { return metaAt(x, y, z) & 15; }
+
+    /** Redstone wire colour for power 0-15 (dark red to bright red), like Minecraft. */
+    public static int wireColor(int power) {
+        float f = power / 15f;
+        int r = (int) ((f * 0.6f + (power > 0 ? 0.4f : 0.3f)) * 255);
+        int g = (int) (Math.max(0, f * f * 0.7f - 0.5f) * 255);
+        int b = (int) (Math.max(0, f * f * 0.6f - 0.7f) * 255);
+        return 0xFF000000 | Math.min(255, r) << 16 | Math.max(0, g) << 8 | Math.max(0, b);
+    }
+
     private int metaAt(int x, int y, int z) {
         if (y < 0 || y >= h) return 0;
         return m[idx(x, y, z)];
@@ -130,6 +141,7 @@ public final class ChunkMesher {
                         case SPRUCE -> 0xFF619961;
                         default -> 0xFFFFFFFF;
                     };
+                    if (block == Block.REDSTONE_WIRE) tint = wireColor(b0Meta(x, y, z));
                     switch (block.model) {
                         case CUBE -> cube(block, x, y, z, tint, block.layer == Block.Layer.TRANSLUCENT ? translucent : solid);
                         case LIQUID -> liquid(block, x, y, z, block == Block.WATER ? translucent : solid);
@@ -440,7 +452,8 @@ public final class ChunkMesher {
 
     private void torch(Block block, int x, int y, int z, VertexBuilder out) {
         flatLight(x, y, z);
-        for (int v = 0; v < 4; v++) vBlk[v] = 15 * 16;
+        boolean lit = block.lightEmission > 0;
+        if (lit) for (int v = 0; v < 4; v++) vBlk[v] = 15 * 16;
         int tex = block.texSide;
         int meta = metaAt(x, y, z);
         if (meta >= 1 && meta <= 4) {
@@ -449,11 +462,20 @@ public final class ChunkMesher {
             shearX = -Shapes.DX[wall] * 4; shearZ = -Shapes.DZ[wall] * 4;
         }
         for (int f = 0; f < 6; f++) {
-            if (f == 0) emit(out, f, x, y, z, 7, 0, 7, 9, 10, 9, tex, 0xFFFFFF, false, 0, -1, F_EMISSIVE);
+            if (f == 0) emit(out, f, x, y, z, 7, 0, 7, 9, 10, 9, tex, 0xFFFFFF, false, 0, -1, lit ? F_EMISSIVE : 0);
             else if (f == 1) emit(out, f, x, y, z, 7, 0, 7, 9, 10, 9, tex, 0xFFFFFF, false, 0, 7, 0);
             else emit(out, f, x, y, z, 7, 0, 7, 9, 10, 9, tex, 0xFFFFFF, false, 0, 0, 0);
         }
         offX = offY = offZ = shearX = shearZ = 0;
+    }
+
+    /** Multi-part shapes whose parts use different textures (repeater torches, lever handle, piston arm). */
+    public static int boxTexture(Block block, int face, int meta, int boxIndex) {
+        if (block.shape == Block.Shape.REPEATER && boxIndex > 0)
+            return block == Block.POWERED_REPEATER ? Block.Tex.REDSTONE_TORCH_ON : Block.Tex.REDSTONE_TORCH_OFF;
+        if (block == Block.LEVER) return boxIndex == 0 ? Block.Tex.COBBLE : Block.Tex.LOG_SIDE;
+        if ((block.shape == Block.Shape.PISTON && boxIndex == 1) || (block == Block.PISTON_HEAD && boxIndex == 1)) return Block.Tex.PLANKS;
+        return block.textureForFace(face, meta);
     }
 
     private static boolean onBoundary(int face, int[] bx) {
@@ -470,7 +492,9 @@ public final class ChunkMesher {
     /** Slabs, stairs, fences, doors...: every box of the shape, with faces on the cell boundary culled like cubes. */
     private void shaped(Block block, int x, int y, int z, int tint, VertexBuilder out) {
         int meta = metaAt(x, y, z);
+        int boxIndex = -1;
         for (int[] bx : Shapes.boxes(block, meta, getter, x, y, z, Shapes.Mode.RENDER)) {
+            boxIndex++;
             for (int f = 0; f < 6; f++) {
                 boolean boundary = onBoundary(f, bx);
                 if (boundary) {
@@ -479,7 +503,7 @@ public final class ChunkMesher {
                 } else {
                     flatLight(x, y, z);
                 }
-                emit(out, f, x, y, z, bx[0], bx[1], bx[2], bx[3], bx[4], bx[5], block.textureForFace(f, meta), tint, boundary, 0, 0,
+                emit(out, f, x, y, z, bx[0], bx[1], bx[2], bx[3], bx[4], bx[5], boxTexture(block, f, meta, boxIndex), tint, boundary, 0, 0,
                         block.lightEmission > 0 ? F_EMISSIVE : 0);
             }
         }

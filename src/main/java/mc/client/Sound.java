@@ -227,6 +227,9 @@ public final class Sound {
         named("zombie_pigman_death", voice(150, 1.0, 0.5, 0.1, 0, -0.6, 0, 0.1, 85));
         named("magma_cube_hurt", voice(160, 0.25, 0.9, 0, 0, -0.3, 0, 0.12, 86));
         named("magma_cube_death", voice(140, 0.4, 0.9, 0, 0, -0.5, 0, 0.12, 87));
+        named("click", voice(1600, 0.05, 0.6, 0, 0, 0, 0, 0.8, 88));
+        named("piston_out", voice(180, 0.3, 0.8, 0, 0, 0.3, 0, 0.35, 89));
+        named("piston_in", voice(150, 0.3, 0.8, 0, 0, -0.3, 0, 0.35, 90));
         named("armor", voice(700, 0.18, 0.85, 0, 20, -0.2, 0, 0.5, 46));
         named("levelup", chime(new double[]{523, 659, 784, 1046}, 0.9));
         named("orb", chime(new double[]{1320, 1760}, 0.18));

@@ -77,6 +77,18 @@ public final class Recipes {
         shaped(Item.SHEARS, 1, new String[]{" I", "I "}, 'I', Item.IRON_INGOT);
         shaped(Item.of(Block.CAKE), 1, new String[]{"MMM", "SES", "WWW"}, 'M', Item.MILK_BUCKET, 'S', Item.SUGAR, 'E', Item.EGG, 'W', Item.WHEAT);
         shapeless(Item.of(Block.BLACK_WOOL), 1, Block.WHITE_WOOL, Item.INK_SAC);
+        shaped(Item.of(Block.REDSTONE_TORCH), 1, new String[]{"R", "S"}, 'R', Item.REDSTONE, 'S', Item.STICK);
+        shaped(Item.of(Block.LEVER), 1, new String[]{"S", "C"}, 'S', Item.STICK, 'C', Block.COBBLESTONE);
+        shapeless(Item.of(Block.STONE_BUTTON), 1, Block.STONE);
+        shapeless(Item.of(Block.OAK_BUTTON), 1, PLANKS);
+        shaped(Item.of(Block.STONE_PRESSURE_PLATE), 1, new String[]{"##"}, '#', Block.STONE);
+        shaped(Item.of(Block.OAK_PRESSURE_PLATE), 1, new String[]{"##"}, '#', PLANKS);
+        shaped(Item.of(Block.REDSTONE_LAMP), 1, new String[]{" R ", "RGR", " R "}, 'R', Item.REDSTONE, 'G', Block.GLOWSTONE);
+        shaped(Item.of(Block.REPEATER), 1, new String[]{"TRT", "SSS"}, 'T', Block.REDSTONE_TORCH, 'R', Item.REDSTONE, 'S', Block.STONE);
+        shaped(Item.of(Block.PISTON), 1, new String[]{"PPP", "CIC", "CRC"}, 'P', PLANKS, 'C', Block.COBBLESTONE, 'I', Item.IRON_INGOT, 'R', Item.REDSTONE);
+        shaped(Item.of(Block.STICKY_PISTON), 1, new String[]{"S", "P"}, 'S', Item.SLIMEBALL, 'P', Block.PISTON);
+        shaped(Item.of(Block.REDSTONE_BLOCK), 1, new String[]{"###", "###", "###"}, '#', Item.REDSTONE);
+        shapeless(Item.REDSTONE, 9, Block.REDSTONE_BLOCK);
         shaped(Item.BREAD, 1, new String[]{"WWW"}, 'W', Item.WHEAT);
         shaped(Item.BUCKET, 1, new String[]{"I I", " I "}, 'I', Item.IRON_INGOT);
         shaped(Item.BOW, 1, new String[]{" TS", "T S", " TS"}, 'T', Item.STICK, 'S', Item.STRING);
@@ -141,6 +153,7 @@ public final class Recipes {
         smelt(Block.GOLD_ORE, Item.GOLD_INGOT);
         smelt(Block.DIAMOND_ORE, Item.DIAMOND);
         smelt(Block.EMERALD_ORE, Item.EMERALD);
+        smelt(Block.REDSTONE_ORE, Item.REDSTONE);
         smelt(Block.COAL_ORE, Item.COAL);
         smelt(Block.SAND, Item.of(Block.GLASS));
         smelt(Block.COBBLESTONE, Item.of(Block.STONE));

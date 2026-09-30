@@ -170,6 +170,10 @@ final class Commands {
                     for (int x = Math.min(x0, x1); x <= Math.max(x0, x1); x++)
                         for (int y = Math.min(y0, y1); y <= Math.max(y0, y1); y++)
                             for (int z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) world.setBlock(x, y, z, b.id, fillMeta, false);
+                    if (mc.world.Redstone.relevant(b.id) || b == Block.AIR)
+                        for (int x = Math.min(x0, x1); x <= Math.max(x0, x1); x++)
+                            for (int y = Math.min(y0, y1); y <= Math.max(y0, y1); y++)
+                                for (int z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) if (vol <= 512) world.notifyAround(x, y, z);
                     chat("Successfully filled " + vol + " blocks");
                 }
                 case "seed" -> chat("Seed: [" + world.seed + "]");

@@ -118,6 +118,22 @@ public final class TextureGen {
         paint(Tex.SPAWNER, this::spawner);
         paint(Tex.GRAVEL_PATH, this::gravel);
         paint(Tex.NETHERRACK, this::netherrack);
+        paint(Tex.REDSTONE_DUST, this::redstoneDust);
+        paint(Tex.REDSTONE_TORCH_ON, () -> redstoneTorch(true));
+        paint(Tex.REDSTONE_TORCH_OFF, () -> redstoneTorch(false));
+        paint(Tex.LEVER, this::lever);
+        paint(Tex.LAMP_OFF, () -> lamp(false));
+        paint(Tex.LAMP_ON, () -> lamp(true));
+        paint(Tex.REPEATER_OFF, () -> repeater(false));
+        paint(Tex.REPEATER_ON, () -> repeater(true));
+        paint(Tex.PISTON_TOP, () -> pistonFace(false));
+        paint(Tex.PISTON_STICKY, () -> pistonFace(true));
+        paint(Tex.PISTON_SIDE, this::pistonSide);
+        paint(Tex.PISTON_BOTTOM, () -> pistonBottom(false));
+        paint(Tex.PISTON_INNER, () -> pistonBottom(true));
+        paint(Tex.REDSTONE_ORE, () -> ore(0xe01010, 0x8a0000));
+        paint(Tex.REDSTONE_BLOCK, () -> metalBlock(0xc81a10, 0x7a0a04));
+        paint(Tex.REPEATER_ITEM, this::repeaterItem);
         paint(Tex.SOUL_SAND, this::soulSand);
         paint(Tex.QUARTZ_ORE, this::quartzOre);
         paint(Tex.PORTAL, this::portal);
@@ -1022,5 +1038,74 @@ public final class TextureGen {
                 boolean mortar = y % 4 == 3 || (x + off) % 8 == 7;
                 set(x, y, mortar ? 0x1a0a0e : scale(0x442228, jitter(0.1)));
             }
+    }
+
+    // ------------------------------------------------------------------ redstone
+
+    /** Grey-scale dust cross (tinted by power level in the mesher). */
+    private void redstoneDust() {
+        clearTile();
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                boolean cross = (x >= 5 && x <= 10) || (y >= 5 && y <= 10);
+                if (!cross || r.nextDouble() < 0.06) continue;
+                set(x, y, gray(200 + r.nextInt(56)));
+            }
+    }
+
+    private void redstoneTorch(boolean lit) {
+        clearTile();
+        for (int y = 6; y < 16; y++) { set(7, y, 0x6b4a26); set(8, y, 0x5a3a1a); }
+        int tip = lit ? 0xff3020 : 0x5a1a14;
+        set(7, 6, tip); set(8, 6, tip); set(7, 7, lit ? 0xd81a10 : 0x4a1410); set(8, 7, lit ? 0xd81a10 : 0x4a1410);
+        if (lit) { set(7, 5, 0xff8060); set(8, 5, 0xff8060); }
+    }
+
+    private void lever() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) set(x, y, y < 6 ? scale(0x6b4a26, jitter(0.08)) : scale(0x8a8a8a, jitter(0.08)));
+    }
+
+    private void lamp(boolean on) {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                boolean frame = x == 0 || y == 0 || x == 15 || y == 15 || x == 7 || y == 7 || x == 8 || y == 8;
+                int c = frame ? (on ? 0x8a6a3a : 0x4a3220) : on ? mix(0xffe8a0, 0xf8b040, r.nextDouble() * 0.5) : mix(0x6a4428, 0x8a5a34, r.nextDouble());
+                set(x, y, c);
+            }
+    }
+
+    private void repeater(boolean on) {
+        speckle(0xa0a0a0, 0.03, 0x949494, 0.1);
+        for (int y = 2; y < 14; y++) set(7, y, on ? 0xff2010 : 0x6a1a14);
+        for (int y = 2; y < 14; y++) set(8, y, on ? 0xd01a10 : 0x5a1410);
+    }
+
+    private void pistonFace(boolean sticky) {
+        planks(0xa2824e);
+        for (int i = 0; i < 16; i++) { set(i, 0, 0x6a6a6a); set(i, 15, 0x6a6a6a); set(0, i, 0x6a6a6a); set(15, i, 0x6a6a6a); }
+        if (sticky) for (int y = 3; y < 13; y++) for (int x = 3; x < 13; x++) set(x, y, scale(0x78c060, jitter(0.1)));
+    }
+
+    private void pistonSide() {
+        cobble(false);
+        for (int y = 0; y < 4; y++) for (int x = 0; x < 16; x++) set(x, y, scale(0xa2824e, jitter(0.05)));
+        for (int x = 0; x < 16; x++) set(x, 4, 0x6a6a6a);
+    }
+
+    private void pistonBottom(boolean inner) {
+        cobble(false);
+        int a = inner ? 6 : 5, b = inner ? 9 : 10;
+        for (int y = a; y <= b; y++) for (int x = a; x <= b; x++) set(x, y, inner ? 0xa2824e : 0x3a3a3a);
+    }
+
+    private void repeaterItem() {
+        clearTile();
+        for (int y = 10; y < 14; y++) for (int x = 1; x < 15; x++) set(x, y, scale(0xa0a0a0, jitter(0.05)));
+        for (int t = 0; t < 2; t++) {
+            int x = 4 + t * 7;
+            for (int y = 4; y < 10; y++) set(x, y, 0x6b4a26);
+            set(x, 3, 0xff2010); set(x, 4, 0xd01a10);
+        }
     }
 }

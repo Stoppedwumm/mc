@@ -45,7 +45,12 @@ public final class Drops {
             }
             case 102, 105 -> { }
             case 103 -> add(out, Item.EMERALD, 1);
-            case 106, 110 -> { }
+            case 106, 110, 127 -> { }
+            case 113 -> add(out, Item.REDSTONE, 1);
+            case 115 -> add(out, Item.of(Block.REDSTONE_TORCH), 1);
+            case 122 -> add(out, Item.of(Block.REDSTONE_LAMP), 1);
+            case 124 -> add(out, Item.of(Block.REPEATER), 1);
+            case 128, 129 -> add(out, Item.REDSTONE, 4 + RANDOM.nextInt(2));
             case 109 -> add(out, Item.QUARTZ, 1);
             case 30 -> add(out, Item.GLOWSTONE_DUST, 2 + RANDOM.nextInt(3));
             case 63 -> {
@@ -56,6 +61,7 @@ public final class Drops {
             }
             default -> {
                 if (b.isSlab() && (meta & 3) == 2) add(out, Item.get(b.id), 2);
+                else if (b == Block.PISTON || b == Block.STICKY_PISTON) add(out, Item.get(b.id), 1);
                 else if (b.shape == Block.Shape.SNOW_LAYER) add(out, Item.SNOWBALL, (meta & 7) + 1);
                 else if (b == Block.SNOW) add(out, Item.SNOWBALL, 4);
                 else add(out, Item.get(b.id), 1);

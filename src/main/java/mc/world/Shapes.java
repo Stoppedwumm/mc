@@ -20,6 +20,11 @@ import java.util.List;
  * <li>snow layer: layers - 1</li>
  * <li>cake: slices eaten (0-6)</li>
  * <li>nether portal: 0 = spans the x axis, 1 = spans the z axis</li>
+ * <li>redstone wire: power 0-15</li>
+ * <li>lever / button: attached face (0 floor, 1-4 wall, 5 ceiling), bit 3 on</li>
+ * <li>pressure plate: bit 0 pressed</li>
+ * <li>repeater: facing of the output (bits 0-1), delay - 1 (bits 2-3)</li>
+ * <li>piston: 6-way facing (bits 0-2: down, up, north, south, west, east), bit 3 extended; head: facing, bit 3 sticky</li>
  * <li>torch: 0 standing, 1-4 on a wall in direction (meta - 1)</li>
  * </ul>
  */
@@ -196,6 +201,53 @@ public final class Shapes {
             }
             case CARPET -> out.add(new int[]{0, 0, 0, 16, 1, 16});
             case PORTAL -> { if (!col) out.add((meta & 1) == 0 ? new int[]{0, 0, 6, 16, 16, 10} : new int[]{6, 0, 0, 10, 16, 16}); }
+            case WIRE -> {
+                if (col) break;
+                if (mode == Mode.OUTLINE) { out.add(new int[]{0, 0, 0, 16, 1, 16}); break; }
+                boolean[] c = new boolean[4];
+                int n = 0;
+                for (int d = 0; d < 4; d++) if (c[d] = Redstone.wireConnects(g, x, y, z, d)) n++;
+                if (n == 1) for (int d = 0; d < 4; d++) if (c[d]) c[opposite(d)] = true;
+                out.add(new int[]{5, 0, 5, 11, 1, 11});
+                for (int d = 0; d < 4; d++) if (c[d]) {
+                    int[] a = arm(d, 2, 0, 1);
+                    trimToPost(a, d, 3);
+                    out.add(a);
+                }
+            }
+            case LEVER -> {
+                if (col) break;
+                boolean on = (meta & 8) != 0;
+                int f6 = attachFacing(meta);
+                out.add(rot6(new int[]{5, 0, 4, 11, 3, 12}, f6));
+                out.add(rot6(on ? new int[]{7, 3, 9, 9, 10, 11} : new int[]{7, 3, 5, 9, 10, 7}, f6));
+            }
+            case BUTTON -> {
+                if (col) break;
+                int h = (meta & 8) != 0 ? 1 : 2;
+                out.add(rot6(new int[]{5, 0, 6, 11, h, 10}, attachFacing(meta)));
+            }
+            case PLATE -> { if (!col) out.add(new int[]{1, 0, 1, 15, (meta & 1) != 0 ? 1 : 2, 15}); }
+            case REPEATER -> {
+                out.add(new int[]{0, 0, 0, 16, 2, 16});
+                if (col) break;
+                int delay = (meta >> 2) & 3;
+                out.add(rotH(new int[]{7, 2, 10, 9, 7, 12}, meta & 3));
+                out.add(rotH(new int[]{7, 2, 2 + 2 * delay, 9, 7, 4 + 2 * delay}, meta & 3));
+            }
+            case PISTON -> {
+                int f6 = meta & 7;
+                if ((meta & 8) == 0) out.add(new int[]{0, 0, 0, 16, 16, 16});
+                else {
+                    out.add(rot6(new int[]{0, 0, 0, 16, 12, 16}, f6));
+                    if (!col) out.add(rot6(new int[]{6, 12, 6, 10, 16, 10}, f6));
+                }
+            }
+            case PISTON_HEAD -> {
+                int f6 = meta & 7;
+                out.add(rot6(new int[]{0, 12, 0, 16, 16, 16}, f6));
+                out.add(rot6(new int[]{6, 0, 6, 10, 12, 10}, f6));
+            }
             case CAKE -> out.add(new int[]{1 + 2 * Math.min(6, meta & 7), 0, 1, 15, 8, 15});
             case SNOW_LAYER -> {
                 int layers = (meta & 7) + 1;
@@ -205,6 +257,43 @@ public final class Shapes {
             default -> out.add(new int[]{0, 0, 0, 16, 16, 16});
         }
         return out;
+    }
+
+    /** 6-way facing (0 down, 1 up, 2 north, 3 south, 4 west, 5 east) of a horizontal facing (0 south, 1 west, 2 north, 3 east). */
+    public static final int[] H_TO_6 = {3, 4, 2, 5};
+    public static final int[][] DIR6 = {{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}};
+
+    /**
+     * Levers and buttons: meta bits 0-2 give the attached face (0 floor, 1-4 wall towards horizontal facing m-1,
+     * 5 ceiling). Returns the 6-way direction the component points (away from its support).
+     */
+    public static int attachFacing(int meta) {
+        int m = meta & 7;
+        if (m == 0) return 1;
+        if (m == 5) return 0;
+        return H_TO_6[opposite(m - 1)];
+    }
+
+    /** Rotates a box modelled pointing up (+y) so it points along 6-way facing f. */
+    public static int[] rot6(int[] b, int f) {
+        return switch (f) {
+            case 0 -> new int[]{b[0], 16 - b[4], b[2], b[3], 16 - b[1], b[5]};
+            case 2 -> new int[]{b[0], b[2], 16 - b[4], b[3], b[5], 16 - b[1]};
+            case 3 -> new int[]{b[0], b[2], b[1], b[3], b[5], b[4]};
+            case 4 -> new int[]{16 - b[4], b[0], b[2], 16 - b[1], b[3], b[5]};
+            case 5 -> new int[]{b[1], b[0], b[2], b[4], b[3], b[5]};
+            default -> b;
+        };
+    }
+
+    /** Rotates a box modelled facing south (+z) to horizontal facing f. */
+    public static int[] rotH(int[] b, int f) {
+        return switch (f & 3) {
+            case 1 -> new int[]{16 - b[5], b[1], b[0], 16 - b[2], b[4], b[3]};
+            case 2 -> new int[]{16 - b[3], b[1], 16 - b[5], 16 - b[0], b[4], 16 - b[2]};
+            case 3 -> new int[]{b[2], b[1], 16 - b[3], b[5], b[4], 16 - b[0]};
+            default -> b;
+        };
     }
 
     /** Starts an arm at the post's surface instead of the centre, avoiding overlapping faces. */

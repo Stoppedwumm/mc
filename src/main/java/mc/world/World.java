@@ -197,6 +197,7 @@ public final class World implements Shapes.Getter {
         int old = c.blocks[Chunk.index(x & 15, y, z & 15)] & 255;
         c.set(x & 15, y, z & 15, id, meta);
         c.touched = true;
+        if (id == Block.FIRE.id && old != id) scheduleTick(x, y, z, 30 + random.nextInt(10));
         if (old != id) {
             long key = posKey(x, y, z);
             boolean furnaceSwap = (old == Block.FURNACE.id || old == Block.LIT_FURNACE.id) && (id == Block.FURNACE.id || id == Block.LIT_FURNACE.id);
@@ -220,11 +221,42 @@ public final class World implements Shapes.Getter {
         }
         if (notify) {
             notifyNeighbors(x, y, z);
+            if (Redstone.relevant(old) || Redstone.relevant(id) || redstoneNearby(x, y, z)) Redstone.update(this, x, y, z);
         }
         return true;
     }
 
     private static final int[][] NEIGHBORS = {{0, 0, 0}, {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+
+    /** Full solid block for attaching things to its sides (opaque cubes and double slabs). */
+    public boolean sturdy(int x, int y, int z) {
+        Block b = Block.get(getBlock(x, y, z));
+        return b.opaque || (b.isSlab() && (getMeta(x, y, z) & 3) == 2);
+    }
+
+    /** Solid top surface for things placed on it (also top slabs and upside-down stairs). */
+    public boolean sturdyTop(int x, int y, int z) {
+        Block b = Block.get(getBlock(x, y, z));
+        int m = getMeta(x, y, z);
+        return b.opaque || (b.isSlab() && (m & 3) != 0) || (b.shape == Block.Shape.STAIRS && (m & 4) != 0);
+    }
+
+    /** Any redstone component within two blocks (cheap pre-check before running a redstone update). */
+    private boolean redstoneNearby(int x, int y, int z) {
+        for (int dx = -2; dx <= 2; dx++)
+            for (int dy = -2; dy <= 2; dy++)
+                for (int dz = -2; dz <= 2; dz++) {
+                    if (Math.abs(dx) + Math.abs(dy) + Math.abs(dz) > 2) continue;
+                    if (Redstone.relevant(getBlock(x + dx, y + dy, z + dz))) return true;
+                }
+        return false;
+    }
+
+    /** Neighbour updates (and redstone) around a position changed without notification. */
+    public void notifyAround(int x, int y, int z) {
+        notifyNeighbors(x, y, z);
+        Redstone.update(this, x, y, z);
+    }
 
     private void notifyNeighbors(int x, int y, int z) {
         for (int[] d : NEIGHBORS) {
@@ -243,22 +275,39 @@ public final class World implements Shapes.Getter {
         boolean ok = true;
         int meta = getMeta(x, y, z);
         if (b == Block.TORCH) {
-            if (meta >= 1 && meta <= 4) ok = Block.get(getBlock(x + Shapes.DX[meta - 1], y, z + Shapes.DZ[meta - 1])).opaque;
-            else ok = below.opaque;
+            if (meta >= 1 && meta <= 4) ok = sturdy(x + Shapes.DX[meta - 1], y, z + Shapes.DZ[meta - 1]);
+            else ok = sturdyTop(x, y - 1, z);
         }
-        else if (b == Block.LADDER) ok = Block.get(getBlock(x + Shapes.DX[meta & 3], y, z + Shapes.DZ[meta & 3])).opaque;
+        else if (b == Block.LADDER) ok = sturdy(x + Shapes.DX[meta & 3], y, z + Shapes.DZ[meta & 3]);
         else if (b.shape == Block.Shape.DOOR) {
             if ((meta & 8) != 0) ok = getBlock(x, y - 1, z) == b.id;
-            else ok = getBlock(x, y + 1, z) == b.id && below.opaque;
+            else ok = getBlock(x, y + 1, z) == b.id && sturdyTop(x, y - 1, z);
         }
         else if (b == Block.BED) {
             int f = meta & 3, dir = (meta & 4) != 0 ? Shapes.opposite(f) : f;
             ok = getBlock(x + Shapes.DX[dir], y, z + Shapes.DZ[dir]) == b.id;
         }
         else if (b == Block.NETHER_PORTAL) ok = Portal.intact(this, x, y, z);
+        else if (b == Block.REDSTONE_TORCH || b == Block.UNLIT_REDSTONE_TORCH) {
+            if (meta >= 1 && meta <= 4) ok = sturdy(x + Shapes.DX[meta - 1], y, z + Shapes.DZ[meta - 1]);
+            else ok = sturdyTop(x, y - 1, z);
+        }
+        else if (b == Block.REDSTONE_WIRE || b.shape == Block.Shape.REPEATER) ok = sturdyTop(x, y - 1, z);
+        else if (b.shape == Block.Shape.PLATE) ok = below.solid && !below.isLiquid();
+        else if (b == Block.LEVER || b.shape == Block.Shape.BUTTON) {
+            int m = meta & 7;
+            int sx = x, sy = y, sz = z;
+            if (m == 0) sy--; else if (m == 5) sy++; else { sx += Shapes.DX[m - 1]; sz += Shapes.DZ[m - 1]; }
+            ok = m == 0 ? sturdyTop(sx, sy, sz) : sturdy(sx, sy, sz);
+        }
+        else if (b == Block.PISTON_HEAD) {
+            int[] d = Shapes.DIR6[meta & 7];
+            int base = getBlock(x - d[0], y - d[1], z - d[2]);
+            ok = (base == Block.PISTON.id || base == Block.STICKY_PISTON.id) && (getMeta(x - d[0], y - d[1], z - d[2]) & 8) != 0;
+        }
         else if (b == Block.FIRE) ok = (below.solid && !below.isLiquid()) || nextToFlammable(x, y, z);
         else if (b.shape == Block.Shape.CARPET) ok = below != Block.AIR && !below.isLiquid();
-        else if (b.shape == Block.Shape.SNOW_LAYER) ok = below.opaque;
+        else if (b.shape == Block.Shape.SNOW_LAYER) ok = sturdyTop(x, y - 1, z);
         else if (b.isCrop()) ok = below == Block.FARMLAND;
         else if (b == Block.SUGAR_CANE) ok = below == Block.SUGAR_CANE || below == Block.GRASS || below == Block.DIRT || below == Block.SAND;
         else if (b == Block.CACTUS) ok = below == Block.CACTUS || below == Block.SAND;
@@ -266,7 +315,7 @@ public final class World implements Shapes.Getter {
         else if (b.model == Block.Model.CROSS) ok = below == Block.GRASS || below == Block.DIRT || below == Block.COARSE_DIRT || below == Block.SNOWY_GRASS || below == Block.FARMLAND;
         else if (b == Block.SAND || b == Block.GRAVEL) { checkFalling(x, y, z); return; }
         if (!ok) {
-            if (b == Block.FIRE || b == Block.NETHER_PORTAL) setBlock(x, y, z, 0);
+            if (b == Block.FIRE || b == Block.NETHER_PORTAL || b == Block.PISTON_HEAD) setBlock(x, y, z, 0);
             else breakBlock(x, y, z, null, true);
         }
     }
@@ -336,6 +385,21 @@ public final class World implements Shapes.Getter {
             ox += Shapes.DX[dir]; oz += Shapes.DZ[dir];
         }
         if ((ox != x || oy != y || oz != z) && getBlock(ox, oy, oz) == id) setBlock(ox, oy, oz, 0, 0, false);
+        if ((b == Block.PISTON || b == Block.STICKY_PISTON) && (meta & 8) != 0) {
+            int[] d = Shapes.DIR6[meta & 7];
+            if (getBlock(x + d[0], y + d[1], z + d[2]) == Block.PISTON_HEAD.id) setBlock(x + d[0], y + d[1], z + d[2], 0, 0, false);
+        }
+        if (b == Block.PISTON_HEAD) {
+            int[] d = Shapes.DIR6[meta & 7];
+            int bx = x - d[0], by = y - d[1], bz = z - d[2];
+            int base = getBlock(bx, by, bz);
+            if (base == Block.PISTON.id || base == Block.STICKY_PISTON.id) {
+                // Breaking the head breaks the whole piston
+                if (listener != null) listener.blockBroken(bx, by, bz, Block.get(base), getMeta(bx, by, bz));
+                setBlock(bx, by, bz, 0);
+                if (drop) spawnItem(bx + 0.5, by + 0.5, bz + 0.5, new ItemStack(Item.get(base), 1));
+            }
+        }
         setBlock(x, y, z, 0);
         if (drop) {
             List<ItemStack> drops = Drops.of(b, meta, tool);
@@ -477,7 +541,12 @@ public final class World implements Shapes.Getter {
             scheduledSet.remove(e[0]);
             int x = (int) e[2], y = (int) e[3], z = (int) e[4];
             if (!isLoaded(x, z)) continue;
-            Liquids.tick(this, x, y, z);
+            int sid = getBlock(x, y, z);
+            if (Block.get(sid).isLiquid()) Liquids.tick(this, x, y, z);
+            else if (sid == Block.FIRE.id) {
+                tickFire(x, y, z);
+                if (getBlock(x, y, z) == Block.FIRE.id && getBlock(x, y - 1, z) != Block.NETHERRACK.id) scheduleTick(x, y, z, 30 + random.nextInt(10));
+            } else Redstone.scheduledTick(this, x, y, z);
             processed++;
         }
         if (player != null) randomTicks();
@@ -500,7 +569,23 @@ public final class World implements Shapes.Getter {
         }
         entities.addAll(pendingEntities);
         pendingEntities.clear();
+        checkPlates();
         if (player != null) spawner.tick(this, player, random);
+    }
+
+    /** Entities standing on pressure plates press them. */
+    private void checkPlates() {
+        List<Entity> all = new ArrayList<>(entities);
+        if (player != null && !player.isDead()) all.add(player);
+        for (Entity e : all) {
+            if (e.removed) continue;
+            int bx = (int) Math.floor(e.x), by = (int) Math.floor(e.y + 0.05), bz = (int) Math.floor(e.z);
+            Block b = Block.get(getBlock(bx, by, bz));
+            if (b.shape != Block.Shape.PLATE || (getMeta(bx, by, bz) & 1) != 0) continue;
+            if (b == Block.STONE_PRESSURE_PLATE && !(e instanceof LivingEntity)) continue;
+            if (!(e instanceof LivingEntity) && !(e instanceof ItemEntity)) continue;
+            Redstone.stepOnPlate(this, bx, by, bz);
+        }
     }
 
     private void randomTicks() {
@@ -554,8 +639,8 @@ public final class World implements Shapes.Getter {
             if (h < 3 && random.nextInt(8) == 0) setBlock(x, y + 1, z, b.id);
         } else if (b == Block.OAK_LEAVES || b == Block.BIRCH_LEAVES || b == Block.SPRUCE_LEAVES) {
             if (getMeta(x, y, z) == 0 && !logNearby(x, y, z)) breakBlock(x, y, z, null, true);
-        } else if (b == Block.FIRE) {
-            tickFire(x, y, z);
+        } else if (b == Block.LIT_REDSTONE_ORE) {
+            setBlock(x, y, z, Block.REDSTONE_ORE.id);
         } else if (b == Block.ICE) {
             if (getBlockLight(x, y + 1, z) > 11) setBlock(x, y, z, Block.WATER.id);
         }

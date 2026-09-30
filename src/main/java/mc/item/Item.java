@@ -210,7 +210,8 @@ public final class Item {
         if (b == Block.STONE || b == Block.COBBLESTONE || b == Block.MOSSY_COBBLESTONE || b == Block.SANDSTONE || b == Block.BRICKS
                 || b == Block.STONE_BRICKS || b == Block.FURNACE || b == Block.LIT_FURNACE || b == Block.OBSIDIAN || b == Block.GRANITE
                 || b == Block.DIORITE || b == Block.ANDESITE || b == Block.TERRACOTTA || b == Block.ICE || b.name.endsWith("Ore")
-                || b == Block.SPAWNER || b.name.startsWith("Block of") || b == Block.NETHERRACK || b == Block.NETHER_BRICKS)
+                || b == Block.SPAWNER || b.name.startsWith("Block of") || b == Block.NETHERRACK || b == Block.NETHER_BRICKS
+                || b == Block.STONE_BUTTON || b == Block.STONE_PRESSURE_PLATE || b == Block.PISTON || b == Block.STICKY_PISTON)
             return Tool.PICKAXE;
         if (b.base != null && b.shape != Block.Shape.CARPET) return effectiveTool(b.base);
         if (b == Block.IRON_DOOR || b == Block.IRON_BARS) return Tool.PICKAXE;
@@ -225,6 +226,7 @@ public final class Item {
         if (b == Block.OBSIDIAN) return 3;
         if (b == Block.DIAMOND_ORE || b == Block.GOLD_ORE || b == Block.EMERALD_ORE || b == Block.EMERALD_BLOCK || b == Block.DIAMOND_BLOCK) return 2;
         if (b == Block.IRON_BLOCK) return 1;
+        if (b == Block.REDSTONE_ORE || b == Block.LIT_REDSTONE_ORE) return 2;
         if (b == Block.NETHERRACK || b == Block.NETHER_QUARTZ_ORE || b == Block.NETHER_BRICKS || b == Block.QUARTZ_BLOCK) return 0;
         if (b == Block.IRON_ORE) return 1;
         if (effectiveTool(b) == Tool.PICKAXE) return 0;

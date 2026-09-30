@@ -6,7 +6,7 @@ package mc.world;
 public final class Block {
     public enum Model { NONE, CUBE, CROSS, LIQUID, TORCH, SHAPE }
     /** Non-cube geometry, see {@link Shapes}. */
-    public enum Shape { NONE, SLAB, STAIRS, FENCE, GATE, DOOR, TRAPDOOR, LADDER, PANE, BED, WALL, CARPET, SNOW_LAYER, CAKE, PORTAL }
+    public enum Shape { NONE, SLAB, STAIRS, FENCE, GATE, DOOR, TRAPDOOR, LADDER, PANE, BED, WALL, CARPET, SNOW_LAYER, CAKE, PORTAL, WIRE, LEVER, BUTTON, PLATE, REPEATER, PISTON, PISTON_HEAD }
     public enum Layer { OPAQUE, CUTOUT, TRANSLUCENT }
     public enum Tint { NONE, GRASS, FOLIAGE, BIRCH, SPRUCE }
     public enum SoundType { STONE, WOOD, GRASS, GRAVEL, SAND, GLASS, CLOTH, SNOW, NONE }
@@ -95,9 +95,12 @@ public final class Block {
                 CAKE_TOP = 116, CAKE_SIDE = 117, CAKE_INNER = 118, CAKE_BOTTOM = 119, CAKE_ITEM = 120,
                 EMERALD_ORE = 121, EMERALD_BLOCK = 122, SPAWNER = 123, GRAVEL_PATH = 124,
                 NETHERRACK = 125, SOUL_SAND = 126, QUARTZ_ORE = 127, PORTAL = 128, FIRE = 129, NETHER_BRICKS = 130,
-                QUARTZ_SIDE = 131, QUARTZ_TOP = 132,
+                QUARTZ_SIDE = 131, QUARTZ_TOP = 132, REDSTONE_DUST = 133, REDSTONE_TORCH_ON = 134, REDSTONE_TORCH_OFF = 135,
+                LEVER = 136, LAMP_OFF = 137, LAMP_ON = 138, REPEATER_OFF = 139, REPEATER_ON = 140, PISTON_TOP = 141,
+                PISTON_STICKY = 142, PISTON_SIDE = 143, PISTON_BOTTOM = 144, PISTON_INNER = 145, REDSTONE_ORE = 146,
+                REDSTONE_BLOCK = 147, REPEATER_ITEM = 148, REDSTONE_DUST_LINE = 149,
                 BREAK_0 = 240; // 240..249 crack stages
-        public static final int COUNT = 133;
+        public static final int COUNT = 150;
     }
 
     public static final Block AIR = new Block(0, "Air", 0);
@@ -215,6 +218,25 @@ public final class Block {
     public static final Block FIRE = new Block(110, "Fire", Tex.FIRE).plant().light(15);
     public static final Block NETHER_BRICKS = new Block(111, "Nether Bricks", Tex.NETHER_BRICKS).hardness(2f);
     public static final Block QUARTZ_BLOCK = new Block(112, "Block of Quartz", 0).tex(Tex.QUARTZ_TOP, Tex.QUARTZ_TOP, Tex.QUARTZ_SIDE).hardness(0.8f);
+    // Redstone (meta layouts documented in Shapes and Redstone)
+    public static final Block REDSTONE_WIRE = new Block(113, "Redstone Wire", Tex.REDSTONE_DUST).shape(Shape.WIRE).cutout().hardness(0);
+    public static final Block REDSTONE_TORCH = new Block(114, "Redstone Torch", Tex.REDSTONE_TORCH_ON).light(7);
+    public static final Block UNLIT_REDSTONE_TORCH = new Block(115, "Redstone Torch", Tex.REDSTONE_TORCH_OFF);
+    public static final Block LEVER = new Block(116, "Lever", Tex.LEVER).shape(Shape.LEVER).cutout().hardness(0.5f);
+    public static final Block STONE_BUTTON = derived(117, "Stone Button", STONE, Shape.BUTTON).hardness(0.5f);
+    public static final Block OAK_BUTTON = derived(118, "Oak Button", PLANKS, Shape.BUTTON).hardness(0.5f);
+    public static final Block STONE_PRESSURE_PLATE = derived(119, "Stone Pressure Plate", STONE, Shape.PLATE).hardness(0.5f);
+    public static final Block OAK_PRESSURE_PLATE = derived(120, "Oak Pressure Plate", PLANKS, Shape.PLATE).hardness(0.5f);
+    public static final Block REDSTONE_LAMP = new Block(121, "Redstone Lamp", Tex.LAMP_OFF).sound(SoundType.GLASS).hardness(0.3f);
+    public static final Block LIT_REDSTONE_LAMP = new Block(122, "Redstone Lamp", Tex.LAMP_ON).light(15).sound(SoundType.GLASS).hardness(0.3f);
+    public static final Block REPEATER = new Block(123, "Redstone Repeater", 0).tex(Tex.REPEATER_OFF, Tex.SMOOTH_STONE, Tex.SMOOTH_STONE).shape(Shape.REPEATER).hardness(0).itemTex(Tex.REPEATER_ITEM);
+    public static final Block POWERED_REPEATER = new Block(124, "Redstone Repeater", 0).tex(Tex.REPEATER_ON, Tex.SMOOTH_STONE, Tex.SMOOTH_STONE).shape(Shape.REPEATER).hardness(0).itemTex(Tex.REPEATER_ITEM);
+    public static final Block PISTON = new Block(125, "Piston", 0).tex(Tex.PISTON_TOP, Tex.PISTON_BOTTOM, Tex.PISTON_SIDE).shape(Shape.PISTON).hardness(1.5f);
+    public static final Block STICKY_PISTON = new Block(126, "Sticky Piston", 0).tex(Tex.PISTON_STICKY, Tex.PISTON_BOTTOM, Tex.PISTON_SIDE).shape(Shape.PISTON).hardness(1.5f);
+    public static final Block PISTON_HEAD = new Block(127, "Piston Head", 0).tex(Tex.PISTON_TOP, Tex.PISTON_TOP, Tex.PISTON_SIDE).shape(Shape.PISTON_HEAD).hardness(1.5f);
+    public static final Block REDSTONE_ORE = new Block(128, "Redstone Ore", Tex.REDSTONE_ORE).hardness(3f);
+    public static final Block LIT_REDSTONE_ORE = new Block(129, "Redstone Ore", Tex.REDSTONE_ORE).light(9).hardness(3f);
+    public static final Block REDSTONE_BLOCK = new Block(130, "Block of Redstone", Tex.REDSTONE_BLOCK).hardness(5f);
 
     static {
         AIR.model = Model.NONE; AIR.opaque = false; AIR.solid = false; AIR.replaceable = true; AIR.inCreativeInventory = false; AIR.sound = SoundType.NONE;
@@ -231,6 +253,15 @@ public final class Block {
         DANDELION.replaceable = false; POPPY.replaceable = false; BLUE_ORCHID.replaceable = false; SUGAR_CANE.replaceable = false;
         DEAD_BUSH.replaceable = true;
         LADDER.climbable = true;
+        for (Block b : new Block[]{REDSTONE_TORCH, UNLIT_REDSTONE_TORCH}) {
+            b.model = Model.TORCH; b.layer = Layer.CUTOUT; b.opaque = false; b.solid = false; b.sound = SoundType.WOOD; b.hardness = 0; b.washable = true;
+        }
+        REDSTONE_WIRE.solid = false; REDSTONE_WIRE.washable = true; REDSTONE_WIRE.inCreativeInventory = false; REDSTONE_WIRE.sound = SoundType.NONE;
+        UNLIT_REDSTONE_TORCH.inCreativeInventory = false; LIT_REDSTONE_LAMP.inCreativeInventory = false; POWERED_REPEATER.inCreativeInventory = false;
+        PISTON_HEAD.inCreativeInventory = false; LIT_REDSTONE_ORE.inCreativeInventory = false;
+        for (Block b : new Block[]{LEVER, STONE_BUTTON, OAK_BUTTON, STONE_PRESSURE_PLATE, OAK_PRESSURE_PLATE}) { b.solid = false; b.washable = true; }
+        REPEATER.washable = true; POWERED_REPEATER.washable = true;
+        OAK_BUTTON.sound = SoundType.WOOD; OAK_PRESSURE_PLATE.sound = SoundType.WOOD;
         NETHER_PORTAL.solid = false; NETHER_PORTAL.inCreativeInventory = false; NETHER_PORTAL.sound = SoundType.GLASS;
         FIRE.inCreativeInventory = false; FIRE.sound = SoundType.NONE; FIRE.tint = Tint.NONE;
         for (Block b : BY_ID) {
@@ -253,6 +284,9 @@ public final class Block {
         return face == 0 ? texTop : face == 1 ? texBottom : texSide;
     }
 
+    /** Mesh face index (0 up, 1 down, 2 north, 3 south, 4 west, 5 east) for 6-way facing 0 down, 1 up, 2 north, 3 south, 4 west, 5 east. */
+    public static final int[] PISTON_FACE = {1, 0, 2, 3, 4, 5};
+
     /** Face index of the front for facing meta 0-3 (south, west, north, east). */
     public static final int[] FRONT_FACE = {3, 4, 2, 5};
 
@@ -270,6 +304,18 @@ public final class Block {
         if (this == CARROTS) return Tex.CARROTS_0 + cropStage(meta);
         if (this == POTATOES) return Tex.POTATOES_0 + cropStage(meta);
         if (this == CAKE && face == 4 && (meta & 7) > 0) return Tex.CAKE_INNER;
+        if (shape == Shape.PISTON) {
+            int f = meta & 7, opposite = f ^ 1;
+            if (face == PISTON_FACE[f]) return (meta & 8) != 0 ? Tex.PISTON_INNER : texTop;
+            if (face == PISTON_FACE[opposite]) return Tex.PISTON_BOTTOM;
+            return Tex.PISTON_SIDE;
+        }
+        if (this == PISTON_HEAD) {
+            int f = meta & 7;
+            if (face == PISTON_FACE[f]) return (meta & 8) != 0 ? Tex.PISTON_STICKY : Tex.PISTON_TOP;
+            return face == PISTON_FACE[f ^ 1] ? Tex.PISTON_TOP : Tex.PISTON_SIDE;
+        }
+        if (shape == Shape.REPEATER && face != 0) return Tex.SMOOTH_STONE;
         if (shape == Shape.DOOR) return (meta & 8) != 0 ? texTop : texBottom;
         if (this == BED) return face == 0 ? ((meta & 4) != 0 ? Tex.BED_HEAD : Tex.BED_FOOT) : face == 1 ? Tex.PLANKS : Tex.BED_SIDE;
         if (this == FARMLAND && face == 0 && meta > 0) return Tex.FARMLAND_WET;
@@ -297,7 +343,8 @@ public final class Block {
     /** Items for these shapes are drawn as 3D models in the GUI and in hand; others use a flat sprite. */
     public boolean has3dItem() {
         return model == Model.CUBE || (model == Model.SHAPE && shape != Shape.DOOR && shape != Shape.LADDER
-                && shape != Shape.PANE && shape != Shape.BED && shape != Shape.CAKE);
+                && shape != Shape.PANE && shape != Shape.BED && shape != Shape.CAKE && shape != Shape.REPEATER && shape != Shape.LEVER
+                && shape != Shape.WIRE);
     }
 
     /** Tile used when the block is shown as a flat sprite. */
