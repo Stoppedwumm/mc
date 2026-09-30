@@ -89,6 +89,11 @@ public final class Recipes {
         shaped(Item.of(Block.STICKY_PISTON), 1, new String[]{"S", "P"}, 'S', Item.SLIMEBALL, 'P', Block.PISTON);
         shaped(Item.of(Block.REDSTONE_BLOCK), 1, new String[]{"###", "###", "###"}, '#', Item.REDSTONE);
         shapeless(Item.REDSTONE, 9, Block.REDSTONE_BLOCK);
+        shaped(Item.of(Block.ENCHANTING_TABLE), 1, new String[]{" B ", "DOD", "OOO"}, 'B', Item.BOOK, 'D', Item.DIAMOND, 'O', Block.OBSIDIAN);
+        shaped(Item.of(Block.ANVIL), 1, new String[]{"III", " i ", "iii"}, 'I', Block.IRON_BLOCK, 'i', Item.IRON_INGOT);
+        shaped(Item.of(Block.LAPIS_BLOCK), 1, new String[]{"###", "###", "###"}, '#', Item.LAPIS_LAZULI);
+        shapeless(Item.LAPIS_LAZULI, 9, Block.LAPIS_BLOCK);
+        shaped(Item.FISHING_ROD, 1, new String[]{"  S", " SX", "S X"}, 'S', Item.STICK, 'X', Item.STRING);
         shaped(Item.BREAD, 1, new String[]{"WWW"}, 'W', Item.WHEAT);
         shaped(Item.BUCKET, 1, new String[]{"I I", " I "}, 'I', Item.IRON_INGOT);
         shaped(Item.BOW, 1, new String[]{" TS", "T S", " TS"}, 'T', Item.STICK, 'S', Item.STRING);
@@ -154,6 +159,7 @@ public final class Recipes {
         smelt(Block.DIAMOND_ORE, Item.DIAMOND);
         smelt(Block.EMERALD_ORE, Item.EMERALD);
         smelt(Block.REDSTONE_ORE, Item.REDSTONE);
+        smelt(Block.LAPIS_ORE, Item.LAPIS_LAZULI);
         smelt(Block.COAL_ORE, Item.COAL);
         smelt(Block.SAND, Item.of(Block.GLASS));
         smelt(Block.COBBLESTONE, Item.of(Block.STONE));

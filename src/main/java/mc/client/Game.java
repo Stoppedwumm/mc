@@ -24,7 +24,7 @@ import static org.lwjgl.opengl.GL33C.*;
 public final class Game implements World.Listener {
     private static final double TICK = 0.05;
 
-    enum Screen { LOADING, NONE, PAUSE, INVENTORY, CRAFTING, FURNACE, CHEST, CREATIVE, CHAT, DEATH, TRADING }
+    enum Screen { LOADING, NONE, PAUSE, INVENTORY, CRAFTING, FURNACE, CHEST, CREATIVE, CHAT, DEATH, TRADING, ENCHANTING, ANVIL }
 
     private final Path gameDir, worldDir;
     final Options options;
@@ -155,7 +155,7 @@ public final class Game implements World.Listener {
             if (level.inventory != null) {
                 for (int i = 0; i < Math.min(36, level.inventory.length); i++) {
                     int[] e = level.inventory[i];
-                    if (e != null && Item.get(e[0]) != null) player.inventory.slots[i] = new ItemStack(Item.get(e[0]), e[1], e[2]);
+                    if (e != null) player.inventory.slots[i] = ItemStack.fromArray(e);
                 }
             } else if (level.hotbar != null) {
                 for (int i = 0; i < 9 && i < level.hotbar.length; i++) if (Item.get(level.hotbar[i]) != null) player.inventory.slots[i] = new ItemStack(Item.get(level.hotbar[i]), 64);
@@ -163,7 +163,7 @@ public final class Game implements World.Listener {
             if (level.armor != null) {
                 for (int i = 0; i < Math.min(4, level.armor.length); i++) {
                     int[] e = level.armor[i];
-                    if (e != null && Item.get(e[0]) != null) player.inventory.armor[i] = new ItemStack(Item.get(e[0]), e[1], e[2]);
+                    if (e != null) player.inventory.armor[i] = ItemStack.fromArray(e);
                 }
             }
             player.xpLevel = level.xpLevel;
@@ -239,7 +239,7 @@ public final class Game implements World.Listener {
             };
             for (int i = 0; d.slots != null && i < Math.min(be.slots.length, d.slots.length); i++) {
                 int[] e = d.slots[i];
-                if (e != null && Item.get(e[0]) != null) be.slots[i] = new ItemStack(Item.get(e[0]), e[1], e[2]);
+                if (e != null) be.slots[i] = ItemStack.fromArray(e);
             }
             if (be instanceof BlockEntity.Furnace f) { f.burnTime = d.burnTime; f.burnTotal = d.burnTotal; f.cookTime = d.cookTime; }
             world.blockEntities.put(World.posKey(d.x, d.y, d.z), be);
@@ -250,7 +250,7 @@ public final class Game implements World.Listener {
         int[][] out = new int[slots.length][];
         for (int i = 0; i < slots.length; i++) {
             ItemStack s = slots[i];
-            if (!ItemStack.isEmpty(s)) out[i] = new int[]{s.item.id, s.count, s.damage};
+            if (!ItemStack.isEmpty(s)) out[i] = s.toArray();
         }
         return out;
     }
@@ -453,6 +453,13 @@ public final class Game implements World.Listener {
             } else if (id == Block.LAVA.id && world.getBlock(x, y + 1, z) == 0 && random.nextInt(60) == 0) {
                 particles.spawn("flame", x + random.nextDouble(), y + 1, z + random.nextDouble());
                 particles.spawn("smoke", x + random.nextDouble(), y + 1.1, z + random.nextDouble());
+            } else if (id == Block.BOOKSHELF.id && random.nextInt(16) == 0) {
+                // Glyphs drift from bookshelves to a nearby enchanting table
+                for (int dx = -2; dx <= 2; dx++)
+                    for (int dz = -2; dz <= 2; dz++)
+                        for (int dy = -1; dy <= 0; dy++)
+                            if (world.getBlock(x + dx, y + dy, z + dz) == Block.ENCHANTING_TABLE.id)
+                                particles.spawn("enchant", x + 0.5 - dx * 0.3, y + 1.2, z + 0.5 - dz * 0.3);
             } else if (id == Block.LIT_FURNACE.id && random.nextInt(3) == 0) {
                 int f = world.getMeta(x, y, z) & 3;
                 double fx = x + 0.5 + mc.world.Shapes.DX[f] * 0.52, fz = z + 0.5 + mc.world.Shapes.DZ[f] * 0.52;
@@ -805,7 +812,7 @@ public final class Game implements World.Listener {
         switch (screen) {
             case NONE -> handleGameInput();
             case PAUSE -> { if (input.pressed(GLFW_KEY_ESCAPE)) closeScreen(); }
-            case INVENTORY, CRAFTING, FURNACE, CHEST, CREATIVE, TRADING -> {
+            case INVENTORY, CRAFTING, FURNACE, CHEST, CREATIVE, TRADING, ENCHANTING, ANVIL -> {
                 if (input.pressed(GLFW_KEY_ESCAPE) || input.pressed(GLFW_KEY_E)) closeScreen();
             }
             case CHAT -> handleChatInput();

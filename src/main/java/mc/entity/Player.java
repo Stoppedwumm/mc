@@ -25,6 +25,8 @@ public final class Player extends LivingEntity {
     public int xpLevel, xpTotal;
     /** Ticks spent standing in a portal, and the cooldown after travelling. */
     public int portalTicks, portalCooldown;
+    /** Seed for the enchanting table's offers (changes after every enchantment, like Minecraft). */
+    public int enchantSeed = new java.util.Random().nextInt();
 
     public boolean inPortal() { return touching(Block.NETHER_PORTAL.id); }
     /** Progress towards the next level, 0-1. */

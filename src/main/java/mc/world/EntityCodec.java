@@ -21,17 +21,16 @@ public final class EntityCodec {
 
     private static JsonArray stack(ItemStack s) {
         JsonArray a = new JsonArray();
-        a.add(s.item.id);
-        a.add(s.count);
-        a.add(s.damage);
+        for (int v : s.toArray()) a.add(v);
         return a;
     }
 
     private static ItemStack stack(JsonElement e) {
         if (e == null || e.isJsonNull()) return null;
         JsonArray a = e.getAsJsonArray();
-        Item it = Item.get(a.get(0).getAsInt());
-        return it == null ? null : new ItemStack(it, a.get(1).getAsInt(), a.get(2).getAsInt());
+        int[] v = new int[a.size()];
+        for (int i = 0; i < v.length; i++) v[i] = a.get(i).getAsInt();
+        return ItemStack.fromArray(v);
     }
 
     public static JsonObject write(Entity e) {

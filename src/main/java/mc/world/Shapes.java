@@ -243,6 +243,13 @@ public final class Shapes {
                     if (!col) out.add(rot6(new int[]{6, 12, 6, 10, 16, 10}, f6));
                 }
             }
+            case TABLE -> out.add(new int[]{0, 0, 0, 16, 12, 16});
+            case ANVIL -> {
+                out.add(rotH(new int[]{2, 0, 2, 14, 4, 14}, f));
+                out.add(rotH(new int[]{4, 4, 3, 12, 5, 13}, f));
+                out.add(rotH(new int[]{6, 5, 4, 10, 10, 12}, f));
+                out.add(rotH(new int[]{3, 10, 0, 13, 16, 16}, f));
+            }
             case PISTON_HEAD -> {
                 int f6 = meta & 7;
                 out.add(rot6(new int[]{0, 12, 0, 16, 16, 16}, f6));

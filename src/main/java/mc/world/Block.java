@@ -6,7 +6,7 @@ package mc.world;
 public final class Block {
     public enum Model { NONE, CUBE, CROSS, LIQUID, TORCH, SHAPE }
     /** Non-cube geometry, see {@link Shapes}. */
-    public enum Shape { NONE, SLAB, STAIRS, FENCE, GATE, DOOR, TRAPDOOR, LADDER, PANE, BED, WALL, CARPET, SNOW_LAYER, CAKE, PORTAL, WIRE, LEVER, BUTTON, PLATE, REPEATER, PISTON, PISTON_HEAD }
+    public enum Shape { NONE, SLAB, STAIRS, FENCE, GATE, DOOR, TRAPDOOR, LADDER, PANE, BED, WALL, CARPET, SNOW_LAYER, CAKE, PORTAL, WIRE, LEVER, BUTTON, PLATE, REPEATER, PISTON, PISTON_HEAD, TABLE, ANVIL }
     public enum Layer { OPAQUE, CUTOUT, TRANSLUCENT }
     public enum Tint { NONE, GRASS, FOLIAGE, BIRCH, SPRUCE }
     public enum SoundType { STONE, WOOD, GRASS, GRAVEL, SAND, GLASS, CLOTH, SNOW, NONE }
@@ -98,9 +98,10 @@ public final class Block {
                 QUARTZ_SIDE = 131, QUARTZ_TOP = 132, REDSTONE_DUST = 133, REDSTONE_TORCH_ON = 134, REDSTONE_TORCH_OFF = 135,
                 LEVER = 136, LAMP_OFF = 137, LAMP_ON = 138, REPEATER_OFF = 139, REPEATER_ON = 140, PISTON_TOP = 141,
                 PISTON_STICKY = 142, PISTON_SIDE = 143, PISTON_BOTTOM = 144, PISTON_INNER = 145, REDSTONE_ORE = 146,
-                REDSTONE_BLOCK = 147, REPEATER_ITEM = 148, REDSTONE_DUST_LINE = 149,
+                REDSTONE_BLOCK = 147, REPEATER_ITEM = 148, REDSTONE_DUST_LINE = 149, ENCH_TOP = 150, ENCH_SIDE = 151,
+                ENCH_BOTTOM = 152, ANVIL_TOP = 153, ANVIL_SIDE = 154, LAPIS_ORE = 155, LAPIS_BLOCK = 156,
                 BREAK_0 = 240; // 240..249 crack stages
-        public static final int COUNT = 150;
+        public static final int COUNT = 157;
     }
 
     public static final Block AIR = new Block(0, "Air", 0);
@@ -237,6 +238,10 @@ public final class Block {
     public static final Block REDSTONE_ORE = new Block(128, "Redstone Ore", Tex.REDSTONE_ORE).hardness(3f);
     public static final Block LIT_REDSTONE_ORE = new Block(129, "Redstone Ore", Tex.REDSTONE_ORE).light(9).hardness(3f);
     public static final Block REDSTONE_BLOCK = new Block(130, "Block of Redstone", Tex.REDSTONE_BLOCK).hardness(5f);
+    public static final Block ENCHANTING_TABLE = new Block(131, "Enchanting Table", 0).tex(Tex.ENCH_TOP, Tex.ENCH_BOTTOM, Tex.ENCH_SIDE).shape(Shape.TABLE).light(7).hardness(5f);
+    public static final Block ANVIL = new Block(132, "Anvil", 0).tex(Tex.ANVIL_TOP, Tex.ANVIL_SIDE, Tex.ANVIL_SIDE).shape(Shape.ANVIL).hardness(5f);
+    public static final Block LAPIS_ORE = new Block(133, "Lapis Lazuli Ore", Tex.LAPIS_ORE).hardness(3f);
+    public static final Block LAPIS_BLOCK = new Block(134, "Block of Lapis Lazuli", Tex.LAPIS_BLOCK).hardness(3f);
 
     static {
         AIR.model = Model.NONE; AIR.opaque = false; AIR.solid = false; AIR.replaceable = true; AIR.inCreativeInventory = false; AIR.sound = SoundType.NONE;
@@ -324,7 +329,7 @@ public final class Block {
 
     /** Blocks with a front that faces the player when placed. */
     public boolean hasFacing() {
-        return this == FURNACE || this == LIT_FURNACE || this == CHEST || this == PUMPKIN;
+        return this == FURNACE || this == LIT_FURNACE || this == CHEST || this == PUMPKIN || this == ANVIL;
     }
 
     public boolean isLiquid() { return model == Model.LIQUID; }

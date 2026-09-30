@@ -14,6 +14,14 @@ public final class Drops {
     public static List<ItemStack> of(Block b, int meta, ItemStack tool) {
         List<ItemStack> out = new ArrayList<>();
         Item t = tool == null ? null : tool.item;
+        // Silk Touch drops the block itself
+        if (ItemStack.level(tool, mc.item.Enchantment.SILK_TOUCH) > 0 && silkTouchable(b)) {
+            int required = Item.requiredTier(b);
+            if (required < 0 || (t != null && t.tool == Item.Tool.PICKAXE && t.tier >= required)) {
+                add(out, Item.of(b == Block.LIT_REDSTONE_ORE ? Block.REDSTONE_ORE : b), 1);
+                return out;
+            }
+        }
         // Shears harvest leaves and cobweb-like plants as themselves
         if (t == Item.SHEARS && (b == Block.OAK_LEAVES || b == Block.BIRCH_LEAVES || b == Block.SPRUCE_LEAVES || b == Block.TALL_GRASS || b == Block.FERN || b == Block.DEAD_BUSH)) {
             add(out, Item.of(b), 1);
@@ -51,6 +59,7 @@ public final class Drops {
             case 122 -> add(out, Item.of(Block.REDSTONE_LAMP), 1);
             case 124 -> add(out, Item.of(Block.REPEATER), 1);
             case 128, 129 -> add(out, Item.REDSTONE, 4 + RANDOM.nextInt(2));
+            case 133 -> add(out, Item.LAPIS_LAZULI, 4 + RANDOM.nextInt(5));
             case 109 -> add(out, Item.QUARTZ, 1);
             case 30 -> add(out, Item.GLOWSTONE_DUST, 2 + RANDOM.nextInt(3));
             case 63 -> {
@@ -66,6 +75,25 @@ public final class Drops {
                 else if (b == Block.SNOW) add(out, Item.SNOWBALL, 4);
                 else add(out, Item.get(b.id), 1);
             }
+        }
+        return out;
+    }
+
+    private static boolean silkTouchable(Block b) {
+        return b == Block.STONE || b == Block.GRASS || b == Block.SNOWY_GRASS || b.name.endsWith("Ore") || b == Block.GLASS || b == Block.GLASS_PANE
+                || b == Block.ICE || b == Block.OAK_LEAVES || b == Block.BIRCH_LEAVES || b == Block.SPRUCE_LEAVES || b == Block.BOOKSHELF
+                || b == Block.GLOWSTONE || b == Block.CLAY || b == Block.SNOW || b == Block.MELON || b == Block.GRAVEL;
+    }
+
+    /** Fortune multiplies ore drops like Minecraft: 1 + max(0, rand(level + 2) - 1) times. */
+    public static List<ItemStack> of(Block b, int meta, ItemStack tool, java.util.Random r) {
+        List<ItemStack> out = of(b, meta, tool);
+        int fortune = ItemStack.level(tool, mc.item.Enchantment.FORTUNE);
+        boolean ore = b == Block.COAL_ORE || b == Block.DIAMOND_ORE || b == Block.EMERALD_ORE || b == Block.REDSTONE_ORE
+                || b == Block.LIT_REDSTONE_ORE || b == Block.LAPIS_ORE || b == Block.NETHER_QUARTZ_ORE || b == Block.GLOWSTONE;
+        if (fortune > 0 && ore && ItemStack.level(tool, mc.item.Enchantment.SILK_TOUCH) == 0) {
+            int bonus = Math.max(0, r.nextInt(fortune + 2) - 1);
+            for (ItemStack s : out) if (s.item.block == null) s.count *= bonus + 1;
         }
         return out;
     }

@@ -78,6 +78,8 @@ public final class ItemTextureGen {
         tile(114, () -> shape((x, y) -> dist(x, y, 7.5, 9.5) < 4 || (y < 7 && y > 1 && Math.abs(x - 7.5) < (y - 1) * 0.7), 0xc8e8f0, 0x6a9aa8, 0xffffff));
         tile(115, () -> shape((x, y) -> dist(x, y, 7.5, 8) < 5.5, 0xf08a20, 0x8a3a0a, 0xffd060));
         tile(116, () -> { shape((x, y) -> dist(x, y, 7.5, 7.5) < 5.5, 0x3a2a20, 0x101010, 0x6a4a3a); for (int i = 0; i < 10; i++) set(4 + r.nextInt(8), 4 + r.nextInt(8), 0xf08a20); });
+        tile(117, () -> shape((x, y) -> Math.abs(x - 7.5) + Math.abs(y - 7.5) < 6.5 && (x + y) % 5 != 0, 0x2a50c8, 0x10287a, 0x7a9af0));
+        tile(118, this::fishingRod);
         tile(91, () -> pile(0xd01010, 0x6a0000, 0xff5a5a));
         tile(92, () -> { book(); for (int y = 2; y < 14; y += 3) set(5 + (y % 5), y, 0xe070ff); });
         tile(93, this::xpBottle);
@@ -303,6 +305,12 @@ public final class ItemTextureGen {
     private void xpBottle() {
         shape((x, y) -> (y >= 6 && dist(x, y, 7.5, 10) < 5) || (y >= 2 && y < 6 && Math.abs(x - 7.5) < 2), 0x9ae05a, 0x3a7a1a, 0xe0ffc0);
         for (int x = 6; x <= 9; x++) set(x, 2, 0x8a6a4a);
+    }
+
+    private void fishingRod() {
+        handle(2, 14, 13, 3);
+        for (int y = 4; y < 13; y++) set(13, y, 0xd8d8d8);
+        set(12, 13, 0xa0a0a0);
     }
 
     private void shears() {

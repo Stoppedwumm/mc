@@ -145,6 +145,8 @@ public final class Item {
     public static final Item GHAST_TEAR = item(354, "Ghast Tear", 114);
     public static final Item MAGMA_CREAM = item(355, "Magma Cream", 115);
     public static final Item FIRE_CHARGE = item(356, "Fire Charge", 116);
+    public static final Item LAPIS_LAZULI = item(357, "Lapis Lazuli", 117);
+    public static final Item FISHING_ROD = tool(358, "Fishing Rod", 118, Tool.NONE, 0, 64, 1, 1);
 
     // Tools: icon = 40 + type*5 + material
     public static final Item WOODEN_PICKAXE = tool(300, "Wooden Pickaxe", 40, Tool.PICKAXE, 0, 59, 2, 2);
@@ -211,7 +213,8 @@ public final class Item {
                 || b == Block.STONE_BRICKS || b == Block.FURNACE || b == Block.LIT_FURNACE || b == Block.OBSIDIAN || b == Block.GRANITE
                 || b == Block.DIORITE || b == Block.ANDESITE || b == Block.TERRACOTTA || b == Block.ICE || b.name.endsWith("Ore")
                 || b == Block.SPAWNER || b.name.startsWith("Block of") || b == Block.NETHERRACK || b == Block.NETHER_BRICKS
-                || b == Block.STONE_BUTTON || b == Block.STONE_PRESSURE_PLATE || b == Block.PISTON || b == Block.STICKY_PISTON)
+                || b == Block.STONE_BUTTON || b == Block.STONE_PRESSURE_PLATE || b == Block.PISTON || b == Block.STICKY_PISTON
+                || b == Block.ENCHANTING_TABLE || b == Block.ANVIL)
             return Tool.PICKAXE;
         if (b.base != null && b.shape != Block.Shape.CARPET) return effectiveTool(b.base);
         if (b == Block.IRON_DOOR || b == Block.IRON_BARS) return Tool.PICKAXE;
@@ -227,6 +230,8 @@ public final class Item {
         if (b == Block.DIAMOND_ORE || b == Block.GOLD_ORE || b == Block.EMERALD_ORE || b == Block.EMERALD_BLOCK || b == Block.DIAMOND_BLOCK) return 2;
         if (b == Block.IRON_BLOCK) return 1;
         if (b == Block.REDSTONE_ORE || b == Block.LIT_REDSTONE_ORE) return 2;
+        if (b == Block.LAPIS_ORE || b == Block.LAPIS_BLOCK) return 1;
+        if (b == Block.ENCHANTING_TABLE || b == Block.ANVIL) return 0;
         if (b == Block.NETHERRACK || b == Block.NETHER_QUARTZ_ORE || b == Block.NETHER_BRICKS || b == Block.QUARTZ_BLOCK) return 0;
         if (b == Block.IRON_ORE) return 1;
         if (effectiveTool(b) == Tool.PICKAXE) return 0;

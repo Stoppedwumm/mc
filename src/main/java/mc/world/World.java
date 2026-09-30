@@ -402,7 +402,7 @@ public final class World implements Shapes.Getter {
         }
         setBlock(x, y, z, 0);
         if (drop) {
-            List<ItemStack> drops = Drops.of(b, meta, tool);
+            List<ItemStack> drops = Drops.of(b, meta, tool, random);
             for (ItemStack s : drops) spawnItem(x + 0.5, y + 0.5, z + 0.5, s);
             int xp = drops.isEmpty() ? 0 : b == Block.COAL_ORE ? random.nextInt(3) : b == Block.DIAMOND_ORE || b == Block.EMERALD_ORE ? 3 + random.nextInt(5) : 0;
             if (b == Block.SPAWNER) xp = 15 + random.nextInt(29);

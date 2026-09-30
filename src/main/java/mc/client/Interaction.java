@@ -3,6 +3,7 @@ package mc.client;
 import mc.entity.*;
 import mc.item.Item;
 import mc.item.ItemStack;
+import mc.item.Enchantment;
 import mc.util.AABB;
 import mc.util.RayCast;
 import mc.world.Block;
@@ -104,8 +105,20 @@ final class Interaction {
         float dmg = ItemStack.isEmpty(h) ? 1 : h.item.attackDamage;
         boolean crit = p.fallDistance > 0 && !p.onGround && !p.inWater && p.motionY < 0;
         if (crit) dmg *= 1.5f;
+        int sharp = ItemStack.level(h, Enchantment.SHARPNESS), smite = ItemStack.level(h, Enchantment.SMITE);
+        if (sharp > 0) dmg += 0.5f * sharp + 0.5f;
+        if (smite > 0 && target instanceof Mob um && um.type.isUndead()) dmg += 2.5f * smite;
+        if (target instanceof Mob lm) lm.lootingBonus = ItemStack.level(h, Enchantment.LOOTING);
         if (target.damage(DamageSource.ATTACK, dmg, p)) {
             w().commandWolves(target);
+            int kb = ItemStack.level(h, Enchantment.KNOCKBACK);
+            if (kb > 0) {
+                double r = Math.toRadians(p.yaw);
+                target.knockback(0.5 * kb, Math.sin(r), -Math.cos(r));
+            }
+            int fire = ItemStack.level(h, Enchantment.FIRE_ASPECT);
+            if (fire > 0 && !target.fireImmune()) target.fireTicks = Math.max(target.fireTicks, 80 * fire);
+            if (sharp + smite > 0) for (int i = 0; i < 6; i++) g.particles.spawn("magic", target.x, target.y + target.height * 0.7, target.z);
             if (p.sprinting) {
                 double r = Math.toRadians(p.yaw);
                 target.knockback(0.5, Math.sin(r), -Math.cos(r));
@@ -214,12 +227,18 @@ final class Interaction {
         a.setPos(p.x, p.eyeY() - 0.1, p.z);
         double ry = Math.toRadians(p.yaw), rp = Math.toRadians(p.pitch);
         a.shoot(-Math.sin(ry) * Math.cos(rp), -Math.sin(rp), Math.cos(ry) * Math.cos(rp), power * 3, 1);
-        a.pickup = !p.creative;
+        ItemStack bowStack = held();
+        boolean infinity = ItemStack.level(bowStack, Enchantment.INFINITY) > 0;
+        a.pickup = !p.creative && !infinity;
         if (power >= 1) a.damage = 2.5f;
+        int pw = ItemStack.level(bowStack, Enchantment.POWER);
+        if (pw > 0) a.damage += 0.5f * pw + 0.5f;
+        a.punch = ItemStack.level(bowStack, Enchantment.PUNCH);
+        if (ItemStack.level(bowStack, Enchantment.FLAME) > 0) a.fireTicks = 2000;
         g.world.addEntity(a);
         g.sound.play("bow", p.x, p.y + 1.5, p.z, 1, 1.2f + power * 0.5f);
         if (!p.creative) {
-            p.inventory.slots[slot].count--;
+            if (!infinity) p.inventory.slots[slot].count--;
             ItemStack bow = held();
             if (bow != null && bow.damageTool(1)) breakHeld();
             p.inventory.cleanup();
@@ -274,6 +293,8 @@ final class Interaction {
         boolean canHarvest = required < 0 || (t != null && t.tool == Item.Tool.PICKAXE && t.tier >= required);
         float speed = 1;
         if (t != null && t.tool != Item.Tool.NONE && t.tool == Item.effectiveTool(b)) speed = t.miningSpeed;
+        int eff = ItemStack.level(h, Enchantment.EFFICIENCY);
+        if (eff > 0 && speed > 1) speed += eff * eff + 1;
         if (t != null && t.tool == Item.Tool.SWORD) speed = 1.5f;
         if (t == Item.SHEARS && (b.tint == Block.Tint.FOLIAGE || b.tint == Block.Tint.BIRCH || b.tint == Block.Tint.SPRUCE)) speed = 15;
         if (t == Item.SHEARS && b.sound == Block.SoundType.CLOTH && b.shape == Block.Shape.NONE) speed = 5;
@@ -325,6 +346,8 @@ final class Interaction {
         if (hit != null && !p.sneaking && fresh) {
             int id = w().getBlock(hit.x, hit.y, hit.z);
             if (id == Block.CRAFTING_TABLE.id) { g.screens.openCrafting(); startSwing(); return; }
+            if (id == Block.ENCHANTING_TABLE.id) { g.screens.openEnchanting(hit.x, hit.y, hit.z); return; }
+            if (id == Block.ANVIL.id) { g.screens.openAnvil(); return; }
             if (id == Block.LEVER.id) { Redstone.toggleLever(w(), hit.x, hit.y, hit.z); startSwing(); return; }
             if (Block.get(id).shape == Block.Shape.BUTTON) { Redstone.pressButton(w(), hit.x, hit.y, hit.z); startSwing(); return; }
             if (id == Block.REPEATER.id || id == Block.POWERED_REPEATER.id) {

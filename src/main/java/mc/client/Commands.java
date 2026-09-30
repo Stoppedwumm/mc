@@ -73,6 +73,8 @@ final class Commands {
                         case "pause" -> g.setScreen(Game.Screen.PAUSE);
                         case "inventory" -> g.screens.openInventory();
                         case "crafting" -> g.screens.openCrafting();
+                        case "enchanting" -> g.screens.openEnchanting((int) Math.floor(p.x), (int) Math.floor(p.y), (int) Math.floor(p.z));
+                        case "anvil" -> g.screens.openAnvil();
                         case "trading" -> {
                             Mob v = new Mob(MobType.VILLAGER);
                             v.profession = a.length > 2 ? Integer.parseInt(a[2]) : 0;
@@ -100,6 +102,14 @@ final class Commands {
                     int mat = java.util.Arrays.asList("leather", "chainmail", "iron", "golden", "diamond").indexOf(a[1]);
                     for (int i = 0; i < 4; i++) p.inventory.armor[i] = mat < 0 ? null : new ItemStack(Item.armor(mat, i), 1);
                     chat(mat < 0 ? "Removed armor" : "Equipped " + a[1] + " armor");
+                }
+                case "enchant" -> {
+                    ItemStack held = p.inventory.held();
+                    if (ItemStack.isEmpty(held)) { chat("Hold an item to enchant"); return; }
+                    mc.item.Enchantment e = mc.item.Enchantment.valueOf(a[1].toUpperCase());
+                    int lv = a.length > 2 ? Integer.parseInt(a[2]) : 1;
+                    held.enchant(e, lv);
+                    chat("Applied " + e.describe(lv) + " to " + held.item.name);
                 }
                 case "clear" -> { p.inventory.clear(); chat("Cleared the inventory"); }
                 case "summon" -> {

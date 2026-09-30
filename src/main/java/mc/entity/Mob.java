@@ -43,6 +43,8 @@ public final class Mob extends LivingEntity {
     /** Iron golem arm swing after an attack. */
     public int attackAnim;
     private int targetScan;
+    /** Looting level of the weapon that last hit this mob. */
+    public int lootingBonus;
 
     public static final String[] PROFESSIONS = {"Farmer", "Librarian", "Priest", "Smith", "Butcher"};
 
@@ -218,6 +220,7 @@ public final class Mob extends LivingEntity {
     }
 
     private void drop(Item item, int min, int max) {
+        max += lootingBonus;
         int n = min + random.nextInt(max - min + 1);
         if (n > 0) world.spawnItem(x, y + 0.5, z, new ItemStack(item, n));
     }

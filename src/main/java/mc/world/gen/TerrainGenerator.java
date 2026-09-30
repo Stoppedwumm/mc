@@ -372,6 +372,7 @@ public final class TerrainGenerator {
         vein(chunk, rand, Block.GOLD_ORE.id, 2, 9, 5, 34);
         vein(chunk, rand, Block.DIAMOND_ORE.id, 1, 8, 5, 17);
         vein(chunk, rand, Block.REDSTONE_ORE.id, 8, 8, 5, 17);
+        vein(chunk, rand, Block.LAPIS_ORE.id, 1, 7, 5, 32);
     }
 
     /** Minecraft style ellipsoid vein generator, clipped to the chunk. */

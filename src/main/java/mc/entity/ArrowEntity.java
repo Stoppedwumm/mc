@@ -11,6 +11,8 @@ public final class ArrowEntity extends Entity {
     public boolean inGround, pickup;
     private int groundTicks;
     public float damage = 2;
+    /** Punch enchantment level (extra knockback). */
+    public int punch;
 
     public ArrowEntity(Entity shooter) {
         this.shooter = shooter;
@@ -60,8 +62,14 @@ public final class ArrowEntity extends Entity {
         }
         if (target != null) {
             float dmg = (float) Math.ceil(speed * damage);
-            if (((LivingEntity) target).damage(DamageSource.ARROW, dmg, shooter != null ? shooter : this)) {
+            LivingEntity le = (LivingEntity) target;
+            if (le.damage(DamageSource.ARROW, dmg, shooter != null ? shooter : this)) {
                 world.playSound("hit", x, y, z, 1, 1);
+                if (fireTicks > 0 && !le.fireImmune()) le.fireTicks = Math.max(le.fireTicks, 100);
+                if (punch > 0) {
+                    double h = Math.sqrt(motionX * motionX + motionZ * motionZ);
+                    if (h > 0) le.knockback(0.6 * punch, -motionX / h, -motionZ / h);
+                }
             }
             remove();
             return;

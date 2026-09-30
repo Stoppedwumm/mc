@@ -76,6 +76,13 @@ public final class Trades {
         if (!canAfford(inv, o)) return null;
         inv.remove(o.cost.item, o.cost.count);
         if (o.cost2 != null) inv.remove(o.cost2.item, o.cost2.count);
-        return o.result.copy();
+        ItemStack out = o.result.copy();
+        if (out.item == Item.ENCHANTED_BOOK && !out.isEnchanted()) {
+            // Librarians sell a random enchantment at a random level
+            java.util.Random r = new java.util.Random();
+            Enchantment e = Enchantment.values()[r.nextInt(Enchantment.values().length)];
+            out.enchant(e, 1 + r.nextInt(e.maxLevel));
+        }
+        return out;
     }
 }

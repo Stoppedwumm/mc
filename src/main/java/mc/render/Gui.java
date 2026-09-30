@@ -174,6 +174,16 @@ public final class Gui {
             batch.begin(GL_TRIANGLES);
             batch.rect(x, y, 16, 16, u0, v0, u0 + 1 / 16f, v0 + 1 / 16f, 0xFFFFFFFF);
             batch.end();
+            if (s.isEnchanted() || it == mc.item.Item.ENCHANTED_BOOK) {
+                // Enchantment glint: the sprite again, additively, in a pulsing purple
+                float t = (System.nanoTime() % 100_000_000_000L) / 1e9f;
+                int a = (int) (150 + 70 * Math.sin(t * 2.5 + x * 0.05));
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+                batch.begin(GL_TRIANGLES);
+                batch.rect(x, y, 16, 16, u0, v0, u0 + 1 / 16f, v0 + 1 / 16f, a << 24 | 0x9a50ff);
+                batch.end();
+                glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+            }
         }
         if (it.maxDamage > 0 && s.damage > 0) {
             float f = 1 - (float) s.damage / it.maxDamage;
@@ -188,6 +198,20 @@ public final class Gui {
     }
 
     /** Minecraft-style tooltip box. */
+    /** Multi-line tooltip; lines starting with §7 are drawn grey (enchantments). */
+    public void tooltip(java.util.List<String> lines, float x, float y) {
+        float tw = 0;
+        for (String l : lines) tw = Math.max(tw, textWidth(l.replace("§7", "")));
+        float h = lines.size() * 10 + 2;
+        fill(x + 8, y - 12, tw + 6, h, 0xF0100010);
+        frame(x + 8, y - 12, tw + 6, h, 1, 0xFF3a0080);
+        for (int i = 0; i < lines.size(); i++) {
+            String l = lines.get(i);
+            boolean grey = l.startsWith("§7");
+            text(grey ? l.substring(2) : l, x + 11, y - 10 + i * 10, grey ? 0xFFA0A0FF : 0xFFFFFFFF);
+        }
+    }
+
     public void tooltip(String textLine, float x, float y) {
         float tw = textWidth(textLine);
         fill(x + 8, y - 12, tw + 6, 12, 0xF0100010);

@@ -134,6 +134,13 @@ public final class TextureGen {
         paint(Tex.REDSTONE_ORE, () -> ore(0xe01010, 0x8a0000));
         paint(Tex.REDSTONE_BLOCK, () -> metalBlock(0xc81a10, 0x7a0a04));
         paint(Tex.REPEATER_ITEM, this::repeaterItem);
+        paint(Tex.ENCH_TOP, this::enchTop);
+        paint(Tex.ENCH_SIDE, this::enchSide);
+        paint(Tex.ENCH_BOTTOM, this::obsidian);
+        paint(Tex.ANVIL_TOP, () -> anvil(true));
+        paint(Tex.ANVIL_SIDE, () -> anvil(false));
+        paint(Tex.LAPIS_ORE, () -> ore(0x2a50c8, 0x10287a));
+        paint(Tex.LAPIS_BLOCK, () -> metalBlock(0x2a50c8, 0x142a80));
         paint(Tex.SOUL_SAND, this::soulSand);
         paint(Tex.QUARTZ_ORE, this::quartzOre);
         paint(Tex.PORTAL, this::portal);
@@ -1107,5 +1114,27 @@ public final class TextureGen {
             for (int y = 4; y < 10; y++) set(x, y, 0x6b4a26);
             set(x, 3, 0xff2010); set(x, 4, 0xd01a10);
         }
+    }
+
+    // ------------------------------------------------------------------ enchanting
+
+    private void enchTop() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) set(x, y, scale((x + y) % 7 == 0 ? 0xa01818 : 0xc02424, jitter(0.06)));
+        for (int[] c : new int[][]{{0, 0}, {14, 0}, {0, 14}, {14, 14}})
+            for (int y = 0; y < 2; y++) for (int x = 0; x < 2; x++) set(c[0] + x, c[1] + y, 0x5aece8);
+        for (int i = 2; i < 14; i++) { set(i, 1, 0x8a1010); set(i, 14, 0x8a1010); set(1, i, 0x8a1010); set(14, i, 0x8a1010); }
+    }
+
+    private void enchSide() {
+        obsidian();
+        for (int y = 4; y < 7; y++) for (int x = 0; x < 16; x++) set(x, y, scale(0xc02424, jitter(0.06)));
+        for (int x = 0; x < 16; x += 5) { set(x, 7, 0x5aece8); }
+    }
+
+    private void anvil(boolean top) {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) set(x, y, scale(0x4a4a4a, jitter(0.08) * (top && (x == 0 || x == 15) ? 0.7 : 1)));
+        if (top) for (int x = 3; x < 13; x++) set(x, 7, 0x3a3a3a);
     }
 }

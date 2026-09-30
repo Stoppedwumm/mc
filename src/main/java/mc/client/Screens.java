@@ -25,7 +25,7 @@ final class Screens {
     private final List<Item> creativeItems = new ArrayList<>();
 
     /** Slot kinds */
-    private static final int NORMAL = 0, CRAFT_OUT = 1, FURNACE_OUT = 2, CREATIVE = 3, ARMOR = 4;
+    private static final int NORMAL = 0, CRAFT_OUT = 1, FURNACE_OUT = 2, CREATIVE = 3, ARMOR = 4, ANVIL_OUT = 5;
 
     private record Slot(ItemStack[] arr, int index, float x, float y, int kind, int group) { }
 
@@ -40,7 +40,7 @@ final class Screens {
 
     boolean isContainer(Game.Screen s) {
         return s == Game.Screen.INVENTORY || s == Game.Screen.CRAFTING || s == Game.Screen.FURNACE || s == Game.Screen.CHEST
-                || s == Game.Screen.CREATIVE || s == Game.Screen.TRADING;
+                || s == Game.Screen.CREATIVE || s == Game.Screen.TRADING || s == Game.Screen.ENCHANTING || s == Game.Screen.ANVIL;
     }
 
     void openInventory() {
@@ -115,10 +115,186 @@ final class Screens {
             if (!ItemStack.isEmpty(craft[i])) giveOrDrop(craft[i]);
             craft[i] = null;
         }
+        for (int i = 0; i < 2; i++) {
+            if (!ItemStack.isEmpty(enchantSlots[i])) giveOrDrop(enchantSlots[i]);
+            if (!ItemStack.isEmpty(anvilSlots[i])) giveOrDrop(anvilSlots[i]);
+            enchantSlots[i] = anvilSlots[i] = null;
+        }
         if (!ItemStack.isEmpty(cursor)) giveOrDrop(cursor);
         cursor = null;
         furnace = null;
         chest = null;
+    }
+
+    // ------------------------------------------------------------------ enchanting & anvil
+
+    private final ItemStack[] enchantSlots = new ItemStack[2];
+    private final ItemStack[] anvilSlots = new ItemStack[2];
+    private final ItemStack[] anvilOut = new ItemStack[1];
+    private int bookshelves, anvilCost;
+    private final int[] enchantLevels = new int[3];
+    private final List<java.util.Map<mc.item.Enchantment, Integer>> previews = new ArrayList<>();
+
+    void openEnchanting(int x, int y, int z) {
+        // Bookshelves one block away from the table, with air in between, power the offers (max 15)
+        int n = 0;
+        for (int dx = -2; dx <= 2; dx++)
+            for (int dz = -2; dz <= 2; dz++) {
+                if (Math.abs(dx) != 2 && Math.abs(dz) != 2) continue;
+                int mx = x + Integer.signum(dx), mz = z + Integer.signum(dz);
+                for (int dy = 0; dy <= 1; dy++) {
+                    if (g.world.getBlock(mx, y + dy, mz) != 0 && !(Math.abs(dx) == 2 && Math.abs(dz) == 2)) continue;
+                    if (g.world.getBlock(x + dx, y + dy, z + dz) == Block.BOOKSHELF.id) n++;
+                }
+            }
+        bookshelves = Math.min(15, n);
+        g.setScreen(Game.Screen.ENCHANTING);
+    }
+
+    void openAnvil() {
+        g.setScreen(Game.Screen.ANVIL);
+    }
+
+    /** Recomputes the three enchanting offers for the current item (Minecraft 1.8+ level formula). */
+    private void updateEnchantOffers() {
+        previews.clear();
+        java.util.Arrays.fill(enchantLevels, 0);
+        ItemStack it = enchantSlots[0];
+        if (ItemStack.isEmpty(it) || it.isEnchanted() || mc.item.Enchantment.enchantability(it.item) <= 0 || it.count != 1) return;
+        java.util.Random r = new java.util.Random(g.player.enchantSeed);
+        int b = bookshelves;
+        int base = r.nextInt(8) + 1 + (b >> 1) + r.nextInt(b + 1);
+        enchantLevels[0] = Math.max(base / 3, 1);
+        enchantLevels[1] = base * 2 / 3 + 1;
+        enchantLevels[2] = Math.max(base, b * 2);
+        for (int i = 0; i < 3; i++) previews.add(rollEnchants(it.item, enchantLevels[i], i));
+    }
+
+    private java.util.Map<mc.item.Enchantment, Integer> rollEnchants(Item item, int level, int slot) {
+        java.util.Map<mc.item.Enchantment, Integer> e = mc.item.Enchantment.roll(item, level, new java.util.Random(g.player.enchantSeed * 31L + slot));
+        if (e.isEmpty()) {
+            for (mc.item.Enchantment x : mc.item.Enchantment.values()) if (x.canApply(item)) { e.put(x, 1); break; }
+        }
+        return e;
+    }
+
+    private void renderEnchanting(Gui gui, Input input, float px, float py, double mx, double my) {
+        updateEnchantOffers();
+        var p = g.player;
+        int lapis = ItemStack.isEmpty(enchantSlots[1]) ? 0 : enchantSlots[1].count;
+        for (int i = 0; i < 3; i++) {
+            float ox = px + 60, oy = py + 14 + i * 19;
+            boolean has = enchantLevels[i] > 0 && !previews.isEmpty();
+            boolean afford = has && (p.creative || (p.xpLevel >= enchantLevels[i] && lapis >= i + 1));
+            boolean hover = mx >= ox && mx < ox + 108 && my >= oy && my < oy + 19;
+            gui.fill(ox, oy, 108, 19, !has ? 0xFF8A7A6A : afford ? (hover ? 0xFFB09AD0 : 0xFF9A84B8) : 0xFF6A5A6A);
+            gui.frame(ox, oy, 108, 19, 1, 0xFF3a2a3a);
+            if (!has) continue;
+            var first = previews.get(i).entrySet().iterator().next();
+            String hint = first.getKey().describe(first.getValue()) + " . . . ?";
+            gui.text(hint.length() > 20 ? hint.substring(0, 20) : hint, ox + 3, oy + 2, afford ? 0xFFE8E0FF : 0xFF3a2a3a);
+            gui.text((i + 1) + " lapis   " + enchantLevels[i], ox + 3, oy + 10, afford ? 0xFF80FF20 : 0xFF3a3030);
+            if (hover && afford && input.clicked(GLFW_MOUSE_BUTTON_LEFT)) {
+                input.consumeClick(GLFW_MOUSE_BUTTON_LEFT);
+                ItemStack it = enchantSlots[0];
+                java.util.Map<mc.item.Enchantment, Integer> result = rollEnchants(it.item, enchantLevels[i], i);
+                ItemStack out = it.item == Item.BOOK ? new ItemStack(Item.ENCHANTED_BOOK, 1) : it.copy();
+                for (var e : result.entrySet()) out.enchant(e.getKey(), e.getValue());
+                enchantSlots[0] = out;
+                if (!p.creative) {
+                    p.removeLevels(i + 1);
+                    enchantSlots[1].count -= i + 1;
+                    if (enchantSlots[1].count <= 0) enchantSlots[1] = null;
+                }
+                p.enchantSeed = g.random.nextInt();
+                g.sound.play("levelup", p.x, p.y + 1, p.z, 0.5f, 1.4f);
+                for (int k = 0; k < 20; k++) g.particles.spawn("enchant", p.x + g.random.nextGaussian(), p.y + 1.5 + g.random.nextDouble(), p.z + g.random.nextGaussian());
+            }
+        }
+    }
+
+    private static Item repairMaterial(Item it) {
+        if (it.isArmor()) return new Item[]{Item.LEATHER, Item.IRON_INGOT, Item.IRON_INGOT, Item.GOLD_INGOT, Item.DIAMOND}[it.armorMaterial];
+        if (!it.isTool()) return null;
+        if (it.name.startsWith("Wooden")) return Item.of(Block.PLANKS);
+        if (it.name.startsWith("Stone")) return Item.of(Block.COBBLESTONE);
+        if (it.name.startsWith("Iron")) return Item.IRON_INGOT;
+        if (it.name.startsWith("Golden")) return Item.GOLD_INGOT;
+        if (it.name.startsWith("Diamond")) return Item.DIAMOND;
+        return null;
+    }
+
+    private int anvilUnits;
+
+    /** Anvil result: repair with materials or a second item, and merge enchantments (from books too). */
+    private void updateAnvil() {
+        anvilOut[0] = null;
+        anvilCost = 0;
+        anvilUnits = 0;
+        ItemStack left = anvilSlots[0], right = anvilSlots[1];
+        if (ItemStack.isEmpty(left) || ItemStack.isEmpty(right)) return;
+        ItemStack out = left.copy();
+        out.count = 1;
+        int cost = 0;
+        int max = left.item.maxDamage;
+        if (repairMaterial(left.item) != null && right.item == repairMaterial(left.item) && max > 0) {
+            if (left.damage == 0) return;
+            int units = 0;
+            while (units < right.count && out.damage > 0) { out.damage = Math.max(0, out.damage - max / 4); units++; }
+            cost += units;
+            anvilUnits = units;
+        } else if (right.item == left.item || right.item == Item.ENCHANTED_BOOK) {
+            if (right.item == left.item && max > 0) {
+                int remaining = (max - left.damage) + (max - right.damage) + max * 12 / 100;
+                int newDamage = Math.max(0, max - remaining);
+                if (newDamage < out.damage) { out.damage = newDamage; cost += 2; }
+            }
+            if (right.enchants != null) {
+                for (var e : right.enchants.entrySet()) {
+                    mc.item.Enchantment en = e.getKey();
+                    if (!en.canApply(left.item) && left.item != Item.ENCHANTED_BOOK) continue;
+                    boolean clash = false;
+                    if (out.enchants != null) for (mc.item.Enchantment have : out.enchants.keySet()) if (have != en && !en.compatibleWith(have)) clash = true;
+                    if (clash) { cost++; continue; }
+                    int cur = out.level(en), l = e.getValue();
+                    int nl = cur == l ? Math.min(en.maxLevel, l + 1) : Math.max(cur, l);
+                    if (nl != cur) {
+                        out.enchant(en, nl);
+                        cost += nl * (right.item == Item.ENCHANTED_BOOK ? 1 : 2) * Math.max(1, 10 / en.weight);
+                    }
+                }
+            }
+        } else return;
+        if (cost == 0) return;
+        anvilCost = cost;
+        anvilOut[0] = out;
+    }
+
+    private void renderAnvil(Gui gui, float px, float py) {
+        updateAnvil();
+        gui.text("+", px + 58, py + 51, 0xFF404040);
+        gui.hudIcon(mc.render.ItemTextureGen.PROGRESS, px + 100, py + 48, 22, 15);
+        if (anvilCost > 0) {
+            boolean tooMuch = anvilCost >= 40 && !g.player.creative;
+            boolean afford = g.player.creative || g.player.xpLevel >= anvilCost;
+            String t = tooMuch ? "Too Expensive!" : "Enchantment Cost: " + anvilCost;
+            gui.text(t, px + 60, py + 70, tooMuch || !afford ? 0xFFFF6060 : 0xFF80FF20);
+        }
+    }
+
+    private void takeAnvilResult() {
+        ItemStack out = anvilOut[0];
+        if (out == null || !ItemStack.isEmpty(cursor)) return;
+        var p = g.player;
+        if (!p.creative && (anvilCost >= 40 || p.xpLevel < anvilCost)) return;
+        if (!p.creative) p.removeLevels(anvilCost);
+        cursor = out;
+        anvilSlots[0] = null;
+        if (anvilUnits > 0) {
+            anvilSlots[1].count -= anvilUnits;
+            if (anvilSlots[1].count <= 0) anvilSlots[1] = null;
+        } else anvilSlots[1] = null;
+        g.sound.play("anvil", p.x, p.y + 1, p.z, 0.6f, 1);
     }
 
     private void giveOrDrop(ItemStack s) {
@@ -167,6 +343,15 @@ final class Screens {
             }
             case CHEST -> {
                 for (int i = 0; i < 27; i++) slots.add(new Slot(chest.slots, i, px + 8 + (i % 9) * 18, py + 18 + (float) (i / 9) * 18, NORMAL, 3));
+            }
+            case ENCHANTING -> {
+                slots.add(new Slot(enchantSlots, 0, px + 15, py + 47, NORMAL, 3));
+                slots.add(new Slot(enchantSlots, 1, px + 35, py + 47, NORMAL, 3));
+            }
+            case ANVIL -> {
+                slots.add(new Slot(anvilSlots, 0, px + 27, py + 47, NORMAL, 3));
+                slots.add(new Slot(anvilSlots, 1, px + 76, py + 47, NORMAL, 3));
+                slots.add(new Slot(anvilOut, 0, px + 134, py + 47, ANVIL_OUT, 3));
             }
             default -> { }
         }
@@ -230,6 +415,10 @@ final class Screens {
             g.sound.click();
             return;
         }
+        if (s.kind == ANVIL_OUT) {
+            takeAnvilResult();
+            return;
+        }
         ItemStack in = s.arr[s.index];
         if (shift) {
             if (ItemStack.isEmpty(in)) return;
@@ -284,6 +473,11 @@ final class Screens {
             if (stack.item.isArmor() && inv.armor[stack.item.armorSlot] == null && (screen == Game.Screen.INVENTORY || screen == Game.Screen.CREATIVE)) {
                 inv.armor[stack.item.armorSlot] = stack;
                 stack = null;
+            } else if (screen == Game.Screen.ENCHANTING) {
+                if (stack.item == Item.LAPIS_LAZULI) stack = insert(enchantSlots, 1, 2, stack);
+                else if (enchantSlots[0] == null && stack.count == 1) { enchantSlots[0] = stack; stack = null; }
+            } else if (screen == Game.Screen.ANVIL) {
+                stack = insert(anvilSlots, 0, 2, stack);
             } else if (screen == Game.Screen.CHEST) {
                 stack = insert(chest.slots, 0, 27, stack);
             } else if (screen == Game.Screen.FURNACE) {
@@ -339,6 +533,8 @@ final class Screens {
             case CHEST -> "Chest";
             case CREATIVE -> "Creative Inventory";
             case TRADING -> trader == null ? "Villager" : mc.entity.Mob.PROFESSIONS[trader.profession];
+            case ENCHANTING -> "Enchant";
+            case ANVIL -> "Repair & Name";
             default -> "";
         };
         gui.text(title, px + (screen == Game.Screen.INVENTORY ? 97 : 8), py + 6, 0xFF404040);
@@ -363,6 +559,10 @@ final class Screens {
             }
         } else if (screen == Game.Screen.TRADING) {
             renderOffers(gui, input, px, py, mx, my);
+        } else if (screen == Game.Screen.ENCHANTING) {
+            renderEnchanting(gui, input, px, py, mx, my);
+        } else if (screen == Game.Screen.ANVIL) {
+            renderAnvil(gui, px, py);
         } else if (screen == Game.Screen.CREATIVE) {
             int rows = (creativeItems.size() + 8) / 9;
             gui.text("Scroll for more (" + (creativeScroll + 1) + "/" + Math.max(1, rows - 5) + ")", px + 8, py + 128, 0xFF404040);
@@ -416,7 +616,10 @@ final class Screens {
             ItemStack hs = get(hover);
             String name = hs.item.name;
             if (hs.item.maxDamage > 0) name += " (" + (hs.item.maxDamage - hs.damage) + "/" + hs.item.maxDamage + ")";
-            gui.tooltip(name, (float) mx, (float) my);
+            List<String> lines = new ArrayList<>();
+            lines.add(name);
+            if (hs.enchants != null) for (var e : hs.enchants.entrySet()) lines.add("§7" + e.getKey().describe(e.getValue()));
+            gui.tooltip(lines, (float) mx, (float) my);
         }
     }
 

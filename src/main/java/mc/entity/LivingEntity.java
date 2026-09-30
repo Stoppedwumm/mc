@@ -36,6 +36,12 @@ public abstract class LivingEntity extends Entity {
             hurtTime = 10;
         }
         amount = applyArmor(source, amount);
+        amount = applyEnchantProtection(source, amount);
+        if (attacker instanceof LivingEntity le && armorSlots() != null) {
+            int thorns = 0;
+            for (ItemStack s : armorSlots()) thorns = Math.max(thorns, ItemStack.level(s, mc.item.Enchantment.THORNS));
+            if (thorns > 0 && random.nextFloat() < 0.15f * thorns) le.damage(DamageSource.GENERIC, 1 + random.nextInt(4), this);
+        }
         health -= amount;
         lastHurtAge = age;
         lastAttacker = attacker;
@@ -80,6 +86,23 @@ public abstract class LivingEntity extends Entity {
         return amount * (1 - reduction);
     }
 
+    /** Protection enchantments: Minecraft's enchantment protection factor, capped at 20 (80%). */
+    protected float applyEnchantProtection(DamageSource source, float amount) {
+        ItemStack[] a = armorSlots();
+        if (a == null || source == DamageSource.VOID || source == DamageSource.STARVE) return amount;
+        int epf = 0;
+        for (ItemStack s : a) {
+            if (s == null) continue;
+            epf += s.level(mc.item.Enchantment.PROTECTION);
+            if (source == DamageSource.FIRE || source == DamageSource.LAVA) epf += 2 * s.level(mc.item.Enchantment.FIRE_PROTECTION);
+            if (source == DamageSource.EXPLOSION) epf += 2 * s.level(mc.item.Enchantment.BLAST_PROTECTION);
+            if (source == DamageSource.ARROW) epf += 2 * s.level(mc.item.Enchantment.PROJECTILE_PROTECTION);
+            if (source == DamageSource.FALL) epf += 3 * s.level(mc.item.Enchantment.FEATHER_FALLING);
+        }
+        epf = Math.min(20, Math.max(0, epf));
+        return amount * (1 - epf / 25f);
+    }
+
     public void knockback(double strength, double dx, double dz) {
         double d = Math.sqrt(dx * dx + dz * dz);
         if (d < 1e-4) return;
@@ -118,7 +141,9 @@ public abstract class LivingEntity extends Entity {
         }
         // Drowning
         if (eyeInBlock(Block.WATER.id) && canDrown()) {
-            air--;
+            ItemStack[] worn = armorSlots();
+            int resp = worn == null ? 0 : ItemStack.level(worn[0], mc.item.Enchantment.RESPIRATION);
+            if (resp == 0 || random.nextInt(resp + 1) == 0) air--;
             if (air <= -20) {
                 air = 0;
                 damage(DamageSource.DROWN, 2, null);
