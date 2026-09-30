@@ -141,6 +141,15 @@ public final class TextureGen {
         paint(Tex.ANVIL_SIDE, () -> anvil(false));
         paint(Tex.LAPIS_ORE, () -> ore(0x2a50c8, 0x10287a));
         paint(Tex.LAPIS_BLOCK, () -> metalBlock(0x2a50c8, 0x142a80));
+        paint(Tex.BREWING_BASE, () -> { speckle(0x7a7a7a, 0.08, 0x5a5a5a, 0.3); for (int i = 0; i < 16; i++) { set(i, 0, 0x4a4a4a); set(i, 15, 0x4a4a4a); } });
+        paint(Tex.BREWING_ROD, () -> { for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) set(x, y, scale((x + y) % 4 == 0 ? 0xfff0a0 : 0xe8b030, jitter(0.08))); });
+        for (int i = 0; i < 3; i++) {
+            final int stage = i;
+            paint(Tex.NETHER_WART_0 + i, () -> netherWart(stage));
+        }
+        paint(Tex.BROWN_MUSHROOM, () -> mushroom(0x9a7050, 0x7a5638, false));
+        paint(Tex.RED_MUSHROOM, () -> mushroom(0xd82020, 0xa01010, true));
+        paint(Tex.BREWING_ITEM, this::brewingItem);
         paint(Tex.SOUL_SAND, this::soulSand);
         paint(Tex.QUARTZ_ORE, this::quartzOre);
         paint(Tex.PORTAL, this::portal);
@@ -1104,6 +1113,36 @@ public final class TextureGen {
         cobble(false);
         int a = inner ? 6 : 5, b = inner ? 9 : 10;
         for (int y = a; y <= b; y++) for (int x = a; x <= b; x++) set(x, y, inner ? 0xa2824e : 0x3a3a3a);
+    }
+
+    private void netherWart(int stage) {
+        clearTile();
+        int h = 5 + stage * 3;
+        for (int s = 0; s < 3; s++) {
+            int x = 3 + s * 4;
+            for (int y = 16 - h; y < 16; y++) set(x + ((y + s) % 3 == 0 ? 1 : 0), y, scale(0x8a1a1a, jitter(0.1)));
+            int top = 16 - h;
+            for (int dy = 0; dy < 2 + stage; dy++) for (int dx = -1; dx <= 1; dx++) set(x + dx, top + dy, scale(stage == 2 ? 0xb02020 : 0x8a1818, jitter(0.15)));
+        }
+    }
+
+    private void mushroom(int cap, int dark, boolean spots) {
+        clearTile();
+        for (int y = 9; y < 15; y++) for (int x = 7; x < 9; x++) set(x, y, scale(0xe8dcc8, jitter(0.05)));
+        for (int y = 4; y < 10; y++)
+            for (int x = 3; x < 13; x++) {
+                double d = Math.pow((x - 7.5) / 5, 2) + Math.pow((y - 9.5) / 5.5, 2);
+                if (d < 1 && y < 10) set(x, y, scale(y == 9 ? dark : cap, jitter(0.08)));
+            }
+        if (spots) for (int[] p : new int[][]{{5, 6}, {9, 5}, {10, 8}, {7, 8}}) set(p[0], p[1], 0xf8f0f0);
+    }
+
+    private void brewingItem() {
+        clearTile();
+        for (int y = 1; y < 14; y++) set(8, y, 0xe8b030);
+        for (int x = 3; x < 14; x++) { set(x, 13, 0x6a6a6a); set(x, 14, 0x4a4a4a); }
+        for (int[] c : new int[][]{{4, 10}, {12, 10}, {8, 7}})
+            for (int y = -2; y <= 2; y++) for (int x = -1; x <= 1; x++) set(c[0] + x, c[1] + y, y < 0 ? 0xc8d8f0 : 0xd070c0);
     }
 
     private void repeaterItem() {

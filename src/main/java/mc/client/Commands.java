@@ -5,6 +5,7 @@ import mc.entity.Mob;
 import mc.entity.MobType;
 import mc.item.Item;
 import mc.item.ItemStack;
+import mc.world.BlockEntity;
 import mc.world.Block;
 
 /** Chat commands, mirroring Minecraft's syntax where possible. */
@@ -75,6 +76,17 @@ final class Commands {
                         case "crafting" -> g.screens.openCrafting();
                         case "enchanting" -> g.screens.openEnchanting((int) Math.floor(p.x), (int) Math.floor(p.y), (int) Math.floor(p.z));
                         case "anvil" -> g.screens.openAnvil();
+                        case "brewing" -> {
+                            BlockEntity.BrewingStand b = new BlockEntity.BrewingStand(0, 0, 0);
+                            b.slots[0] = new ItemStack(Item.POTION, 1, mc.item.Potions.meta(mc.item.Potions.Type.SWIFTNESS));
+                            b.slots[1] = new ItemStack(Item.POTION, 1, mc.item.Potions.meta(mc.item.Potions.Type.HEALING));
+                            b.slots[2] = new ItemStack(Item.SPLASH_POTION, 1, mc.item.Potions.meta(mc.item.Potions.Type.POISON));
+                            b.slots[3] = new ItemStack(Item.REDSTONE, 4);
+                            b.slots[4] = new ItemStack(Item.BLAZE_POWDER, 3);
+                            b.fuel = 12;
+                            b.brewTime = 150;
+                            g.screens.openBrewing(b);
+                        }
                         case "trading" -> {
                             Mob v = new Mob(MobType.VILLAGER);
                             v.profession = a.length > 2 ? Integer.parseInt(a[2]) : 0;
@@ -110,6 +122,18 @@ final class Commands {
                     int lv = a.length > 2 ? Integer.parseInt(a[2]) : 1;
                     held.enchant(e, lv);
                     chat("Applied " + e.describe(lv) + " to " + held.item.name);
+                }
+                case "effect" -> {
+                    if (a[1].equals("clear")) { p.clearEffects(); chat("Cleared effects"); return; }
+                    mc.entity.Effect e = mc.entity.Effect.valueOf(a[1].toUpperCase());
+                    int secs = a.length > 2 ? Integer.parseInt(a[2]) : 30, amp = a.length > 3 ? Integer.parseInt(a[3]) : 0;
+                    p.addEffect(e, amp, secs * 20);
+                    chat("Gave " + e.displayName + " to Player");
+                }
+                case "potion" -> {
+                    mc.item.Potions.Type t = mc.item.Potions.Type.valueOf(a[1].toUpperCase());
+                    boolean splash = a.length > 2 && a[2].equals("splash");
+                    p.inventory.add(new ItemStack(splash ? Item.SPLASH_POTION : Item.POTION, 1, mc.item.Potions.meta(t)));
                 }
                 case "clear" -> { p.inventory.clear(); chat("Cleared the inventory"); }
                 case "summon" -> {

@@ -105,6 +105,9 @@ final class Interaction {
         float dmg = ItemStack.isEmpty(h) ? 1 : h.item.attackDamage;
         boolean crit = p.fallDistance > 0 && !p.onGround && !p.inWater && p.motionY < 0;
         if (crit) dmg *= 1.5f;
+        int str = p.amplifier(mc.entity.Effect.STRENGTH), weak = p.amplifier(mc.entity.Effect.WEAKNESS);
+        if (str >= 0) dmg += 3 * (str + 1);
+        if (weak >= 0) dmg = Math.max(0, dmg - 4 * (weak + 1));
         int sharp = ItemStack.level(h, Enchantment.SHARPNESS), smite = ItemStack.level(h, Enchantment.SMITE);
         if (sharp > 0) dmg += 0.5f * sharp + 0.5f;
         if (smite > 0 && target instanceof Mob um && um.type.isUndead()) dmg += 2.5f * smite;
@@ -170,7 +173,7 @@ final class Interaction {
         tickMining(in.button(GLFW_MOUSE_BUTTON_LEFT));
         boolean useHeld = in.button(GLFW_MOUSE_BUTTON_RIGHT);
         if (useType != 0) {
-            if (!useHeld || ItemStack.isEmpty(h) || (useType == 1 && !h.item.isFood() && h.item != Item.MILK_BUCKET) || (useType == 2 && h.item != Item.BOW)) {
+            if (!useHeld || ItemStack.isEmpty(h) || (useType == 1 && !h.item.isFood() && h.item != Item.MILK_BUCKET && h.item != Item.POTION) || (useType == 2 && h.item != Item.BOW)) {
                 if (useType == 2) releaseBow();
                 useType = 0;
                 useTicks = 0;
@@ -190,8 +193,20 @@ final class Interaction {
             double r = Math.toRadians(p.yaw);
             for (int i = 0; i < 3; i++) g.particles.spawn("poof", p.x - Math.sin(r) * 0.4, p.eyeY() - 0.2, p.z + Math.cos(r) * 0.4);
         }
+        if (useTicks >= 32 && h.item == Item.POTION) {
+            mc.item.Potions.apply(p, h.damage, 1);
+            if (!p.creative) {
+                if (h.count <= 1) p.inventory.setHeld(new ItemStack(Item.GLASS_BOTTLE, 1));
+                else { h.count--; giveOrDrop(new ItemStack(Item.GLASS_BOTTLE, 1)); }
+            }
+            g.sound.play("burp", p.x, p.y + 1.5, p.z, 0.5f, 1.3f);
+            useType = 0;
+            useTicks = 0;
+            return;
+        }
         if (useTicks >= 32 && h.item == Item.MILK_BUCKET) {
             p.fireTicks = 0;
+            p.clearEffects();
             if (!p.creative) p.inventory.setHeld(new ItemStack(Item.BUCKET, 1));
             g.sound.play("burp", p.x, p.y + 1.5, p.z, 0.5f, 1.2f);
             useType = 0;
@@ -200,6 +215,18 @@ final class Interaction {
         }
         if (useTicks >= 32) {
             p.eat(h.item.food, h.item.saturation);
+            if (h.item == Item.GOLDEN_APPLE) {
+                p.addEffect(mc.entity.Effect.REGENERATION, 1, 100);
+                p.addEffect(mc.entity.Effect.ABSORPTION, 0, 2400);
+            }
+            if (h.item == Item.SPIDER_EYE) p.addEffect(mc.entity.Effect.POISON, 0, 100);
+            if (h.item == Item.MUSHROOM_STEW && !p.creative) {
+                p.inventory.setHeld(new ItemStack(Item.BOWL, 1));
+                g.sound.play("burp", p.x, p.y + 1.5, p.z, 0.5f, 0.9f + random.nextFloat() * 0.1f);
+                useType = 0;
+                useTicks = 0;
+                return;
+            }
             if (h.item == Item.ROTTEN_FLESH && random.nextInt(5) < 4) p.food = Math.max(0, p.food - 1);
             if (!p.creative) h.count--;
             p.inventory.cleanup();
@@ -298,6 +325,8 @@ final class Interaction {
         if (t != null && t.tool == Item.Tool.SWORD) speed = 1.5f;
         if (t == Item.SHEARS && (b.tint == Block.Tint.FOLIAGE || b.tint == Block.Tint.BIRCH || b.tint == Block.Tint.SPRUCE)) speed = 15;
         if (t == Item.SHEARS && b.sound == Block.SoundType.CLOTH && b.shape == Block.Shape.NONE) speed = 5;
+        int haste = p.amplifier(mc.entity.Effect.HASTE);
+        if (haste >= 0) speed *= 1 + 0.2f * (haste + 1);
         float s = speed / b.hardness / (canHarvest ? 30f : 100f);
         if (p.eyeInBlock(Block.WATER.id)) s /= 5;
         if (!p.onGround && !p.flying) s /= 5;
@@ -348,6 +377,10 @@ final class Interaction {
             if (id == Block.CRAFTING_TABLE.id) { g.screens.openCrafting(); startSwing(); return; }
             if (id == Block.ENCHANTING_TABLE.id) { g.screens.openEnchanting(hit.x, hit.y, hit.z); return; }
             if (id == Block.ANVIL.id) { g.screens.openAnvil(); return; }
+            if (id == Block.BREWING_STAND.id) {
+                g.screens.openBrewing((BlockEntity.BrewingStand) w().getOrCreateBlockEntity(hit.x, hit.y, hit.z));
+                return;
+            }
             if (id == Block.LEVER.id) { Redstone.toggleLever(w(), hit.x, hit.y, hit.z); startSwing(); return; }
             if (Block.get(id).shape == Block.Shape.BUTTON) { Redstone.pressButton(w(), hit.x, hit.y, hit.z); startSwing(); return; }
             if (id == Block.REPEATER.id || id == Block.POWERED_REPEATER.id) {
@@ -409,8 +442,25 @@ final class Interaction {
             if (fresh) throwItem(h);
             return;
         }
-        if (item == Item.MILK_BUCKET) {
+        if (item == Item.MILK_BUCKET || item == Item.POTION) {
             if (fresh) { useType = 1; useTicks = 0; }
+            return;
+        }
+        if (item == Item.SPLASH_POTION) {
+            if (fresh) throwItem(h);
+            return;
+        }
+        if (item == Item.GLASS_BOTTLE) {
+            if (fresh) fillBottle(h);
+            return;
+        }
+        if (item == Item.NETHER_WART) {
+            if (hit != null && w().getBlock(hit.x, hit.y, hit.z) == Block.SOUL_SAND.id && hit.ny == 1 && w().getBlock(hit.x, hit.y + 1, hit.z) == 0) {
+                w().setBlock(hit.x, hit.y + 1, hit.z, Block.NETHER_WART.id);
+                g.sound.dig(Block.TALL_GRASS, hit.x + 0.5, hit.y + 1, hit.z + 0.5);
+                consume(h);
+                startSwing();
+            }
             return;
         }
         if ((item == Item.FLINT_AND_STEEL || item == Item.FIRE_CHARGE) && hit != null) {
@@ -497,9 +547,37 @@ final class Interaction {
         }
     }
 
+    private void giveOrDrop(ItemStack s) {
+        ItemStack left = p().inventory.add(s);
+        if (left.count > 0) w().spawnItem(p().x, p().y + 1, p().z, left);
+    }
+
+    /** Glass bottle on water: a water bottle. */
+    private void fillBottle(ItemStack h) {
+        Player p = p();
+        double ry = Math.toRadians(p.yaw), rp = Math.toRadians(p.pitch);
+        double dx = -Math.sin(ry) * Math.cos(rp), dy = -Math.sin(rp), dz = Math.cos(ry) * Math.cos(rp);
+        for (double t = 0; t < reach(); t += 0.1) {
+            int bx = (int) Math.floor(p.x + dx * t), by = (int) Math.floor(p.eyeY() + dy * t), bz = (int) Math.floor(p.z + dz * t);
+            int id = w().getBlock(bx, by, bz);
+            if (id == Block.WATER.id) {
+                g.sound.play("bucket", bx, by, bz, 0.6f, 1.4f);
+                ItemStack water = new ItemStack(Item.POTION, 1, 0);
+                if (!p.creative) {
+                    if (h.count == 1) p.inventory.setHeld(water);
+                    else { h.count--; giveOrDrop(water); }
+                } else giveOrDrop(water);
+                startSwing();
+                return;
+            }
+            if (id != 0 && Block.get(id).solid) return;
+        }
+    }
+
     private void throwItem(ItemStack h) {
         Player p = p();
         ThrownEntity t = new ThrownEntity(h.item, p);
+        t.potionMeta = h.damage;
         t.setPos(p.x, p.eyeY() - 0.1, p.z);
         double ry = Math.toRadians(p.yaw), rp = Math.toRadians(p.pitch);
         t.shoot(-Math.sin(ry) * Math.cos(rp), -Math.sin(rp), Math.cos(ry) * Math.cos(rp), 1.5);

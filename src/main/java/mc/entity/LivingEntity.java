@@ -12,6 +12,10 @@ public abstract class LivingEntity extends Entity {
     public float limbSwing, limbSwingAmount, prevLimbSwingAmount;
     public float bodyYaw, prevBodyYaw, headYaw, prevHeadYaw;
     public Entity lastAttacker;
+    /** Active status effects. */
+    public final java.util.EnumMap<Effect, Effect.Instance> effects = new java.util.EnumMap<>(Effect.class);
+    /** Extra hearts from Absorption (golden apples). */
+    public float absorption;
     public int lastHurtAge = -1000;
 
     protected LivingEntity() {
@@ -19,6 +23,72 @@ public abstract class LivingEntity extends Entity {
     }
 
     public boolean isDead() { return health <= 0; }
+
+    public boolean hasEffect(Effect e) { return effects.containsKey(e); }
+
+    /** Amplifier of an effect, or -1 if it isn't active. */
+    public int amplifier(Effect e) {
+        Effect.Instance i = effects.get(e);
+        return i == null ? -1 : i.amplifier;
+    }
+
+    /** Adds or strengthens an effect; instant effects apply immediately. */
+    public void addEffect(Effect e, int amplifier, int duration) {
+        if (e == Effect.INSTANT_HEALTH) { heal(4 << amplifier); return; }
+        if (e == Effect.INSTANT_DAMAGE) { damage(DamageSource.MAGIC, 6 << amplifier, null); return; }
+        Effect.Instance cur = effects.get(e);
+        if (cur == null || amplifier > cur.amplifier || (amplifier == cur.amplifier && duration > cur.duration)) {
+            effects.put(e, new Effect.Instance(e, amplifier, duration));
+            if (e == Effect.ABSORPTION) absorption = Math.max(absorption, 4 * (amplifier + 1));
+        }
+    }
+
+    public void clearEffects() {
+        effects.clear();
+        absorption = 0;
+    }
+
+    /** Mixed colour of the active effects (for particles), or -1. */
+    public int effectColor() {
+        if (effects.isEmpty()) return -1;
+        int r = 0, g = 0, b = 0, n = 0;
+        for (Effect.Instance i : effects.values()) {
+            if (i.effect == Effect.INVISIBILITY) continue;
+            for (int k = 0; k <= i.amplifier; k++) {
+                r += i.effect.color >> 16 & 255; g += i.effect.color >> 8 & 255; b += i.effect.color & 255; n++;
+            }
+        }
+        return n == 0 ? -1 : (r / n) << 16 | (g / n) << 8 | (b / n);
+    }
+
+    public void tickEffects() {
+        if (effects.isEmpty()) return;
+        java.util.Iterator<Effect.Instance> it = effects.values().iterator();
+        while (it.hasNext()) {
+            Effect.Instance i = it.next();
+            switch (i.effect) {
+                case REGENERATION -> { int period = Math.max(1, 50 >> i.amplifier); if (i.duration % period == 0) heal(1); }
+                case POISON -> { int period = Math.max(1, 25 >> i.amplifier); if (i.duration % period == 0 && health > 1) damage(DamageSource.MAGIC, 1, null); }
+                default -> { }
+            }
+            if (--i.duration <= 0) {
+                if (i.effect == Effect.ABSORPTION) absorption = 0;
+                it.remove();
+            }
+        }
+        int color = effectColor();
+        if (color >= 0 && world != null && random.nextInt(3) == 0)
+            world.addParticle("effect:" + Integer.toHexString(color), x + (random.nextDouble() - 0.5) * width, y + random.nextDouble() * height, z + (random.nextDouble() - 0.5) * width);
+    }
+
+    /** Movement speed multiplier from Speed and Slowness. */
+    public float speedFactor() {
+        float f = 1;
+        int s = amplifier(Effect.SPEED), sl = amplifier(Effect.SLOWNESS);
+        if (s >= 0) f *= 1 + 0.2f * (s + 1);
+        if (sl >= 0) f *= Math.max(0, 1 - 0.15f * (sl + 1));
+        return f;
+    }
 
     protected boolean isInvulnerable() { return false; }
 
@@ -35,8 +105,16 @@ public abstract class LivingEntity extends Entity {
             invulnerableTime = 20;
             hurtTime = 10;
         }
+        if (hasEffect(Effect.FIRE_RESISTANCE) && (source == DamageSource.FIRE || source == DamageSource.LAVA)) return false;
         amount = applyArmor(source, amount);
         amount = applyEnchantProtection(source, amount);
+        int res = amplifier(Effect.RESISTANCE);
+        if (res >= 0 && source != DamageSource.VOID) amount *= Math.max(0, 1 - 0.2f * (res + 1));
+        if (absorption > 0) {
+            float absorbed = Math.min(absorption, amount);
+            absorption -= absorbed;
+            amount -= absorbed;
+        }
         if (attacker instanceof LivingEntity le && armorSlots() != null) {
             int thorns = 0;
             for (ItemStack s : armorSlots()) thorns = Math.max(thorns, ItemStack.level(s, mc.item.Enchantment.THORNS));
@@ -122,7 +200,7 @@ public abstract class LivingEntity extends Entity {
     @Override
     protected void onLanded(float distance) {
         if (inWater) return;
-        int dmg = (int) Math.ceil(distance - 3);
+        int dmg = (int) Math.ceil(distance - 3 - (amplifier(Effect.JUMP_BOOST) + 1));
         if (dmg > 0) damage(DamageSource.FALL, dmg, null);
     }
 
@@ -139,8 +217,10 @@ public abstract class LivingEntity extends Entity {
             if (deathTime >= 20) remove();
             return;
         }
+        tickEffects();
+        if (isDead()) return;
         // Drowning
-        if (eyeInBlock(Block.WATER.id) && canDrown()) {
+        if (eyeInBlock(Block.WATER.id) && canDrown() && !hasEffect(Effect.WATER_BREATHING)) {
             ItemStack[] worn = armorSlots();
             int resp = worn == null ? 0 : ItemStack.level(worn[0], mc.item.Enchantment.RESPIRATION);
             if (resp == 0 || random.nextInt(resp + 1) == 0) air--;
@@ -151,7 +231,7 @@ public abstract class LivingEntity extends Entity {
         } else {
             air = Math.min(300, air + 5);
         }
-        if (fireImmune()) fireTicks = 0;
+        if (fireImmune() || hasEffect(Effect.FIRE_RESISTANCE)) { if (fireImmune()) fireTicks = 0; else if (fireTicks > 0) fireTicks--; }
         else {
             if (inLava) {
                 fireTicks = 300;
@@ -216,6 +296,7 @@ public abstract class LivingEntity extends Entity {
             if (horizontalCollision && fits(box().offset(motionX, motionY + 0.6 - y + startY, motionZ))) motionY = 0.3;
         } else {
             float slip = onGround ? slipperiness() * 0.91f : 0.91f;
+            speed *= speedFactor();
             float accel = onGround ? speed * 0.16277136f / (slip * slip * slip) : speed * 0.2f;
             moveRelative(strafe, forward, accel);
             boolean ladder = onLadder();
@@ -251,6 +332,6 @@ public abstract class LivingEntity extends Entity {
     protected boolean holdsOnLadder() { return false; }
 
     protected void jumpFromGround() {
-        motionY = 0.42;
+        motionY = 0.42 + 0.1 * (amplifier(Effect.JUMP_BOOST) + 1);
     }
 }

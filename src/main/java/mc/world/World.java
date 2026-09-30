@@ -309,6 +309,8 @@ public final class World implements Shapes.Getter {
         else if (b.shape == Block.Shape.CARPET) ok = below != Block.AIR && !below.isLiquid();
         else if (b.shape == Block.Shape.SNOW_LAYER) ok = sturdyTop(x, y - 1, z);
         else if (b.isCrop()) ok = below == Block.FARMLAND;
+        else if (b == Block.NETHER_WART) ok = below == Block.SOUL_SAND;
+        else if (b == Block.BROWN_MUSHROOM || b == Block.RED_MUSHROOM) ok = below.opaque;
         else if (b == Block.SUGAR_CANE) ok = below == Block.SUGAR_CANE || below == Block.GRASS || below == Block.DIRT || below == Block.SAND;
         else if (b == Block.CACTUS) ok = below == Block.CACTUS || below == Block.SAND;
         else if (b == Block.DEAD_BUSH) ok = below == Block.SAND || below == Block.TERRACOTTA || below == Block.DIRT;
@@ -525,6 +527,7 @@ public final class World implements Shapes.Getter {
             if (id == Block.CHEST.id) be = new BlockEntity.Chest(x, y, z);
             else if (id == Block.FURNACE.id || id == Block.LIT_FURNACE.id) be = new BlockEntity.Furnace(x, y, z);
             else if (id == Block.SPAWNER.id) be = new BlockEntity.Spawner(x, y, z);
+            else if (id == Block.BREWING_STAND.id) be = new BlockEntity.BrewingStand(x, y, z);
             if (be != null) blockEntities.put(key, be);
         }
         return be;
@@ -639,6 +642,15 @@ public final class World implements Shapes.Getter {
             if (h < 3 && random.nextInt(8) == 0) setBlock(x, y + 1, z, b.id);
         } else if (b == Block.OAK_LEAVES || b == Block.BIRCH_LEAVES || b == Block.SPRUCE_LEAVES) {
             if (getMeta(x, y, z) == 0 && !logNearby(x, y, z)) breakBlock(x, y, z, null, true);
+        } else if (b == Block.NETHER_WART) {
+            int age = getMeta(x, y, z);
+            if (age < 3 && random.nextInt(10) == 0) setBlock(x, y, z, b.id, age + 1, false);
+        } else if (b == Block.BROWN_MUSHROOM || b == Block.RED_MUSHROOM) {
+            // Mushrooms spread slowly in the dark
+            if (random.nextInt(25) == 0 && getBlockLight(x, y, z) < 13) {
+                int tx = x + random.nextInt(3) - 1, ty = y + random.nextInt(2) - random.nextInt(2), tz = z + random.nextInt(3) - 1;
+                if (getBlock(tx, ty, tz) == 0 && Block.get(getBlock(tx, ty - 1, tz)).opaque && getSkyLight(tx, ty, tz) < 13) setBlock(tx, ty, tz, b.id);
+            }
         } else if (b == Block.LIT_REDSTONE_ORE) {
             setBlock(x, y, z, Block.REDSTONE_ORE.id);
         } else if (b == Block.ICE) {

@@ -2,6 +2,7 @@ package mc.client;
 
 import mc.entity.*;
 import mc.item.Item;
+import mc.entity.Effect;
 import mc.item.ItemStack;
 import mc.render.*;
 import mc.world.*;
@@ -24,7 +25,7 @@ import static org.lwjgl.opengl.GL33C.*;
 public final class Game implements World.Listener {
     private static final double TICK = 0.05;
 
-    enum Screen { LOADING, NONE, PAUSE, INVENTORY, CRAFTING, FURNACE, CHEST, CREATIVE, CHAT, DEATH, TRADING, ENCHANTING, ANVIL }
+    enum Screen { LOADING, NONE, PAUSE, INVENTORY, CRAFTING, FURNACE, CHEST, CREATIVE, CHAT, DEATH, TRADING, ENCHANTING, ANVIL, BREWING }
 
     private final Path gameDir, worldDir;
     final Options options;
@@ -169,6 +170,11 @@ public final class Game implements World.Listener {
             player.xpLevel = level.xpLevel;
             player.xpProgress = level.xpProgress;
             player.xpTotal = level.xpTotal;
+            if (level.effects != null)
+                for (int[] e : level.effects)
+                    if (e != null && e.length == 3 && e[0] >= 0 && e[0] < Effect.values().length)
+                        player.effects.put(Effect.values()[e[0]], new Effect.Instance(Effect.values()[e[0]], e[1], e[2]));
+            player.absorption = level.absorption;
             player.inventory.selected = Math.max(0, Math.min(8, level.selected));
         } else {
             int[] spawn = findSpawn(world.generator);
@@ -235,6 +241,7 @@ public final class Game implements World.Listener {
             BlockEntity be = switch (d.type) {
                 case "chest" -> new BlockEntity.Chest(d.x, d.y, d.z);
                 case "spawner" -> { BlockEntity.Spawner sp = new BlockEntity.Spawner(d.x, d.y, d.z); if (d.mob != null) sp.mob = d.mob; yield sp; }
+                case "brewing" -> { BlockEntity.BrewingStand bs = new BlockEntity.BrewingStand(d.x, d.y, d.z); bs.brewTime = d.cookTime; bs.fuel = d.burnTime; yield bs; }
                 default -> new BlockEntity.Furnace(d.x, d.y, d.z);
             };
             for (int i = 0; d.slots != null && i < Math.min(be.slots.length, d.slots.length); i++) {
@@ -289,6 +296,8 @@ public final class Game implements World.Listener {
         level.xpLevel = player.xpLevel;
         level.xpProgress = player.xpProgress;
         level.xpTotal = player.xpTotal;
+        level.effects = player.effects.values().stream().map(e -> new int[]{e.effect.ordinal(), e.amplifier, e.duration}).toArray(int[][]::new);
+        level.absorption = player.absorption;
         level.hotbar = null;
         level.selected = player.inventory.selected;
         level.health = player.isDead() ? player.maxHealth : player.health;
@@ -302,7 +311,8 @@ public final class Game implements World.Listener {
         for (BlockEntity be : world.blockEntities.values()) {
             Options.BlockEntityData d = new Options.BlockEntityData();
             d.x = be.x; d.y = be.y; d.z = be.z;
-            d.type = be instanceof BlockEntity.Chest ? "chest" : be instanceof BlockEntity.Spawner ? "spawner" : "furnace";
+            d.type = be instanceof BlockEntity.Chest ? "chest" : be instanceof BlockEntity.Spawner ? "spawner" : be instanceof BlockEntity.BrewingStand ? "brewing" : "furnace";
+            if (be instanceof BlockEntity.BrewingStand bs) { d.cookTime = bs.brewTime; d.burnTime = bs.fuel; }
             if (be instanceof BlockEntity.Spawner sp) d.mob = sp.mob;
             d.slots = saveSlots(be.slots);
             if (be instanceof BlockEntity.Furnace f) { d.burnTime = f.burnTime; d.burnTotal = f.burnTotal; d.cookTime = f.cookTime; }
@@ -664,6 +674,7 @@ public final class Game implements World.Listener {
         int bx = (int) Math.floor(x), by = (int) Math.floor(y), bz = (int) Math.floor(z);
         float sky = world.getSkyLight(bx, by, bz) / 15f, blk = world.getBlockLight(bx, by, bz) / 15f;
         float b = blk * blk;
+        if (renderer.nightVision > 0) b = Math.max(b, renderer.nightVision * 0.45f);
         if (world.dimension == Dimension.NETHER) return 1.8f * b * b + 0.3f * b + 0.28f;
         return renderer.daylight * 1.4f * sky * sky + 1.8f * b * b + 0.3f * b + 0.03f;
     }
@@ -694,6 +705,8 @@ public final class Game implements World.Listener {
         if (underwater) fovNow *= 0.92f;
 
         renderer.brightness = options.gamma;
+        Effect.Instance nv = player.effects.get(Effect.NIGHT_VISION);
+        renderer.nightVision = nv == null ? 0 : nv.duration > 200 ? 1 : 0.7f + 0.3f * (float) Math.sin(nv.duration * 0.1);
         renderer.shadows = options.shadows;
         renderer.clouds = options.clouds;
         renderer.nether = world.dimension == Dimension.NETHER;
@@ -739,6 +752,8 @@ public final class Game implements World.Listener {
             float br = lightValue(renderer.camX, renderer.camY, renderer.camZ);
             if (player.inLava) br = 3;
             float use = interaction.useType == 2 ? interaction.bowPower() : (interaction.useTicks + pt) / 32f;
+            ItemStack shown = player.inventory.held();
+            renderer.heldMeta = shown != null ? shown.damage : 0;
             renderer.renderHeldItem(interaction.shownItem, itemRenderer, sw, eq, br, (float) window.width / window.height,
                     interaction.useType, use, ticks + pt);
         }
@@ -812,7 +827,7 @@ public final class Game implements World.Listener {
         switch (screen) {
             case NONE -> handleGameInput();
             case PAUSE -> { if (input.pressed(GLFW_KEY_ESCAPE)) closeScreen(); }
-            case INVENTORY, CRAFTING, FURNACE, CHEST, CREATIVE, TRADING, ENCHANTING, ANVIL -> {
+            case INVENTORY, CRAFTING, FURNACE, CHEST, CREATIVE, TRADING, ENCHANTING, ANVIL, BREWING -> {
                 if (input.pressed(GLFW_KEY_ESCAPE) || input.pressed(GLFW_KEY_E)) closeScreen();
             }
             case CHAT -> handleChatInput();

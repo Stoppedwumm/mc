@@ -94,6 +94,16 @@ public final class Recipes {
         shaped(Item.of(Block.LAPIS_BLOCK), 1, new String[]{"###", "###", "###"}, '#', Item.LAPIS_LAZULI);
         shapeless(Item.LAPIS_LAZULI, 9, Block.LAPIS_BLOCK);
         shaped(Item.FISHING_ROD, 1, new String[]{"  S", " SX", "S X"}, 'S', Item.STICK, 'X', Item.STRING);
+        shaped(Item.GLASS_BOTTLE, 3, new String[]{"# #", " # "}, '#', Block.GLASS);
+        shaped(Item.BOWL, 4, new String[]{"# #", " # "}, '#', PLANKS);
+        shaped(Item.of(Block.BREWING_STAND), 1, new String[]{" B ", "CCC"}, 'B', Item.BLAZE_ROD, 'C', Block.COBBLESTONE);
+        shapeless(Item.BLAZE_POWDER, 2, Item.BLAZE_ROD);
+        shapeless(Item.FERMENTED_SPIDER_EYE, 1, Item.SPIDER_EYE, Block.BROWN_MUSHROOM, Item.SUGAR);
+        shaped(Item.GLISTERING_MELON, 1, new String[]{"NNN", "NMN", "NNN"}, 'N', Item.GOLD_NUGGET, 'M', Item.MELON_SLICE);
+        shaped(Item.GOLDEN_CARROT, 1, new String[]{"NNN", "NCN", "NNN"}, 'N', Item.GOLD_NUGGET, 'C', Item.CARROT);
+        shaped(Item.GOLDEN_APPLE, 1, new String[]{"III", "IAI", "III"}, 'I', Item.GOLD_INGOT, 'A', Item.APPLE);
+        shapeless(Item.MUSHROOM_STEW, 1, Block.BROWN_MUSHROOM, Block.RED_MUSHROOM, Item.BOWL);
+        shaped(Item.of(Block.MELON), 1, new String[]{"###", "###", "###"}, '#', Item.MELON_SLICE);
         shaped(Item.BREAD, 1, new String[]{"WWW"}, 'W', Item.WHEAT);
         shaped(Item.BUCKET, 1, new String[]{"I I", " I "}, 'I', Item.IRON_INGOT);
         shaped(Item.BOW, 1, new String[]{" TS", "T S", " TS"}, 'T', Item.STICK, 'S', Item.STRING);
@@ -151,7 +161,7 @@ public final class Recipes {
         shapeless(Item.IRON_INGOT, 9, Block.IRON_BLOCK);
         shapeless(Item.GOLD_INGOT, 9, Block.GOLD_BLOCK);
         shapeless(Item.DIAMOND, 9, Block.DIAMOND_BLOCK);
-        shaped(Item.of(Block.PUMPKIN), 1, new String[]{"#"}, '#', Block.MELON);
+
         shapeless(Item.of(Block.MOSSY_COBBLESTONE), 1, Block.COBBLESTONE, Block.TALL_GRASS);
 
         smelt(Block.IRON_ORE, Item.IRON_INGOT);

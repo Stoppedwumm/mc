@@ -122,6 +122,10 @@ public final class EntityRenderer {
 
     /** A flat item sprite that always faces the camera. */
     private void renderSprite(Item item, WorldRenderer wr, float pt, double ex, double ey, double ez, float light, float size) {
+        renderSprite(item, 0, wr, pt, ex, ey, ez, light, size);
+    }
+
+    private void renderSprite(Item item, int meta, WorldRenderer wr, float pt, double ex, double ey, double ez, float light, float size) {
         wr.setupBasic(wr.projView, true, 0, 0.1f);
         wr.basicShader.set("uLight", light);
         items.bindFor(item, wr);
@@ -129,6 +133,7 @@ public final class EntityRenderer {
                 .rotateY((float) Math.toRadians(-wr.camYaw + 180)).rotateX((float) Math.toRadians(-wr.camPitch)).scale(size * 2);
         wr.batch.begin(GL_TRIANGLES);
         items.emit(wr.batch, m, item, ItemRenderer.tint(item));
+        items.emitPotion(wr.batch, m, item, meta);
         wr.batch.end();
     }
 
@@ -162,8 +167,8 @@ public final class EntityRenderer {
             if (e instanceof Mob m) renderMob(m, wr, pt, ex, ey, ez, l);
             else if (e instanceof ItemEntity it) renderItem(it, wr, pt, ex, ey, ez, l);
             else if (e instanceof XpOrbEntity o) renderOrb(o, wr, pt, ex, ey, ez);
-            else if (e instanceof ThrownEntity t) renderSprite(t.item, wr, pt, ex, ey, ez, l, 0.25f);
-            else if (e instanceof FireballEntity) renderSprite(Item.FIRE_CHARGE, wr, pt, ex, ey + 0.3, ez, 3f, 0.6f);
+            else if (e instanceof ThrownEntity t) renderSprite(t.item, t.potionMeta, wr, pt, ex, ey, ez, l, 0.25f);
+            else if (e instanceof FireballEntity) renderSprite(Item.FIRE_CHARGE, wr, pt, ex, ey + 0.3, ez, 3f, ((FireballEntity) e).small ? 0.3f : 0.6f);
             else if (e instanceof FallingBlockEntity fb) renderBlock(Block.get(fb.blockId), wr, ex, ey + 0.49, ez, 0.98f, l, 0xFFFFFF);
             else if (e instanceof TntEntity tnt) {
                 float s = tnt.fuse < 10 ? 1 + (10 - tnt.fuse) * 0.02f : 1;
@@ -222,6 +227,17 @@ public final class EntityRenderer {
                 mat.translate(0, 0.3f, 0);
             }
             case MAGMA_CUBE -> light = Math.max(light, 2.2f);
+            case BLAZE -> {
+                light = Math.max(light, 2.4f);
+                // Three rings of rods spinning in alternating directions and bobbing
+                for (int i = 0; i < 12; i++) {
+                    int ring = i / 4;
+                    float dir = ring == 1 ? -1 : 1;
+                    MobModel.Part rod = model.get("rod" + i);
+                    rod.ry = (float) (dir * time * 0.05 * (ring + 1) * 0.6 + (i % 4) * Math.PI / 2 + ring * 0.4);
+                }
+                mat.translate(0, (float) Math.sin(time * 0.1) * 0.08f, 0);
+            }
             case ENDERMAN -> {
                 model.get("legL").rx = legA * 0.5f;
                 model.get("legR").rx = legB * 0.5f;
@@ -403,6 +419,7 @@ public final class EntityRenderer {
             if (ItemRenderer.isCube(item)) m.translate(i * 0.06f, i * 0.06f, i * 0.04f).scale(0.25f);
             else m.translate(0, 0.05f, i * 0.07f).scale(0.5f);
             items.emit(wr.batch, m, item, ItemRenderer.tint(item));
+            items.emitPotion(wr.batch, m, item, it.stack.damage);
         }
         wr.batch.end();
     }

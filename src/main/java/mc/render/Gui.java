@@ -173,6 +173,11 @@ public final class Gui {
             float u0 = (it.icon & 15) / 16f, v0 = (it.icon >> 4) / 16f;
             batch.begin(GL_TRIANGLES);
             batch.rect(x, y, 16, 16, u0, v0, u0 + 1 / 16f, v0 + 1 / 16f, 0xFFFFFFFF);
+            if (it == mc.item.Item.POTION || it == mc.item.Item.SPLASH_POTION) {
+                int li = mc.item.Item.POTION_LIQUID_ICON;
+                float lu = (li & 15) / 16f, lv = (li >> 4) / 16f;
+                batch.rect(x, y, 16, 16, lu, lv, lu + 1 / 16f, lv + 1 / 16f, 0xFF000000 | mc.item.Potions.color(s.damage));
+            }
             batch.end();
             if (s.isEnchanted() || it == mc.item.Item.ENCHANTED_BOOK) {
                 // Enchantment glint: the sprite again, additively, in a pulsing purple

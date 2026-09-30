@@ -60,6 +60,60 @@ public abstract class BlockEntity {
         }
     }
 
+    /** Slots 0-2 potions, 3 ingredient, 4 blaze powder. Brews for 20 seconds; each powder fuels 20 brews. */
+    public static final class BrewingStand extends BlockEntity {
+        public int brewTime, fuel;
+        public static final int BREW_TOTAL = 400;
+
+        public BrewingStand(int x, int y, int z) {
+            super(x, y, z, 5);
+        }
+
+        private boolean isPotion(ItemStack s) { return !ItemStack.isEmpty(s) && (s.item == Item.POTION || s.item == Item.SPLASH_POTION); }
+
+        public boolean canBrew() {
+            ItemStack ing = slots[3];
+            if (ItemStack.isEmpty(ing)) return false;
+            for (int i = 0; i < 3; i++) {
+                if (!isPotion(slots[i])) continue;
+                if (ing.item == Item.GUNPOWDER && slots[i].item == Item.POTION) return true;
+                if (mc.item.Potions.brew(slots[i].damage, ing.item) >= 0) return true;
+            }
+            return false;
+        }
+
+        @Override
+        public void tick(World world) {
+            if (fuel <= 0 && !ItemStack.isEmpty(slots[4]) && slots[4].item == Item.BLAZE_POWDER) {
+                fuel = 20;
+                if (--slots[4].count <= 0) slots[4] = null;
+            }
+            boolean can = canBrew();
+            if (brewTime > 0) {
+                if (!can) brewTime = 0;
+                else if (--brewTime == 0) finish(world);
+            } else if (can && fuel > 0) {
+                brewTime = BREW_TOTAL;
+                fuel--;
+            }
+        }
+
+        private void finish(World world) {
+            ItemStack ing = slots[3];
+            for (int i = 0; i < 3; i++) {
+                if (!isPotion(slots[i])) continue;
+                if (ing.item == Item.GUNPOWDER) {
+                    if (slots[i].item == Item.POTION) slots[i] = new ItemStack(Item.SPLASH_POTION, 1, slots[i].damage);
+                    continue;
+                }
+                int out = mc.item.Potions.brew(slots[i].damage, ing.item);
+                if (out >= 0) slots[i] = new ItemStack(slots[i].item, 1, out);
+            }
+            if (--ing.count <= 0) slots[3] = null;
+            world.playSound("brew", x + 0.5, y + 0.5, z + 0.5, 1, 1);
+        }
+    }
+
     public static final class Chest extends BlockEntity {
         public Chest(int x, int y, int z) {
             super(x, y, z, 27);

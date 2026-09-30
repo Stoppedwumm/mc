@@ -40,6 +40,8 @@ public final class WorldRenderer {
     public float daylight, celestialAngle, time, rain;
     public final Vector3f sunDir = new Vector3f(), lightDir = new Vector3f();
     public float brightness = 0.5f;
+    /** 0..1 strength of the night vision effect (fades out in its last seconds). */
+    public float nightVision;
     public boolean shadows = true, clouds = true, underwater, inLava;
     /** Rendering the Nether: no sky, sun or shadows; red fog. */
     public boolean nether;
@@ -227,6 +229,7 @@ public final class WorldRenderer {
         chunkShader.set("uNear", near);
         chunkShader.set("uFar", far);
         chunkShader.set("uBrightness", brightness);
+        chunkShader.set("uNightVision", nightVision);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, shadowFb.depth);
         glActiveTexture(GL_TEXTURE2);
@@ -374,6 +377,9 @@ public final class WorldRenderer {
      * First-person hand: the held item (block cube or extruded sprite) or the bare arm, with swing, equip,
      * eating and bow-drawing animations.
      */
+    /** Damage/meta of the held stack (potion colour). */
+    public int heldMeta;
+
     public void renderHeldItem(mc.item.Item item, ItemRenderer ir, float swing, float equip, float light, float aspect,
                                int useType, float useProgress, float time) {
         glClear(GL_DEPTH_BUFFER_BIT);
@@ -421,6 +427,7 @@ public final class WorldRenderer {
         glDisable(GL_CULL_FACE);
         batch.begin(GL_TRIANGLES);
         ir.emit(batch, new Matrix4f(), item, ItemRenderer.tint(item));
+        ir.emitPotion(batch, new Matrix4f(), item, heldMeta);
         batch.end();
         glEnable(GL_CULL_FACE);
     }

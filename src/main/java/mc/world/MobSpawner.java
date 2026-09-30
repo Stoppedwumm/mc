@@ -56,6 +56,11 @@ public final class MobSpawner {
             spawn(world, MobType.MAGMA_CUBE, x + 0.5, y, z + 0.5, random);
             return;
         }
+        if (r < 24) {
+            // Blazes (Minecraft keeps them in fortresses; here they roam the wastes a little)
+            if (world.getBlock(x, y + 2, z) == 0) spawn(world, MobType.BLAZE, x + 0.5, y, z + 0.5, random);
+            return;
+        }
         if (floor != Block.NETHERRACK && floor != Block.SOUL_SAND && floor != Block.GRAVEL) return;
         int group = 2 + random.nextInt(3);
         for (int i = 0; i < group; i++) {

@@ -147,6 +147,28 @@ public final class Item {
     public static final Item FIRE_CHARGE = item(356, "Fire Charge", 116);
     public static final Item LAPIS_LAZULI = item(357, "Lapis Lazuli", 117);
     public static final Item FISHING_ROD = tool(358, "Fishing Rod", 118, Tool.NONE, 0, 64, 1, 1);
+    public static final Item GLASS_BOTTLE = item(359, "Glass Bottle", 119);
+    public static final Item NETHER_WART = item(360, "Nether Wart", 120);
+    public static final Item BLAZE_ROD = item(361, "Blaze Rod", 121).fuel(2400);
+    public static final Item BLAZE_POWDER = item(362, "Blaze Powder", 122);
+    public static final Item SPIDER_EYE = item(363, "Spider Eye", 123).food(2, 3.2f);
+    public static final Item FERMENTED_SPIDER_EYE = item(364, "Fermented Spider Eye", 124);
+    public static final Item BOWL = item(365, "Bowl", 125);
+    public static final Item MUSHROOM_STEW = item(366, "Mushroom Stew", 126).food(6, 7.2f).stack(1);
+    public static final Item GLISTERING_MELON = item(367, "Glistering Melon Slice", 127);
+    public static final Item MELON_SLICE = item(368, "Melon Slice", 128).food(2, 1.2f);
+    public static final Item GOLDEN_CARROT = item(369, "Golden Carrot", 129).food(6, 14.4f);
+    public static final Item GOLDEN_APPLE = item(370, "Golden Apple", 130).food(4, 9.6f);
+    public static final Item POTION = item(371, "Potion", 131).stack(1);
+    public static final Item SPLASH_POTION = item(372, "Splash Potion", 132).stack(1);
+    /** Item atlas tile of the coloured liquid drawn over potion bottles. */
+    public static final int POTION_LIQUID_ICON = 133;
+
+    /** Name shown for a particular stack (potions depend on their type). */
+    public static String displayName(ItemStack s) {
+        if (s.item == POTION || s.item == SPLASH_POTION) return Potions.name(s.item, s.damage);
+        return s.item.name;
+    }
 
     // Tools: icon = 40 + type*5 + material
     public static final Item WOODEN_PICKAXE = tool(300, "Wooden Pickaxe", 40, Tool.PICKAXE, 0, 59, 2, 2);

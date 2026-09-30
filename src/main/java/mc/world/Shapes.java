@@ -244,6 +244,14 @@ public final class Shapes {
                 }
             }
             case TABLE -> out.add(new int[]{0, 0, 0, 16, 12, 16});
+            case BREWING -> {
+                out.add(new int[]{7, 0, 7, 9, 14, 9});
+                if (!col) {
+                    out.add(new int[]{9, 0, 5, 15, 2, 11});
+                    out.add(new int[]{2, 0, 1, 8, 2, 7});
+                    out.add(new int[]{2, 0, 9, 8, 2, 15});
+                }
+            }
             case ANVIL -> {
                 out.add(rotH(new int[]{2, 0, 2, 14, 4, 14}, f));
                 out.add(rotH(new int[]{4, 4, 3, 12, 5, 13}, f));

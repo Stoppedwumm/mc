@@ -60,6 +60,8 @@ public final class Drops {
             case 124 -> add(out, Item.of(Block.REPEATER), 1);
             case 128, 129 -> add(out, Item.REDSTONE, 4 + RANDOM.nextInt(2));
             case 133 -> add(out, Item.LAPIS_LAZULI, 4 + RANDOM.nextInt(5));
+            case 136 -> add(out, Item.NETHER_WART, (meta & 3) >= 3 ? 2 + RANDOM.nextInt(3) : 1);
+            case 48 -> add(out, Item.MELON_SLICE, 3 + RANDOM.nextInt(5));
             case 109 -> add(out, Item.QUARTZ, 1);
             case 30 -> add(out, Item.GLOWSTONE_DUST, 2 + RANDOM.nextInt(3));
             case 63 -> {

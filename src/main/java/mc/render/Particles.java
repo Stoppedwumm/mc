@@ -81,7 +81,13 @@ public final class Particles {
             case "portal" -> { p.tint = 0xa040e0 + random.nextInt(40); p.vx *= 8; p.vy = (random.nextDouble() - 0.5) * 0.4; p.vz *= 8; p.size = 0.05f; p.life = 30 + random.nextInt(20); p.brightness = 2.5f; p.grow = -0.001f; }
             case "slime" -> { p.tint = 0x70c860; p.vx *= 4; p.vy = 0.15; p.vz *= 4; p.gravity = 0.04; p.size = 0.06f; p.life = 16; }
             case "drip" -> { p.tint = 0x3060e0; p.vx = p.vz = 0; p.vy = -0.2; p.gravity = 0.02; p.size = 0.03f; p.life = 12; }
-            default -> p.tint = 0xffffff;
+            default -> {
+                if (type.startsWith("effect:")) {
+                    p.tint = Integer.parseInt(type.substring(7), 16);
+                    p.vx *= 2; p.vy = 0.03 + random.nextDouble() * 0.03; p.vz *= 2;
+                    p.size = 0.05f; p.life = 16 + random.nextInt(10); p.brightness = 1.6f;
+                } else p.tint = 0xffffff;
+            }
         }
         list.add(p);
     }
@@ -129,6 +135,8 @@ public final class Particles {
             float y = (float) (p.py + (p.y - p.py) * pt - cy);
             float z = (float) (p.pz + (p.z - p.pz) * pt - cz);
             float s = p.size;
+            // Particles brushing past the lens would fill the screen
+            if (x * x + y * y + z * z < 0.16f) continue;
             if (colored) {
                 float fade = 1 - (float) p.age / p.life;
                 int a = (int) (Math.min(1, fade * 1.5f) * 255);

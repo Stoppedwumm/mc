@@ -78,6 +78,13 @@ final class Hud {
                 if (v >= 2) gui.hudIcon(ItemTextureGen.HEART, hx, hy, 9, 9);
                 else if (v >= 1) gui.hudIcon(ItemTextureGen.HEART_HALF, hx, hy, 9, 9);
             }
+            // Absorption hearts sit in a second row above
+            int gold = (int) Math.ceil(p.absorption);
+            for (int i = 0; i < Math.min(10, (gold + 1) / 2); i++) {
+                int v = gold - i * 2;
+                gui.hudIcon(ItemTextureGen.HEART_EMPTY, x + i * 8, top - (armor > 0 ? 20 : 10), 9, 9);
+                gui.hudIcon(v >= 2 ? ItemTextureGen.HEART_GOLD : ItemTextureGen.HEART_GOLD_HALF, x + i * 8, top - (armor > 0 ? 20 : 10), 9, 9);
+            }
             // Hunger (right to left)
             for (int i = 0; i < 10; i++) {
                 float fx = x + w - 9 - i * 8, fy = top;
@@ -98,10 +105,31 @@ final class Hud {
         long age = g.ticks - nameShownAt;
         if (!ItemStack.isEmpty(held) && age < 50) {
             int a = (int) (Math.min(1, (50 - age) / 10f) * 255);
-            gui.centered(held.item.name, gui.width / 2, y - (p.creative ? 12 : p.armorValue() > 0 ? 50 : 40), a << 24 | 0xFFFFFF);
+            gui.centered(mc.item.Item.displayName(held), gui.width / 2, y - (p.creative ? 12 : p.armorValue() > 0 ? 50 : 40), a << 24 | 0xFFFFFF);
         }
+        renderEffects(gui);
         if (g.showDebug) renderDebug(gui);
         renderChat(gui);
+    }
+
+    /** Active status effects, top right: coloured marker, name with level, and time left. */
+    private void renderEffects(Gui gui) {
+        if (g.player.effects.isEmpty()) return;
+        float y = 4;
+        for (mc.entity.Effect.Instance e : g.player.effects.values()) {
+            String name = e.effect.displayName + (e.amplifier > 0 ? " " + mc.item.Enchantment.roman(e.amplifier + 1) : "");
+            int secs = e.duration / 20;
+            String time = String.format("%d:%02d", secs / 60, secs % 60);
+            float w = Math.max(gui.textWidth(name), gui.textWidth(time)) + 22;
+            float x = gui.width - w - 4;
+            gui.fill(x, y, w, 24, 0xA0101010);
+            gui.frame(x, y, w, 24, 1, e.effect.beneficial ? 0xFF6070A0 : 0xFFA05050);
+            gui.fill(x + 4, y + 7, 10, 10, 0xFF000000 | e.effect.color);
+            gui.text(name, x + 18, y + 3, 0xFFFFFFFF);
+            boolean blink = e.duration < 200 && (g.ticks / 5) % 2 == 0;
+            gui.text(time, x + 18, y + 13, blink ? 0xFF808080 : 0xFFC0C0C0);
+            y += 27;
+        }
     }
 
     private void renderDebug(Gui gui) {

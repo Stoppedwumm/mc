@@ -365,6 +365,22 @@ public final class MobModel {
                     m.part("t" + i, tx, 0, tz).box(-1, -len, -1, 2, len, 2, solid(0xe8e8e8, 0.06));
                 }
             }
+            case BLAZE -> {
+                Painter head = (f, x, y, w, h, r) -> {
+                    if (f == FRONT) {
+                        if (y == 3 && (x == 1 || x == 2 || x == 5 || x == 6)) return x == 1 || x == 6 ? 0xFF2a1a0a : 0xFFfff8c0;
+                        if (y == 5 && x >= 2 && x <= 5) return 0xFF8a3a08;
+                    }
+                    return noise(r.nextDouble() < 0.3 ? 0xfff080 : 0xf0b020, r, 0.1);
+                };
+                m.part("head", 0, 20, 0).box(-4, 0, -4, 8, 8, 8, head);
+                Painter rod = (f, x, y, w, h, r) -> noise(y % 3 == 0 ? 0xfff0a0 : 0xe8a020, r, 0.1);
+                float[][] rings = {{16, 9}, {9, 7}, {3, 5}};
+                for (int i = 0; i < 12; i++) {
+                    float[] ring = rings[i / 4];
+                    m.part("rod" + i, 0, ring[0], 0).box(ring[1] - 1, 0, -1, 2, 8, 2, rod);
+                }
+            }
             case MAGMA_CUBE -> {
                 Painter magma = (f, x, y, w, h, r) -> {
                     if (f == FRONT && y == 3 && (x == 1 || x == 2 || x == 5 || x == 6)) return 0xFFffc020;

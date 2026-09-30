@@ -49,6 +49,8 @@ public enum Enchantment {
 
     private static final String[] ROMAN = {"", "I", "II", "III", "IV", "V"};
 
+    public static String roman(int level) { return level < ROMAN.length ? ROMAN[level] : String.valueOf(level); }
+
     public String describe(int level) {
         return maxLevel == 1 ? displayName : displayName + " " + (level < ROMAN.length ? ROMAN[level] : String.valueOf(level));
     }

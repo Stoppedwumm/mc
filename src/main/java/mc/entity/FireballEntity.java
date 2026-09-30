@@ -7,6 +7,8 @@ import mc.util.RayCast;
 public final class FireballEntity extends Entity {
     public final Entity shooter;
     private double ax, ay, az;
+    /** Blaze fireballs: set things on fire instead of exploding. */
+    public boolean small;
 
     public FireballEntity(Entity shooter) {
         this.shooter = shooter;
@@ -36,8 +38,8 @@ public final class FireballEntity extends Entity {
             if (e == shooter || e.isDead()) continue;
             AABB b = e.box();
             if (ArrowPath.rayBox(x, y, z, motionX, motionY, motionZ, b.minX - 0.5, b.minY - 0.5, b.minZ - 0.5, b.maxX + 0.5, b.maxY + 0.5, b.maxZ + 0.5) >= 0) {
-                e.damage(DamageSource.EXPLOSION, 6, shooter);
-                e.fireTicks = Math.max(e.fireTicks, 100);
+                e.damage(small ? DamageSource.FIRE : DamageSource.EXPLOSION, small ? 5 : 6, shooter);
+                if (!e.fireImmune()) e.fireTicks = Math.max(e.fireTicks, 100);
                 hitEntity = true;
                 break;
             }
@@ -45,7 +47,12 @@ public final class FireballEntity extends Entity {
         if (hit != null || hitEntity) {
             if (hit != null) { x = hit.px; y = hit.py; z = hit.pz; }
             remove();
-            world.explode(x, y, z, 1, this, true);
+            if (small) {
+                if (hit != null) {
+                    int fx = hit.x + hit.nx, fy = hit.y + hit.ny, fz = hit.z + hit.nz;
+                    if (world.getBlock(fx, fy, fz) == 0) world.setBlock(fx, fy, fz, mc.world.Block.FIRE.id);
+                }
+            } else world.explode(x, y, z, 1, this, true);
             return;
         }
         x += motionX;

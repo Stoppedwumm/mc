@@ -115,6 +115,19 @@ public final class ItemRenderer {
         }
     }
 
+    /** The tinted liquid inside a potion bottle, filling the bottle sprite's empty belly. */
+    public void emitPotion(Batch batch, Matrix4f m, Item item, int meta) {
+        if (item != Item.POTION && item != Item.SPLASH_POTION) return;
+        float[] g = extrude(Item.POTION_LIQUID_ICON, false, pixels);
+        Vector3f v = new Vector3f();
+        int tint = mc.item.Potions.color(meta), tr = tint >> 16 & 255, tg = tint >> 8 & 255, tb = tint & 255;
+        for (int i = 0; i < g.length; i += 6) {
+            m.transformPosition(v.set(g[i] - 0.5f, g[i + 1] - 0.5f, g[i + 2]));
+            float s = g[i + 5];
+            batch.v(v.x, v.y, v.z, g[i + 3], g[i + 4], 0xFF000000 | (int) (tr * s) << 16 | (int) (tg * s) << 8 | (int) (tb * s));
+        }
+    }
+
     private static void emitCube(Batch batch, Matrix4f m, Block block) {
         Vector3f a = new Vector3f(), b = new Vector3f(), c = new Vector3f(), d = new Vector3f();
         WorldRenderer.cubeInto((x0, y0, z0, u0, v0, x1, y1, z1, u1, v1, x2, y2, z2, u2, v2, x3, y3, z3, u3, v3, argb) -> {

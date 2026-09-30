@@ -24,6 +24,7 @@ uniform float uNear;
 uniform float uFar;
 uniform float uBrightness;
 uniform int uNether;
+uniform float uNightVision;
 
 const vec3 NETHER_FOG = vec3(0.045, 0.006, 0.004);
 
@@ -76,7 +77,7 @@ vec3 lighting(vec3 albedo, vec3 n, float sky, float blk, float ao, bool foliage)
         float bn = blk * blk;
         vec3 amb = vec3(0.30, 0.19, 0.15) * (0.8 + 0.2 * n.y) * ao;
         vec3 lava = vec3(1.0, 0.55, 0.28) * (bn * bn * 2.2 + bn * 0.35) * ao;
-        return albedo * (amb + lava + vec3(0.01) * (0.5 + uBrightness));
+        return albedo * (amb + lava + vec3(0.01) * (0.5 + uBrightness) + vec3(0.6) * uNightVision * ao);
     }
     float sh = shadow();
     float ndl = foliage ? 0.65 : max(dot(n, uLightDir), 0.0);
@@ -89,7 +90,7 @@ vec3 lighting(vec3 albedo, vec3 n, float sky, float blk, float ao, bool foliage)
     float b = blk * blk;
     vec3 torch = vec3(1.0, 0.62, 0.3) * (b * b * 2.2 + b * 0.35) * ao;
     vec3 minLight = vec3(0.012, 0.013, 0.016) * (0.5 + uBrightness);
-    return albedo * (direct + ambient + torch + minLight * ao);
+    return albedo * (direct + ambient + torch + minLight * ao + vec3(0.55, 0.57, 0.6) * uNightVision * ao);
 }
 
 void main() {

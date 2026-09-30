@@ -10,7 +10,7 @@ import java.util.function.BiPredicate;
 public final class ItemTextureGen {
     public static final int HEART = 96, HEART_HALF = 97, HEART_EMPTY = 98, FOOD = 99, FOOD_HALF = 100, FOOD_EMPTY = 101,
             BUBBLE = 102, FLAME = 103, PROGRESS = 104, PROGRESS_FULL = 105, BUBBLE_POP = 106, HEART_HURT = 107,
-            ARMOR = 108, ARMOR_HALF = 109, ARMOR_EMPTY = 110, XP_ORB = 111;
+            ARMOR = 108, ARMOR_HALF = 109, ARMOR_EMPTY = 110, XP_ORB = 111, HEART_GOLD = 134, HEART_GOLD_HALF = 135;
     /** Base colour per armor material (leather, chainmail, iron, gold, diamond). */
     public static final int[] ARMOR_COLORS = {0xa0653a, 0x8a8a8a, 0xd8d8d8, 0xf8d840, 0x4ae0d8};
     private final int[] px = new int[256 * 256];
@@ -80,6 +80,23 @@ public final class ItemTextureGen {
         tile(116, () -> { shape((x, y) -> dist(x, y, 7.5, 7.5) < 5.5, 0x3a2a20, 0x101010, 0x6a4a3a); for (int i = 0; i < 10; i++) set(4 + r.nextInt(8), 4 + r.nextInt(8), 0xf08a20); });
         tile(117, () -> shape((x, y) -> Math.abs(x - 7.5) + Math.abs(y - 7.5) < 6.5 && (x + y) % 5 != 0, 0x2a50c8, 0x10287a, 0x7a9af0));
         tile(118, this::fishingRod);
+        tile(119, () -> bottle(false, false));
+        tile(120, () -> shape((x, y) -> dist(x, y, 8, 9) < 4.5 || dist(x, y, 5, 5) < 2.2 || dist(x, y, 11, 5) < 2.2, 0x8a1a1a, 0x4a0808, 0xc84a3a));
+        tile(121, () -> { for (int i = 0; i < 12; i++) { set(3 + i, 13 - i, i % 3 == 0 ? 0xfff0a0 : 0xf8b020); set(4 + i, 13 - i, 0x9a5a08); } });
+        tile(122, () -> pile(0xf8a020, 0xa05a08, 0xfff080));
+        tile(123, () -> { shape((x, y) -> dist(x, y, 8, 8) < 5.5, 0x9a1a2a, 0x4a0810, 0xe05060); set(6, 6, 0x200808); set(9, 7, 0x200808); set(7, 10, 0x200808); });
+        tile(124, () -> { shape((x, y) -> dist(x, y, 8, 8) < 5.5, 0x6a3a2a, 0x3a1810, 0x9a6a50); for (int i = 0; i < 6; i++) set(4 + r.nextInt(8), 4 + r.nextInt(8), 0xc02030); });
+        tile(125, () -> bowl(-1));
+        tile(126, () -> bowl(0xc89a6a));
+        tile(127, () -> { melonSlice(); for (int i = 0; i < 7; i++) set(3 + r.nextInt(10), 5 + r.nextInt(7), 0xfff080); });
+        tile(128, this::melonSlice);
+        tile(129, () -> { carrot(); recolor(0xf8d840); });
+        tile(130, () -> { apple(); recolor(0xf8d840); });
+        tile(131, () -> bottle(true, false));
+        tile(132, () -> bottle(true, true));
+        tile(133, () -> { for (int y = 7; y <= 13; y++) for (int x = 4; x <= 11; x++) if (dist(x, y, 7.5, 10) < 3.9) set(x, y, (x < 7 && y < 10) ? 0xffffff : 0xd8d8d8 - (y - 7) * 0x080808); });
+        tile(HEART_GOLD, () -> heart(0xf0c020, true, 1));
+        tile(HEART_GOLD_HALF, () -> heart(0xf0c020, true, 0.5));
         tile(91, () -> pile(0xd01010, 0x6a0000, 0xff5a5a));
         tile(92, () -> { book(); for (int y = 2; y < 14; y += 3) set(5 + (y % 5), y, 0xe070ff); });
         tile(93, this::xpBottle);
@@ -305,6 +322,42 @@ public final class ItemTextureGen {
     private void xpBottle() {
         shape((x, y) -> (y >= 6 && dist(x, y, 7.5, 10) < 5) || (y >= 2 && y < 6 && Math.abs(x - 7.5) < 2), 0x9ae05a, 0x3a7a1a, 0xe0ffc0);
         for (int x = 6; x <= 9; x++) set(x, 2, 0x8a6a4a);
+    }
+
+    /** A glass bottle; potions leave the belly empty for the tinted liquid overlay. */
+    private void bottle(boolean potion, boolean splash) {
+        BiPredicate<Integer, Integer> in = (x, y) -> (y >= 6 && dist(x, y, 7.5, 10) < 5) || (y >= 2 && y < 6 && Math.abs(x - 7.5) < (splash ? 2.5 : 2));
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                if (!in.test(x, y)) continue;
+                boolean edge = !in.test(x - 1, y) || !in.test(x + 1, y) || !in.test(x, y - 1) || !in.test(x, y + 1);
+                if (edge) set(x, y, 0x3a4a5a);
+                else if (!potion || y < 7) set(x, y, (x < 7 && y < 9) ? 0xf0f8ff : 0xb8d0e0);
+            }
+        for (int x = 6; x <= 9; x++) set(x, 2, 0x8a6a4a);
+    }
+
+    private void bowl(int soup) {
+        shape((x, y) -> y >= 7 && y <= 13 && dist(x, y, 7.5, 6) < 7.5, 0x8a6a3a, 0x4a3218, 0xb08a58);
+        if (soup >= 0) for (int x = 2; x <= 13; x++) { set(x, 7, jitter(soup)); if (x > 3 && x < 12) set(x, 8, jitter(soup)); }
+    }
+
+    private void melonSlice() {
+        shape((x, y) -> dist(x, y, 8, 3) < 10 && y > 5 && dist(x, y, 8, 3) > 3, 0xe03a3a, 0x3a8a2a, 0xff7a6a);
+        for (int i = 0; i < 5; i++) set(5 + i * 2, 8 + (i % 2) * 2, 0x201010);
+    }
+
+    /** Tints every opaque pixel of the current tile towards a colour (golden foods). */
+    private void recolor(int c) {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                int i = ((tile >> 4) * 16 + y) * 256 + (tile & 15) * 16 + x;
+                if ((px[i] >>> 24) == 0) continue;
+                int v = px[i];
+                double l = ((v >> 16 & 255) * 0.3 + (v >> 8 & 255) * 0.59 + (v & 255) * 0.11) / 160.0;
+                int rr = Math.min(255, (int) ((c >> 16 & 255) * l)), g = Math.min(255, (int) ((c >> 8 & 255) * l)), b = Math.min(255, (int) ((c & 255) * l));
+                px[i] = 0xFF000000 | rr << 16 | g << 8 | b;
+            }
     }
 
     private void fishingRod() {

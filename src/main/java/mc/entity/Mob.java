@@ -43,6 +43,7 @@ public final class Mob extends LivingEntity {
     /** Iron golem arm swing after an attack. */
     public int attackAnim;
     private int targetScan;
+    private int blazeCharge;
     /** Looting level of the weapon that last hit this mob. */
     public int lootingBonus;
 
@@ -108,6 +109,7 @@ public final class Mob extends LivingEntity {
     @Override
     protected double gravity() {
         if (type == MobType.CHICKEN && motionY < 0) return 0.03;
+        if (type == MobType.BLAZE) return motionY < 0 ? 0.02 : 0.08;
         return 0.08;
     }
 
@@ -237,7 +239,7 @@ public final class Mob extends LivingEntity {
             }
             case SKELETON -> { drop(Item.BONE, 0, 2); drop(Item.ARROW, 0, 2); }
             case CREEPER -> drop(Item.GUNPOWDER, 0, 2);
-            case SPIDER -> drop(Item.STRING, 0, 2);
+            case SPIDER -> { drop(Item.STRING, 0, 2); if (byPlayer && random.nextInt(3) == 0) drop(Item.SPIDER_EYE, 1, 1); }
             case SQUID -> drop(Item.INK_SAC, 1, 3);
             case ENDERMAN -> drop(Item.ENDER_PEARL, 0, 1);
             case SLIME -> { if (slimeSize == 1) drop(Item.SLIMEBALL, 0, 2); }
@@ -250,6 +252,7 @@ public final class Mob extends LivingEntity {
             }
             case GHAST -> { drop(Item.GHAST_TEAR, 0, 1); drop(Item.GUNPOWDER, 0, 2); }
             case MAGMA_CUBE -> { if (slimeSize > 1) drop(Item.MAGMA_CREAM, 0, 1); }
+            case BLAZE -> { if (byPlayer) drop(Item.BLAZE_ROD, 0, 1); }
             default -> { }
         }
         if (type.isUndead() && byPlayer && random.nextInt(40) == 0) drop(Item.IRON_INGOT, 1, 1);
@@ -481,6 +484,24 @@ public final class Mob extends LivingEntity {
                     if (slimeSize > 1) meleeIfClose(target, dist, slimeSize == 4 ? 4 : 2);
                 }
                 case MAGMA_CUBE -> meleeIfClose(target, dist, slimeSize * 1.5f + 1);
+                case BLAZE -> {
+                    forward = dist > 8 ? 1 : 0;
+                    // Hover up to the target's height
+                    if (target.y + 1 > y + 0.5 && motionY < 0.3) motionY += 0.1;
+                    meleeIfClose(target, dist, 6);
+                    if (dist < 16 && canSee(target)) {
+                        if (++blazeCharge == 60) world.playSound("blaze_charge", x, y + 1, z, 1, 1);
+                        if (blazeCharge >= 60 && blazeCharge % 6 == 0) {
+                            FireballEntity f = new FireballEntity(this);
+                            f.small = true;
+                            f.setPos(x, y + height / 2 + 0.5, z);
+                            f.aim(target.x - x, target.y + target.height / 2 - f.y, target.z - z);
+                            world.addEntity(f);
+                            world.playSound("blaze_shoot", x, y + 1, z, 1, 1);
+                        }
+                        if (blazeCharge >= 78) blazeCharge = 0;
+                    }
+                }
                 case IRON_GOLEM -> {
                     forward = dist > 2 ? 1 : 0;
                     if (dist < 2.2 + target.width / 2 && attackCooldown == 0) {
@@ -580,6 +601,7 @@ public final class Mob extends LivingEntity {
                 if (!type.hostile || !playerValid) return null;
                 if (type == MobType.SPIDER && !aggressive && world.isDaytime()) return null;
                 double d = distanceTo(player);
+                if (player.hasEffect(Effect.INVISIBILITY) && d > 2.5) return null;
                 return d < (type == MobType.SLIME ? 16 : 24) && (d < 8 || canSee(player)) ? player : null;
             }
         }
@@ -842,6 +864,8 @@ public final class Mob extends LivingEntity {
 
     private void meleeIfClose(LivingEntity target, double dist, float damage) {
         if (dist < 1.6 + width / 2 && attackCooldown == 0 && Math.abs(target.y - y) < 1.5 + height / 2) {
+            if (hasEffect(Effect.STRENGTH)) damage += 3 * (amplifier(Effect.STRENGTH) + 1);
+            if (hasEffect(Effect.WEAKNESS)) damage = Math.max(0, damage - 4 * (amplifier(Effect.WEAKNESS) + 1));
             target.damage(DamageSource.ATTACK, damage, this);
             attackCooldown = 20;
         }

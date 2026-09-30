@@ -82,6 +82,9 @@ public final class Options {
         public int[][] armor;
         public int xpLevel, xpTotal;
         public float xpProgress;
+        /** Active effects as [ordinal, amplifier, duration]; absorption hearts left. */
+        public int[][] effects;
+        public float absorption;
         public float health = 20;
         public int food = 20;
         public float saturation = 5;

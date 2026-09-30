@@ -6,7 +6,7 @@ package mc.world;
 public final class Block {
     public enum Model { NONE, CUBE, CROSS, LIQUID, TORCH, SHAPE }
     /** Non-cube geometry, see {@link Shapes}. */
-    public enum Shape { NONE, SLAB, STAIRS, FENCE, GATE, DOOR, TRAPDOOR, LADDER, PANE, BED, WALL, CARPET, SNOW_LAYER, CAKE, PORTAL, WIRE, LEVER, BUTTON, PLATE, REPEATER, PISTON, PISTON_HEAD, TABLE, ANVIL }
+    public enum Shape { NONE, SLAB, STAIRS, FENCE, GATE, DOOR, TRAPDOOR, LADDER, PANE, BED, WALL, CARPET, SNOW_LAYER, CAKE, PORTAL, WIRE, LEVER, BUTTON, PLATE, REPEATER, PISTON, PISTON_HEAD, TABLE, ANVIL, BREWING }
     public enum Layer { OPAQUE, CUTOUT, TRANSLUCENT }
     public enum Tint { NONE, GRASS, FOLIAGE, BIRCH, SPRUCE }
     public enum SoundType { STONE, WOOD, GRASS, GRAVEL, SAND, GLASS, CLOTH, SNOW, NONE }
@@ -100,8 +100,10 @@ public final class Block {
                 PISTON_STICKY = 142, PISTON_SIDE = 143, PISTON_BOTTOM = 144, PISTON_INNER = 145, REDSTONE_ORE = 146,
                 REDSTONE_BLOCK = 147, REPEATER_ITEM = 148, REDSTONE_DUST_LINE = 149, ENCH_TOP = 150, ENCH_SIDE = 151,
                 ENCH_BOTTOM = 152, ANVIL_TOP = 153, ANVIL_SIDE = 154, LAPIS_ORE = 155, LAPIS_BLOCK = 156,
+                BREWING_BASE = 157, BREWING_ROD = 158, NETHER_WART_0 = 159, BROWN_MUSHROOM = 162, RED_MUSHROOM = 163,
+                BREWING_ITEM = 164,
                 BREAK_0 = 240; // 240..249 crack stages
-        public static final int COUNT = 157;
+        public static final int COUNT = 165;
     }
 
     public static final Block AIR = new Block(0, "Air", 0);
@@ -242,6 +244,10 @@ public final class Block {
     public static final Block ANVIL = new Block(132, "Anvil", 0).tex(Tex.ANVIL_TOP, Tex.ANVIL_SIDE, Tex.ANVIL_SIDE).shape(Shape.ANVIL).hardness(5f);
     public static final Block LAPIS_ORE = new Block(133, "Lapis Lazuli Ore", Tex.LAPIS_ORE).hardness(3f);
     public static final Block LAPIS_BLOCK = new Block(134, "Block of Lapis Lazuli", Tex.LAPIS_BLOCK).hardness(3f);
+    public static final Block BREWING_STAND = new Block(135, "Brewing Stand", 0).tex(Tex.BREWING_BASE, Tex.BREWING_BASE, Tex.BREWING_ROD).shape(Shape.BREWING).cutout().light(1).hardness(0.5f).itemTex(Tex.BREWING_ITEM);
+    public static final Block NETHER_WART = new Block(136, "Nether Wart", Tex.NETHER_WART_0).plant();
+    public static final Block BROWN_MUSHROOM = new Block(137, "Brown Mushroom", Tex.BROWN_MUSHROOM).plant().light(1);
+    public static final Block RED_MUSHROOM = new Block(138, "Red Mushroom", Tex.RED_MUSHROOM).plant();
 
     static {
         AIR.model = Model.NONE; AIR.opaque = false; AIR.solid = false; AIR.replaceable = true; AIR.inCreativeInventory = false; AIR.sound = SoundType.NONE;
@@ -253,7 +259,8 @@ public final class Block {
         BEDROCK.inCreativeInventory = true;
         GRASS.tintTopOnly = true;
         LIT_FURNACE.inCreativeInventory = false;
-        for (Block crop : new Block[]{WHEAT, CARROTS, POTATOES}) { crop.inCreativeInventory = false; crop.replaceable = false; }
+        for (Block crop : new Block[]{WHEAT, CARROTS, POTATOES, NETHER_WART}) { crop.inCreativeInventory = false; crop.replaceable = false; }
+        BROWN_MUSHROOM.replaceable = false; RED_MUSHROOM.replaceable = false;
         SAPLING.replaceable = false;
         DANDELION.replaceable = false; POPPY.replaceable = false; BLUE_ORCHID.replaceable = false; SUGAR_CANE.replaceable = false;
         DEAD_BUSH.replaceable = true;
@@ -307,6 +314,7 @@ public final class Block {
         if (this == CHEST && front) return Tex.CHEST_FRONT;
         if (this == WHEAT) return Tex.WHEAT_0 + Math.min(7, meta & 7);
         if (this == CARROTS) return Tex.CARROTS_0 + cropStage(meta);
+        if (this == NETHER_WART) return Tex.NETHER_WART_0 + Math.min(2, (meta & 3) * 2 / 3);
         if (this == POTATOES) return Tex.POTATOES_0 + cropStage(meta);
         if (this == CAKE && face == 4 && (meta & 7) > 0) return Tex.CAKE_INNER;
         if (shape == Shape.PISTON) {
@@ -349,7 +357,7 @@ public final class Block {
     public boolean has3dItem() {
         return model == Model.CUBE || (model == Model.SHAPE && shape != Shape.DOOR && shape != Shape.LADDER
                 && shape != Shape.PANE && shape != Shape.BED && shape != Shape.CAKE && shape != Shape.REPEATER && shape != Shape.LEVER
-                && shape != Shape.WIRE);
+                && shape != Shape.WIRE && shape != Shape.BREWING);
     }
 
     /** Tile used when the block is shown as a flat sprite. */

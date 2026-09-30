@@ -43,7 +43,32 @@ All textures and sounds are generated procedurally at startup, so no Mojang asse
   - Zombies and skeletons burn in sunlight.
 - Cuboid models with procedurally painted skins, walk animations, head tracking, hurt flashes and death animations.
 
+**Progression**
+- Armour (leather, chainmail, iron, gold, diamond) with Minecraft's damage reduction, shown on the player and mobs
+- Experience orbs from mobs, mining and smelting, the XP bar and levels
+- Enchanting table with bookshelves, enchantment rolls, enchanted books and lapis; anvils for repairing and combining.
+  Enchantments include Sharpness, Smite, Knockback, Fire Aspect, Looting, Efficiency, Silk Touch, Fortune, Unbreaking,
+  Protection, Feather Falling, Thorns, Respiration, Power, Punch, Flame and Infinity.
+- Status effects: Speed, Slowness, Haste, Strength, Weakness, Regeneration, Poison, Resistance, Fire Resistance,
+  Water Breathing, Invisibility, Night Vision, Jump Boost and Absorption. They show in the HUD, emit coloured particles
+  and are saved with the world.
+- Brewing stands fuelled by blaze powder. They follow Minecraft's recipes: nether wart gives an awkward potion; redstone
+  makes an effect last longer; glowstone makes it level II; a fermented spider eye corrupts it. Drinkable and splash potions.
+- Golden apples, golden carrots, mushroom stew, milk (clears effects) and more foods
+
+**Redstone**
+- Wire with signal strength, torches, levers, buttons, pressure plates, repeaters, lamps, TNT
+- Pistons and sticky pistons, and powered doors, trapdoors and gates
+
+**The Nether**
+- Obsidian portals lit with flint and steel; travel scales 8:1 and links to portals on the other side
+- Netherrack caverns with lava seas, soul sand, glowstone, quartz, nether wart and fire
+- Ghasts, zombie pigmen, magma cubes and blazes
+
 **World**
+- Villages with houses, farms, wells and villagers you can trade emeralds with; dungeons with spawners and loot chests
+- Building blocks: slabs, stairs, fences, gates, doors, trapdoors, ladders, panes, walls, carpets, beds (sleep through the night)
+- More animals and mobs: wolves (tameable), squid, endermen, slimes, iron and snow golems
 - Infinite terrain from continentalness/erosion/peaks noise with 3D overhangs, rivers, 13 biomes, caves, ores and trees
 - Flowing water and lava with levels (water spreads 7 blocks, lava 3, both seek the nearest drop), infinite water sources, and lava + water → obsidian/cobblestone
 - Falling sand and gravel, TNT and creeper explosions that chain-react
@@ -101,7 +126,9 @@ Command-line options:
 /time set <day|noon|sunset|night|midnight|sunrise|ticks>   /time add <ticks>
 /gamemode <creative|survival>     /tp <x> <y> <z>   (~ relative coordinates work)
 /give <item_name> [count]         /setblock <x> <y> <z> <block>
-/summon <pig|cow|sheep|chicken|zombie|skeleton|creeper|spider> [x y z]
+/summon <mob> [x y z] [baby|tamed|angry|<armor material>]
+/effect <effect|clear> [seconds] [amplifier]   /potion <type> [splash]   /enchant <name> [level]
+/xp <points>   /armor <material>   /dimension   /locate village [tp]   /perspective <0-2>
 /kill [@e]   /weather <clear|rain>   /heal   /clear   /spawnpoint
 /fill <x1> <y1> <z1> <x2> <y2> <z2> <block>
 /fly   /seed   /rd <chunks>   /help
@@ -128,12 +155,11 @@ Run the tests with `mvn test`. They check:
 - crafting and smelting
 - water flow, draining, infinite sources and lava + water
 - harvest rules, falling sand, explosions, zombie AI, mob loot, hunger and fall damage
+- building blocks, animals, villages and dungeons, the Nether, redstone circuits, enchanting and brewing
 
 ## Not implemented
 
 The real game is far larger than this project. Missing so far:
-- the Nether and the End, redstone, villages and structures
-- enchanting, brewing, armour, beds, doors and slabs
+- the End, nether fortresses, strongholds
+- fishing, boats, minecarts and rails, signs, paintings, maps
 - multiplayer
-
-Mobs and dropped items are not saved; mobs respawn naturally.

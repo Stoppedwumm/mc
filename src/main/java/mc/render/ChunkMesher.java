@@ -473,6 +473,7 @@ public final class ChunkMesher {
     public static int boxTexture(Block block, int face, int meta, int boxIndex) {
         if (block.shape == Block.Shape.REPEATER && boxIndex > 0)
             return block == Block.POWERED_REPEATER ? Block.Tex.REDSTONE_TORCH_ON : Block.Tex.REDSTONE_TORCH_OFF;
+        if (block == Block.BREWING_STAND) return boxIndex == 0 ? Block.Tex.BREWING_ROD : Block.Tex.BREWING_BASE;
         if (block == Block.LEVER) return boxIndex == 0 ? Block.Tex.COBBLE : Block.Tex.LOG_SIDE;
         if ((block.shape == Block.Shape.PISTON && boxIndex == 1) || (block == Block.PISTON_HEAD && boxIndex == 1)) return Block.Tex.PLANKS;
         return block.textureForFace(face, meta);

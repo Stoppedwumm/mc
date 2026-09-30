@@ -40,7 +40,8 @@ final class Screens {
 
     boolean isContainer(Game.Screen s) {
         return s == Game.Screen.INVENTORY || s == Game.Screen.CRAFTING || s == Game.Screen.FURNACE || s == Game.Screen.CHEST
-                || s == Game.Screen.CREATIVE || s == Game.Screen.TRADING || s == Game.Screen.ENCHANTING || s == Game.Screen.ANVIL;
+                || s == Game.Screen.CREATIVE || s == Game.Screen.TRADING || s == Game.Screen.ENCHANTING || s == Game.Screen.ANVIL
+                || s == Game.Screen.BREWING;
     }
 
     void openInventory() {
@@ -124,6 +125,7 @@ final class Screens {
         cursor = null;
         furnace = null;
         chest = null;
+        brewing = null;
     }
 
     // ------------------------------------------------------------------ enchanting & anvil
@@ -149,6 +151,13 @@ final class Screens {
             }
         bookshelves = Math.min(15, n);
         g.setScreen(Game.Screen.ENCHANTING);
+    }
+
+    private BlockEntity.BrewingStand brewing;
+
+    public void openBrewing(BlockEntity.BrewingStand b) {
+        brewing = b;
+        g.setScreen(Game.Screen.BREWING);
     }
 
     void openAnvil() {
@@ -344,6 +353,13 @@ final class Screens {
             case CHEST -> {
                 for (int i = 0; i < 27; i++) slots.add(new Slot(chest.slots, i, px + 8 + (i % 9) * 18, py + 18 + (float) (i / 9) * 18, NORMAL, 3));
             }
+            case BREWING -> {
+                slots.add(new Slot(brewing.slots, 0, px + 56, py + 51, NORMAL, 3));
+                slots.add(new Slot(brewing.slots, 1, px + 79, py + 58, NORMAL, 3));
+                slots.add(new Slot(brewing.slots, 2, px + 102, py + 51, NORMAL, 3));
+                slots.add(new Slot(brewing.slots, 3, px + 79, py + 17, NORMAL, 3));
+                slots.add(new Slot(brewing.slots, 4, px + 17, py + 17, NORMAL, 3));
+            }
             case ENCHANTING -> {
                 slots.add(new Slot(enchantSlots, 0, px + 15, py + 47, NORMAL, 3));
                 slots.add(new Slot(enchantSlots, 1, px + 35, py + 47, NORMAL, 3));
@@ -478,6 +494,10 @@ final class Screens {
                 else if (enchantSlots[0] == null && stack.count == 1) { enchantSlots[0] = stack; stack = null; }
             } else if (screen == Game.Screen.ANVIL) {
                 stack = insert(anvilSlots, 0, 2, stack);
+            } else if (screen == Game.Screen.BREWING) {
+                if (stack.item == Item.POTION || stack.item == Item.SPLASH_POTION) stack = insert(brewing.slots, 0, 3, stack);
+                else if (stack.item == Item.BLAZE_POWDER && ItemStack.isEmpty(brewing.slots[4])) stack = insert(brewing.slots, 4, 5, stack);
+                else stack = insert(brewing.slots, 3, 4, stack);
             } else if (screen == Game.Screen.CHEST) {
                 stack = insert(chest.slots, 0, 27, stack);
             } else if (screen == Game.Screen.FURNACE) {
@@ -534,6 +554,7 @@ final class Screens {
             case CREATIVE -> "Creative Inventory";
             case TRADING -> trader == null ? "Villager" : mc.entity.Mob.PROFESSIONS[trader.profession];
             case ENCHANTING -> "Enchant";
+            case BREWING -> "Brewing Stand";
             case ANVIL -> "Repair & Name";
             default -> "";
         };
@@ -561,6 +582,15 @@ final class Screens {
             renderOffers(gui, input, px, py, mx, my);
         } else if (screen == Game.Screen.ENCHANTING) {
             renderEnchanting(gui, input, px, py, mx, my);
+        } else if (screen == Game.Screen.BREWING) {
+            // Fuel gauge and brewing progress
+            gui.fill(px + 18, py + 38, 16, 4, 0xFF404040);
+            gui.fill(px + 18, py + 38, 16 * brewing.fuel / 20f, 4, 0xFFf0a020);
+            if (brewing.brewTime > 0) {
+                float f = 1 - (float) brewing.brewTime / BlockEntity.BrewingStand.BREW_TOTAL;
+                gui.fill(px + 98, py + 17, 5, 27, 0xFF606060);
+                gui.fill(px + 98, py + 17, 5, 27 * f, 0xFFFFFFFF);
+            }
         } else if (screen == Game.Screen.ANVIL) {
             renderAnvil(gui, px, py);
         } else if (screen == Game.Screen.CREATIVE) {
@@ -614,11 +644,12 @@ final class Screens {
         if (!ItemStack.isEmpty(cursor)) gui.stack(cursor, (float) mx - 8, (float) my - 8);
         else if (hover != null && !ItemStack.isEmpty(get(hover))) {
             ItemStack hs = get(hover);
-            String name = hs.item.name;
+            String name = Item.displayName(hs);
             if (hs.item.maxDamage > 0) name += " (" + (hs.item.maxDamage - hs.damage) + "/" + hs.item.maxDamage + ")";
             List<String> lines = new ArrayList<>();
             lines.add(name);
             if (hs.enchants != null) for (var e : hs.enchants.entrySet()) lines.add("§7" + e.getKey().describe(e.getValue()));
+            if (hs.item == Item.POTION || hs.item == Item.SPLASH_POTION) lines.add("§7" + mc.item.Potions.describe(hs.damage));
             gui.tooltip(lines, (float) mx, (float) my);
         }
     }

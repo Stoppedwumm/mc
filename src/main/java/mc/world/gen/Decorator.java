@@ -85,6 +85,13 @@ public final class Decorator {
                 world.setBlockGen(x, y + 1, z, type);
             }
         }
+        // Mushrooms under trees and in caves
+        for (int i = 0; i < 3; i++) {
+            int x = bx + rand.nextInt(16), z = bz + rand.nextInt(16), y = 10 + rand.nextInt(100);
+            if (world.getBlock(x, y, z) == 0 && Block.get(world.getBlock(x, y - 1, z)).opaque && world.getBlock(x, y - 1, z) != Block.BEDROCK.id
+                    && (biome == Biome.FOREST || biome == Biome.TAIGA || y < 55) && rand.nextInt(biome == Biome.FOREST || biome == Biome.TAIGA ? 2 : 4) == 0)
+                world.setBlockGen(x, y, z, rand.nextInt(3) == 0 ? Block.RED_MUSHROOM.id : Block.BROWN_MUSHROOM.id);
+        }
         if (biome == Biome.PLAINS && rand.nextInt(24) == 0) {
             int x = bx + rand.nextInt(16), z = bz + rand.nextInt(16);
             int y = surface(x, z);
@@ -156,6 +163,14 @@ public final class Decorator {
                 int px = x + rand.nextInt(6) - 3, py = y + rand.nextInt(4) - 2, pz = z + rand.nextInt(6) - 3;
                 if (world.getBlock(px, py, pz) == 0 && world.getBlock(px, py - 1, pz) == Block.NETHERRACK.id) world.setBlockGen(px, py, pz, Block.FIRE.id);
             }
+        }
+        // Nether wart on soul sand, mushrooms in the dark
+        for (int i = 0; i < 8; i++) {
+            int x = bx + rand.nextInt(16), z = bz + rand.nextInt(16), y = 32 + rand.nextInt(80);
+            int below = world.getBlock(x, y - 1, z);
+            if (world.getBlock(x, y, z) != 0) continue;
+            if (below == Block.SOUL_SAND.id && rand.nextInt(3) == 0) world.setBlockGen(x, y, z, Block.NETHER_WART.id, 3);
+            else if (below == Block.NETHERRACK.id && rand.nextInt(4) == 0) world.setBlockGen(x, y, z, rand.nextBoolean() ? Block.BROWN_MUSHROOM.id : Block.RED_MUSHROOM.id);
         }
         // Lava springs in the walls
         for (int i = 0; i < 6; i++) {

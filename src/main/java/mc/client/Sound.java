@@ -227,6 +227,13 @@ public final class Sound {
         named("zombie_pigman_death", voice(150, 1.0, 0.5, 0.1, 0, -0.6, 0, 0.1, 85));
         named("magma_cube_hurt", voice(160, 0.25, 0.9, 0, 0, -0.3, 0, 0.12, 86));
         named("magma_cube_death", voice(140, 0.4, 0.9, 0, 0, -0.5, 0, 0.12, 87));
+        named("blaze_say", voice(260, 1.2, 0.85, 0.2, 5, -0.2, 0, 0.3, 92));
+        named("blaze_hurt", voice(300, 0.35, 0.8, 0.2, 0, -0.4, 0, 0.4, 93));
+        named("blaze_death", voice(220, 1.2, 0.85, 0.2, 2, -0.7, 0, 0.3, 94));
+        named("blaze_charge", voice(3000, 0.6, 0.95, 0, 0, 0, 40, 0.5, 95));
+        named("blaze_shoot", voice(2500, 0.3, 0.95, 0, 0, -0.3, 40, 0.8, 96));
+        named("brew", voice(900, 0.8, 0.9, 0.3, 6, 0.1, 30, 0.4, 97));
+        named("drink", voice(300, 0.12, 0.5, 0, 0, 0.2, 0, 0.5, 98));
         named("click", voice(1600, 0.05, 0.6, 0, 0, 0, 0, 0.8, 88));
         named("piston_out", voice(180, 0.3, 0.8, 0, 0, 0.3, 0, 0.35, 89));
         named("piston_in", voice(150, 0.3, 0.8, 0, 0, -0.3, 0, 0.35, 90));

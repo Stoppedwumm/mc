@@ -8,6 +8,8 @@ import mc.util.RayCast;
 public final class ThrownEntity extends Entity {
     public final Item item;
     public final Entity thrower;
+    /** Potion type for splash potions. */
+    public int potionMeta;
 
     public ThrownEntity(Item item, Entity thrower) {
         this.item = item;
@@ -56,8 +58,8 @@ public final class ThrownEntity extends Entity {
         motionY -= 0.03;
     }
 
-    private void impact(LivingEntity target) {
-        if (target != null) target.damage(DamageSource.ATTACK, item == Item.SNOWBALL ? 0.01f : 0.01f, thrower);
+    public void impact(LivingEntity target) {
+        if (target != null && item != Item.SPLASH_POTION) target.damage(DamageSource.ATTACK, 0.01f, thrower);
         if (item == Item.SNOWBALL) {
             for (int i = 0; i < 8; i++) world.addParticle("poof", x, y, z);
         } else if (item == Item.EGG) {
@@ -71,6 +73,14 @@ public final class ThrownEntity extends Entity {
                     chick.yaw = random.nextFloat() * 360;
                     world.addEntity(chick);
                 }
+            }
+        } else if (item == Item.SPLASH_POTION) {
+            int color = mc.item.Potions.color(potionMeta);
+            for (int i = 0; i < 30; i++) world.addParticle("effect:" + Integer.toHexString(color), x + random.nextGaussian() * 0.8, y + random.nextDouble(), z + random.nextGaussian() * 0.8);
+            world.playSound("glass", x, y, z, 1, 1);
+            for (LivingEntity e : world.livingEntities()) {
+                double d = Math.sqrt(e.distanceSq(x, y, z));
+                if (d < 4) mc.item.Potions.apply(e, potionMeta, e == target ? 1 : 1 - d / 4);
             }
         } else if (item == Item.EXPERIENCE_BOTTLE) {
             for (int i = 0; i < 12; i++) world.addParticle("happy", x + random.nextGaussian() * 0.3, y + random.nextDouble(), z + random.nextGaussian() * 0.3);
