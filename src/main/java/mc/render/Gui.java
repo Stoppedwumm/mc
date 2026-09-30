@@ -89,6 +89,25 @@ public final class Gui {
 
     public int textWidth(String s) { return font.width(s); }
 
+    /** Text at a multiple of the normal size. */
+    public void textScaled(String s, float x, float y, float size, int argb, boolean shadow) {
+        shader(ortho, true, 0.02f);
+        glActiveTexture(GL_TEXTURE0);
+        font.bind();
+        batch.begin(GL_TRIANGLES);
+        font.draw(batch, s, x, y, size, argb, shadow);
+        batch.end();
+    }
+
+    /** Clips drawing to a rectangle in GUI coordinates until noClip(). */
+    public void clip(float x, float y, float w, float h) {
+        glEnable(GL_SCISSOR_TEST);
+        int px = Math.round(x * scale), py = Math.round((height - y - h) * scale);
+        glScissor(px, py, Math.max(0, Math.round(w * scale)), Math.max(0, Math.round(h * scale)));
+    }
+
+    public void noClip() { glDisable(GL_SCISSOR_TEST); }
+
     /** Draws the crosshair with an inverting blend, like Minecraft. */
     public void crosshair() {
         glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR);

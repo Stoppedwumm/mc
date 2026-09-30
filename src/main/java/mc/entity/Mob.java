@@ -370,6 +370,33 @@ public final class Mob extends LivingEntity {
 
     // ------------------------------------------------------------------ ticking
 
+    private double lastNetVy;
+
+    /** Client copy of a server mob: animations from its movement (tentacles, slime squish, hearts). */
+    @Override
+    public void netTick() {
+        prevFuse = fuse;
+        prevSquish = squish;
+        prevTentacleAngle = tentacleAngle;
+        prevSquidPitch = squidPitch;
+        super.netTick();
+        if (attackAnim > 0) attackAnim--;
+        if (eatGrassTicks > 0) eatGrassTicks--;
+        if (loveTicks > 0 && --loveTicks % 10 == 0) world.addParticle("heart", x + random.nextGaussian() * 0.3, y + height + 0.2, z + random.nextGaussian() * 0.3);
+        squish *= 0.6f;
+        double vy = y - prevY;
+        if (type == MobType.SQUID) {
+            tentacleAngle = inWater ? (float) Math.sin(age * 0.2) * 0.3f + 0.35f : Math.abs((float) Math.sin(age * 0.5)) * 0.8f;
+            double h = Math.sqrt((x - prevX) * (x - prevX) + (z - prevZ) * (z - prevZ));
+            if (h > 0.005 || Math.abs(vy) > 0.005) squidPitch += ((float) -Math.toDegrees(Math.atan2(h, vy)) + 90 - squidPitch) * 0.1f;
+        }
+        if (type.isSlime()) {
+            if (vy > 0.08 && lastNetVy <= 0.02) squish = 1;
+            else if (lastNetVy < -0.05 && vy > -0.01) squish = -0.5f;
+        }
+        lastNetVy = vy;
+    }
+
     @Override
     public void tick() {
         super.tick();
@@ -432,7 +459,7 @@ public final class Mob extends LivingEntity {
         float forward = 0;
         float speed = type.walkSpeed;
         boolean jump = false;
-        Player player = world.player();
+        Player player = world.nearestPlayer(x, y, z);
         LivingEntity target = findTarget(player);
 
         if (target != null) {
@@ -726,7 +753,7 @@ public final class Mob extends LivingEntity {
     public int ghastCharge;
 
     private void tickGhast() {
-        Player p = world.player();
+        Player p = world.nearestPlayer(x, y, z);
         boolean target = p != null && !p.isDead() && !p.creative && distanceTo(p) < 64 && canSee(p);
         // Drift towards a random point, re-picked when reached or blocked
         double dx = flyX - x, dy = flyY - y, dz = flyZ - z;
@@ -771,7 +798,7 @@ public final class Mob extends LivingEntity {
             Block.CACTUS, Block.CLAY, Block.PUMPKIN, Block.MELON, Block.TNT};
 
     private void tickEnderman() {
-        Player p = world.player();
+        Player p = world.nearestPlayer(x, y, z);
         // Looking at an enderman's head angers it
         if (p != null && !p.creative && !p.isDead() && angerTicks == 0) {
             double dx = x - p.x, dy = y + height * 0.9 - p.eyeY(), dz = z - p.z;

@@ -55,6 +55,10 @@ public final class Particles {
     }
 
     /** Untextured effect particles: smoke, explosions, flames, crits, bubbles, splashes... */
+    public void clear() {
+        list.clear();
+    }
+
     public void spawn(String type, double x, double y, double z) {
         P p = new P();
         p.x = p.px = x; p.y = p.py = y; p.z = p.pz = z;

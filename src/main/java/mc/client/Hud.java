@@ -29,10 +29,18 @@ final class Hud {
         this.g = g;
     }
 
+    private static final boolean ECHO = System.getProperty("mc.echoChat") != null;
+
     void chat(String s) {
+        if (ECHO) System.out.println("[Chat] " + s);
         chatLines.add(s);
         chatTimes.add(g.ticks);
         while (chatLines.size() > 50) { chatLines.remove(0); chatTimes.remove(0); }
+    }
+
+    void clearChat() {
+        chatLines.clear();
+        chatTimes.clear();
     }
 
     void render(Gui gui) {
@@ -209,8 +217,18 @@ final class Hud {
             if (!open && age > 200) continue;
             float alpha = open ? 1 : Math.min(1, (200 - age) / 20f);
             int a = (int) (alpha * 255);
-            gui.fill(2, y - 1, Math.max(gui.textWidth(chatLines.get(i)) + 4, 1), 10, (int) (alpha * 0x80) << 24);
-            gui.text(chatLines.get(i), 4, y, (a << 24) | 0xFFFFFF);
+            String line = chatLines.get(i);
+            int rgb = 0xFFFFFF;
+            // A leading Minecraft colour code (e.g. yellow join messages)
+            if (line.length() >= 2 && line.charAt(0) == '\u00a7') {
+                rgb = switch (line.charAt(1)) {
+                    case 'e' -> 0xFFFF55; case '7' -> 0xAAAAAA; case 'c' -> 0xFF5555; case 'a' -> 0x55FF55; case 'b' -> 0x55FFFF; case '6' -> 0xFFAA00;
+                    default -> 0xFFFFFF;
+                };
+                line = line.substring(2);
+            }
+            gui.fill(2, y - 1, Math.max(gui.textWidth(line) + 4, 1), 10, (int) (alpha * 0x80) << 24);
+            gui.text(line, 4, y, (a << 24) | rgb);
             y -= 10;
             shown++;
         }

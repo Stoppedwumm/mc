@@ -25,6 +25,61 @@ public abstract class Entity {
     public int fireTicks;
     protected final Random random = new Random();
 
+    // ------------------------------------------------------------------ network copies
+
+    /** The server's id for this entity (on a client connected to a server). */
+    public int netId;
+    /** Latest state from the server; the entity glides there over a few ticks. */
+    public double netX, netY, netZ;
+    public float netYaw, netPitch, netHeadYaw;
+    public int netSteps;
+    private boolean netPlaced;
+
+    /** Moves towards a position received from the server. */
+    public void setNetTarget(double nx, double ny, double nz, float nyaw, float npitch, float nheadYaw) {
+        netX = nx; netY = ny; netZ = nz;
+        netYaw = nyaw; netPitch = npitch; netHeadYaw = nheadYaw;
+        if (!netPlaced || distanceSq(nx, ny, nz) > 64) {
+            setPos(nx, ny, nz);
+            yaw = prevYaw = nyaw;
+            pitch = prevPitch = npitch;
+            netPlaced = true;
+            netSteps = 0;
+            netTargetReached();
+            return;
+        }
+        netSteps = 3;
+    }
+
+    protected void netTargetReached() { }
+
+    static float wrapDegrees(float d) {
+        d %= 360;
+        if (d >= 180) d -= 360;
+        if (d < -180) d += 360;
+        return d;
+    }
+
+    /** Client-side tick of a server-controlled entity: interpolation only, no physics or AI. */
+    public void netTick() {
+        prevX = x; prevY = y; prevZ = z;
+        prevYaw = yaw; prevPitch = pitch;
+        age++;
+        if (netSteps > 0) {
+            x += (netX - x) / netSteps;
+            y += (netY - y) / netSteps;
+            z += (netZ - z) / netSteps;
+            yaw += wrapDegrees(netYaw - yaw) / netSteps;
+            pitch += (netPitch - pitch) / netSteps;
+            netSteps--;
+        }
+        if (world != null) {
+            inWater = touching(Block.WATER.id);
+            inLava = touching(Block.LAVA.id);
+        }
+        if (fireTicks > 0) fireTicks--;
+    }
+
     public AABB box() {
         return new AABB(x - width / 2, y, z - width / 2, x + width / 2, y + height, z + width / 2);
     }

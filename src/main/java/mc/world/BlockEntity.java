@@ -31,7 +31,7 @@ public abstract class BlockEntity {
 
         @Override
         public void tick(World world) {
-            mc.entity.Player p = world.player();
+            mc.entity.Player p = world.nearestPlayer(x + 0.5, y + 0.5, z + 0.5);
             if (p == null || p.distanceSq(x + 0.5, y + 0.5, z + 0.5) > 16 * 16) return;
             spin += 10;
             if (world.random().nextInt(4) == 0) world.addParticle("smoke", x + world.random().nextDouble(), y + world.random().nextDouble(), z + world.random().nextDouble());

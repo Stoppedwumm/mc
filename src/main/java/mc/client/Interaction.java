@@ -15,6 +15,7 @@ import mc.world.Portal;
 import mc.world.Redstone;
 import mc.world.World;
 
+import java.util.List;
 import java.util.Random;
 
 import static org.lwjgl.glfw.GLFW.*;
@@ -58,7 +59,9 @@ final class Interaction {
         targetEntity = null;
         double best = hit != null ? hit.distance : reach();
         double entityReach = p.creative ? 5 : 3;
-        for (Entity e : w().entities()) {
+        List<Entity> candidates = new java.util.ArrayList<>(w().entities());
+        candidates.addAll(w().networkPlayers());
+        for (Entity e : candidates) {
             if (!(e instanceof LivingEntity le) || le.isDead()) continue;
             AABB b = e.box();
             double t = rayBox(ex, ey, ez, dx, dy, dz, b.minX - 0.1, b.minY - 0.1, b.minZ - 0.1, b.maxX + 0.1, b.maxY + 0.1, b.maxZ + 0.1);
@@ -89,7 +92,11 @@ final class Interaction {
     }
 
     void startSwing() {
-        if (swingTicks < 0 || swingTicks >= 3) swingTicks = 0;
+        if (swingTicks < 0 || swingTicks >= 3) {
+            swingTicks = 0;
+            if (g.multiplayer != null) g.multiplayer.swing();
+            if (g.lanServer != null) g.lanServer.hostSwing();
+        }
     }
 
     /** Left click pressed this frame. */
@@ -112,19 +119,27 @@ final class Interaction {
         if (sharp > 0) dmg += 0.5f * sharp + 0.5f;
         if (smite > 0 && target instanceof Mob um && um.type.isUndead()) dmg += 2.5f * smite;
         if (target instanceof Mob lm) lm.lootingBonus = ItemStack.level(h, Enchantment.LOOTING);
-        if (target.damage(DamageSource.ATTACK, dmg, p)) {
-            w().commandWolves(target);
-            int kb = ItemStack.level(h, Enchantment.KNOCKBACK);
-            if (kb > 0) {
-                double r = Math.toRadians(p.yaw);
-                target.knockback(0.5 * kb, Math.sin(r), -Math.cos(r));
+        int kb = ItemStack.level(h, Enchantment.KNOCKBACK);
+        int fire = ItemStack.level(h, Enchantment.FIRE_ASPECT);
+        boolean remote = g.multiplayer != null;
+        if (remote) {
+            // The server applies the hit; only the attacker's own effects happen here
+            if (target.hurtTime > 0) return;
+            g.multiplayer.attack(target, dmg, 0.5f * kb + (p.sprinting ? 0.5f : 0), fire > 0 ? 80 * fire : 0, ItemStack.level(h, Enchantment.LOOTING));
+        }
+        if (remote || target.damage(DamageSource.ATTACK, dmg, p)) {
+            if (!remote) {
+                w().commandWolves(target);
+                if (kb > 0) {
+                    double r = Math.toRadians(p.yaw);
+                    target.knockback(0.5 * kb, Math.sin(r), -Math.cos(r));
+                }
+                if (fire > 0 && !target.fireImmune()) target.fireTicks = Math.max(target.fireTicks, 80 * fire);
             }
-            int fire = ItemStack.level(h, Enchantment.FIRE_ASPECT);
-            if (fire > 0 && !target.fireImmune()) target.fireTicks = Math.max(target.fireTicks, 80 * fire);
             if (sharp + smite > 0) for (int i = 0; i < 6; i++) g.particles.spawn("magic", target.x, target.y + target.height * 0.7, target.z);
             if (p.sprinting) {
                 double r = Math.toRadians(p.yaw);
-                target.knockback(0.5, Math.sin(r), -Math.cos(r));
+                if (!remote) target.knockback(0.5, Math.sin(r), -Math.cos(r));
                 p.sprinting = false;
             }
             if (crit) for (int i = 0; i < 12; i++) g.particles.spawn("crit", target.x, target.y + target.height * 0.7, target.z);
@@ -365,6 +380,12 @@ final class Interaction {
         lastUseWasPlace = false;
         if (fresh && targetEntity instanceof Mob v && v.type == MobType.VILLAGER && !v.isBaby()) {
             g.screens.openTrading(v);
+            return;
+        }
+        if (fresh && targetEntity instanceof Mob m && g.multiplayer != null) {
+            // Shearing, taming, breeding, milking... happen on the server, which sends back the held item
+            g.multiplayer.interact(m, h == null ? null : h.copy());
+            startSwing();
             return;
         }
         if (fresh && targetEntity instanceof Mob m && m.interact(p)) {

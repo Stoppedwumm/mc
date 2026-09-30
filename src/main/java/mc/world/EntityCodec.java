@@ -116,6 +116,176 @@ public final class EntityCodec {
         return e;
     }
 
+    // ------------------------------------------------------------------ network form
+
+    /**
+     * Everything a client needs to show an entity: the saved form plus kinds that are never saved (players,
+     * projectiles, TNT, falling blocks) and animation state.
+     */
+    public static JsonObject writeNet(Entity e) {
+        JsonObject o;
+        if (e instanceof Player p) {
+            o = base(e);
+            o.addProperty("kind", "player");
+            o.addProperty("name", p.name);
+            o.add("held", ItemStack.isEmpty(p.inventory.held()) ? null : stack(p.inventory.held()));
+            JsonArray armor = new JsonArray();
+            for (ItemStack s : p.inventory.armor) armor.add(ItemStack.isEmpty(s) ? null : stack(s));
+            o.add("armor", armor);
+            o.addProperty("sneaking", p.sneaking);
+        } else if (e instanceof ArrowEntity a) {
+            o = base(e);
+            o.addProperty("kind", "arrow");
+            o.addProperty("ground", a.inGround);
+            o.addProperty("damage", a.damage);
+            o.addProperty("pickup", a.pickup);
+            o.addProperty("punch", a.punch);
+        } else if (e instanceof ThrownEntity t) {
+            o = base(e);
+            o.addProperty("kind", "thrown");
+            o.addProperty("item", t.item.id);
+            o.addProperty("potion", t.potionMeta);
+        } else if (e instanceof TntEntity t) {
+            o = base(e);
+            o.addProperty("kind", "tnt");
+            o.addProperty("fuse", t.fuse);
+        } else if (e instanceof FallingBlockEntity f) {
+            o = base(e);
+            o.addProperty("kind", "falling");
+            o.addProperty("block", f.blockId);
+        } else if (e instanceof FireballEntity f) {
+            o = base(e);
+            o.addProperty("kind", "fireball");
+            o.addProperty("small", f.small);
+        } else {
+            o = write(e);
+        }
+        o.addProperty("pitch", e.pitch);
+        if (e instanceof LivingEntity le) {
+            o.addProperty("health", le.health);
+            o.addProperty("maxHealth", le.maxHealth);
+            o.addProperty("head", le.headYaw);
+            o.addProperty("effectColor", le.effectColor());
+        }
+        if (e instanceof Mob m) {
+            o.addProperty("fuse", m.fuse);
+            o.addProperty("charge", m.ghastCharge);
+            o.addProperty("anger", m.angerTicks);
+            o.addProperty("eat", m.eatGrassTicks);
+            o.addProperty("love", m.loveTicks);
+            o.addProperty("aggressive", m.aggressive);
+        }
+        return o;
+    }
+
+    private static JsonObject base(Entity e) {
+        JsonObject o = new JsonObject();
+        o.addProperty("x", e.x);
+        o.addProperty("y", e.y);
+        o.addProperty("z", e.z);
+        o.addProperty("yaw", e.yaw);
+        o.addProperty("mx", e.motionX);
+        o.addProperty("my", e.motionY);
+        o.addProperty("mz", e.motionZ);
+        o.addProperty("fire", e.fireTicks);
+        o.addProperty("age", e.age);
+        return o;
+    }
+
+    /**
+     * Creates an entity from its network form. owner becomes the shooter or thrower of projectiles (the server
+     * uses the player who sent it).
+     */
+    public static Entity readNet(JsonObject o, Entity owner) {
+        String kind = o.has("kind") ? o.get("kind").getAsString() : "";
+        Entity e;
+        switch (kind) {
+            case "player" -> {
+                Player p = new Player();
+                p.name = o.get("name").getAsString();
+                e = p;
+            }
+            case "arrow" -> {
+                ArrowEntity a = new ArrowEntity(owner);
+                a.inGround = o.get("ground").getAsBoolean();
+                a.damage = o.get("damage").getAsFloat();
+                a.pickup = o.get("pickup").getAsBoolean();
+                a.punch = o.get("punch").getAsInt();
+                e = a;
+            }
+            case "thrown" -> {
+                Item item = Item.get(o.get("item").getAsInt());
+                if (item == null) return null;
+                ThrownEntity t = new ThrownEntity(item, owner);
+                t.potionMeta = o.get("potion").getAsInt();
+                e = t;
+            }
+            case "tnt" -> e = new TntEntity(o.get("fuse").getAsInt());
+            case "falling" -> e = new FallingBlockEntity(o.get("block").getAsInt());
+            case "fireball" -> {
+                FireballEntity f = new FireballEntity(owner);
+                f.small = o.get("small").getAsBoolean();
+                e = f;
+            }
+            default -> {
+                return read(o);
+            }
+        }
+        e.setPos(o.get("x").getAsDouble(), o.get("y").getAsDouble(), o.get("z").getAsDouble());
+        e.yaw = e.prevYaw = o.get("yaw").getAsFloat();
+        e.motionX = o.get("mx").getAsDouble();
+        e.motionY = o.get("my").getAsDouble();
+        e.motionZ = o.get("mz").getAsDouble();
+        e.fireTicks = o.get("fire").getAsInt();
+        e.age = o.get("age").getAsInt();
+        applyState(e, o);
+        return e;
+    }
+
+    /** Updates the changeable parts of a client copy (health, wool, armor, held item, animation state). */
+    public static void applyState(Entity e, JsonObject o) {
+        if (o.has("pitch")) e.pitch = o.get("pitch").getAsFloat();
+        if (o.has("fire")) e.fireTicks = o.get("fire").getAsInt();
+        if (e instanceof LivingEntity le) {
+            if (o.has("maxHealth")) le.maxHealth = o.get("maxHealth").getAsFloat();
+            if (o.has("health")) le.health = o.get("health").getAsFloat();
+            if (o.has("head")) le.headYaw = le.prevHeadYaw = o.get("head").getAsFloat();
+        }
+        if (e instanceof Player p) {
+            p.inventory.slots[p.inventory.selected] = o.has("held") ? stack(o.get("held")) : null;
+            if (o.has("armor")) {
+                JsonArray a = o.getAsJsonArray("armor");
+                for (int i = 0; i < Math.min(4, a.size()); i++) p.inventory.armor[i] = stack(a.get(i));
+            }
+            if (o.has("sneaking")) p.sneaking = o.get("sneaking").getAsBoolean();
+        }
+        if (e instanceof Mob m) {
+            if (o.has("color")) m.sheepColor = o.get("color").getAsInt();
+            if (o.has("sheared")) m.sheared = o.get("sheared").getAsBoolean();
+            if (o.has("tamed")) m.tamed = o.get("tamed").getAsBoolean();
+            if (o.has("growing") && (m.growingAge < 0) != (o.get("growing").getAsInt() < 0)) m.setGrowingAge(o.get("growing").getAsInt());
+            if (o.has("sitting")) m.sitting = o.get("sitting").getAsBoolean();
+            if (o.has("carried")) m.carriedBlock = o.get("carried").getAsInt();
+            if (o.has("profession")) m.profession = o.get("profession").getAsInt();
+            if (o.has("fuse")) m.fuse = o.get("fuse").getAsInt();
+            if (o.has("charge")) m.ghastCharge = o.get("charge").getAsInt();
+            if (o.has("anger")) m.angerTicks = o.get("anger").getAsInt();
+            if (o.has("eat") && o.get("eat").getAsInt() > m.eatGrassTicks) m.eatGrassTicks = o.get("eat").getAsInt();
+            if (o.has("love")) m.loveTicks = o.get("love").getAsInt();
+            if (o.has("aggressive")) m.aggressive = o.get("aggressive").getAsBoolean();
+            if (o.has("armor")) {
+                JsonArray a = o.getAsJsonArray("armor");
+                for (int i = 0; i < Math.min(4, a.size()); i++) m.armor[i] = stack(a.get(i));
+            }
+        }
+        if (e instanceof ItemEntity it && o.has("stack")) {
+            ItemStack s = stack(o.get("stack"));
+            if (s != null) it.stack.count = s.count;
+        }
+        if (e instanceof ArrowEntity a && o.has("ground")) a.inGround = o.get("ground").getAsBoolean();
+        if (e instanceof TntEntity t && o.has("fuse")) t.fuse = o.get("fuse").getAsInt();
+    }
+
     public static String writeAll(List<Entity> list) {
         JsonArray a = new JsonArray();
         for (Entity e : list) a.add(write(e));

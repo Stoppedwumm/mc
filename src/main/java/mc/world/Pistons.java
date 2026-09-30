@@ -78,7 +78,7 @@ public final class Pistons {
     /** Entities in the cells the push moved into get shoved along. */
     private static void pushEntities(World w, int x, int y, int z, int[] d, int length) {
         List<Entity> all = new ArrayList<>(w.entities());
-        if (w.player() != null) all.add(w.player());
+        all.addAll(w.players());
         for (int i = 1; i <= length + 1; i++) {
             int bx = x + d[0] * i, by = y + d[1] * i, bz = z + d[2] * i;
             AABB cell = new AABB(bx, by, bz, bx + 1, by + 1, bz + 1);
@@ -92,7 +92,7 @@ public final class Pistons {
     /** Whether something is standing on a pressure plate (stone plates only react to living things). */
     public static boolean entityOn(World w, int x, int y, int z, boolean livingOnly) {
         AABB plate = new AABB(x + 0.0625, y, z + 0.0625, x + 0.9375, y + 0.25, z + 0.9375);
-        if (w.player() != null && !w.player().isDead() && w.player().box().intersects(plate)) return true;
+        for (mc.entity.Player p : w.players()) if (!p.isDead() && p.box().intersects(plate)) return true;
         for (Entity e : w.entities()) {
             if (e.removed || !e.box().intersects(plate)) continue;
             if (e instanceof LivingEntity || (!livingOnly && e instanceof ItemEntity)) return true;

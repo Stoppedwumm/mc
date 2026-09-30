@@ -29,6 +29,11 @@ final class Commands {
         String n = name.replace("minecraft:", "").replace('_', ' ');
         for (Block b : Block.BY_ID) if (b != null && b.name.equalsIgnoreCase(n)) return b;
         if (n.equalsIgnoreCase("grass block")) return Block.GRASS;
+        // Minecraft ids like gold_block for "Block of Gold"
+        if (n.toLowerCase().endsWith(" block")) {
+            String m = "Block of " + n.substring(0, n.length() - 6);
+            for (Block b : Block.BY_ID) if (b != null && b.name.equalsIgnoreCase(m)) return b;
+        }
         return null;
     }
 
@@ -37,10 +42,30 @@ final class Commands {
         return Double.parseDouble(s);
     }
 
+    /** Commands the server handles in multiplayer (the rest run on this client). */
+    static boolean isServerCommand(String line) {
+        String[] a = line.replaceFirst("^/", "").trim().split("\\s+");
+        return switch (a[0]) {
+            case "time", "weather", "list", "say", "kick" -> true;
+            case "tp" -> a.length == 2;
+            default -> false;
+        };
+    }
+
     void run(String line) {
         String[] a = line.replaceFirst("^/", "").trim().split("\\s+");
         var p = g.player;
         var world = g.world;
+        if (a[0].equals("menu")) {
+            g.menus.open(a.length > 1 ? a[1] : "title");
+            return;
+        }
+        if (world == null) return;
+        if (g.lanServer != null && (a[0].equals("list") || a[0].equals("say") || a[0].equals("kick"))) {
+            String reply = g.lanServer.command(line, null);
+            if (!reply.isEmpty()) chat(reply);
+            return;
+        }
         try {
             switch (a[0]) {
                 case "time" -> {
@@ -211,7 +236,13 @@ final class Commands {
                     chat("Successfully filled " + vol + " blocks");
                 }
                 case "seed" -> chat("Seed: [" + world.seed + "]");
+                case "publish" -> {
+                    if (g.multiplayer != null) chat("Already playing on a server");
+                    else if (g.lanServer != null) chat("Already hosted on port " + g.lanServer.port());
+                    else g.openToLan();
+                }
                 case "dimension", "dim" -> {
+                    if (g.multiplayer != null || g.lanServer != null) { chat("Changing dimension isn't available in multiplayer yet"); return; }
                     mc.world.Dimension d = mc.world.Dimension.valueOf(a[1].toUpperCase().replace("THE_", ""));
                     if (d != world.dimension) g.changeDimension(d, true);
                 }

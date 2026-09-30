@@ -17,6 +17,7 @@
         <joml.version>1.10.5</joml.version>
         <fastutil.version>8.5.12</fastutil.version>
         <gson.version>2.10.1</gson.version>
+        <netty.version>4.1.97.Final</netty.version>
     </properties>
 
     <dependencyManagement>
@@ -40,6 +41,10 @@
         <dependency><groupId>org.joml</groupId><artifactId>joml</artifactId><version>${joml.version}</version></dependency>
         <dependency><groupId>it.unimi.dsi</groupId><artifactId>fastutil</artifactId><version>${fastutil.version}</version></dependency>
         <dependency><groupId>com.google.code.gson</groupId><artifactId>gson</artifactId><version>${gson.version}</version></dependency>
+        <!-- Networking (multiplayer), like Minecraft -->
+        <dependency><groupId>io.netty</groupId><artifactId>netty-transport</artifactId><version>${netty.version}</version></dependency>
+        <dependency><groupId>io.netty</groupId><artifactId>netty-codec</artifactId><version>${netty.version}</version></dependency>
+        <dependency><groupId>io.netty</groupId><artifactId>netty-handler</artifactId><version>${netty.version}</version></dependency>
 
         <!-- Natives for every desktop platform, so the shaded jar runs anywhere -->
         <dependency><groupId>org.lwjgl</groupId><artifactId>lwjgl</artifactId><classifier>natives-linux</classifier></dependency>

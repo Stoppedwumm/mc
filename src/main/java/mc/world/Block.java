@@ -288,7 +288,7 @@ public final class Block {
         }
         TORCH.washable = true;
         for (Block b : BY_ID) if (b != null && (b.shape == Shape.CARPET || b.shape == Shape.SNOW_LAYER)) b.washable = true;
-        for (Block b : new Block[]{RAIL, POWERED_RAIL, DETECTOR_RAIL}) { b.solid = false; b.washable = true; }
+        for (Block b : new Block[]{RAIL, POWERED_RAIL, DETECTOR_RAIL}) { b.solid = false; b.washable = true; b.inCreativeInventory = false; } // until minecarts arrive
         OAK_TRAPDOOR.layer = Layer.CUTOUT; LADDER.layer = Layer.CUTOUT; GLASS_PANE.layer = Layer.CUTOUT; IRON_BARS.layer = Layer.CUTOUT; OAK_DOOR.layer = Layer.CUTOUT;
     }
 

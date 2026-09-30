@@ -189,6 +189,7 @@ public final class Redstone {
 
     /** Something changed at (x, y, z): recompute wire and update components nearby. */
     public static void update(World w, int x, int y, int z) {
+        if (w.remote != null) return; // the server computes power
         QUEUE.enqueue(World.posKey(x, y, z));
         if (busy) return;
         busy = true;

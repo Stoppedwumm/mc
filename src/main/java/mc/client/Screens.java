@@ -104,6 +104,16 @@ final class Screens {
         }
     }
 
+    /** Block entity behind the open container screen (chest, furnace or brewing stand), or null. */
+    BlockEntity openContainer() {
+        return switch (g.screen()) {
+            case FURNACE -> furnace;
+            case CHEST -> chest;
+            case BREWING -> brewing;
+            default -> null;
+        };
+    }
+
     void openChest(BlockEntity.Chest c) {
         chest = c;
         g.setScreen(Game.Screen.CHEST);
@@ -657,7 +667,6 @@ final class Screens {
     // ------------------------------------------------------------------ pause & death
 
     void renderPause(Gui gui, Input input) {
-        Options options = g.options;
         double mx = input.mouseX / gui.scale, my = input.mouseY / gui.scale;
         gui.gradient(0, 0, gui.width, gui.height, 0xA0101010, 0xC0101010);
         gui.centered("Game Menu", gui.width / 2, 30, 0xFFFFFFFF);
@@ -667,15 +676,44 @@ final class Screens {
         float y = Math.max(56, Math.min(gui.height / 4 + 8, gui.height - 176 - 6));
         boolean click = input.clicked(GLFW_MOUSE_BUTTON_LEFT);
         boolean rclick = input.clicked(GLFW_MOUSE_BUTTON_RIGHT);
-        boolean any = click || rclick;
         if (gui.button("Back to Game", x, y, bw, bh, mx, my) && click) { g.sound.click(); g.closeScreen(); return; }
         y += 24;
+        settingsButtons(gui, x, y, mx, my, click, rclick);
+        y += 96;
+        if (!g.isMultiplayer()) {
+            if (gui.button("Game Mode: " + (g.player.creative ? "Creative" : "Survival"), x, y, 98, bh, mx, my) && click) {
+                g.sound.click();
+                g.setCreative(!g.player.creative);
+            }
+            if (g.lanServer == null) {
+                if (gui.button("Open to LAN", x + 102, y, 98, bh, mx, my) && click) {
+                    g.sound.click();
+                    g.openToLan();
+                }
+            } else {
+                String info = "LAN port " + g.lanServer.port();
+                gui.button(info, x + 102, y, 98, bh, -1, -1);
+            }
+        }
+        y += 36;
+        if (gui.button(g.isMultiplayer() ? "Disconnect" : "Save and Quit to Title", x, y, bw, bh, mx, my) && click) {
+            g.sound.click();
+            g.quitToTitle();
+        }
+    }
+
+    /** Video and control settings shared by the pause menu and the options screen (4 rows, 96 pixels). */
+    void settingsButtons(Gui gui, float x, float y, double mx, double my, boolean click, boolean rclick) {
+        Options options = g.options;
+        float bw = 200, bh = 20;
+        boolean any = click || rclick;
         if (gui.button("Render Distance: " + options.renderDistance + " chunks", x, y, bw, bh, mx, my) && any) {
             g.sound.click();
             int[] steps = {2, 4, 6, 8, 10, 12, 16, 20, 24, 32};
             int idx = 0;
             for (int i = 0; i < steps.length; i++) if (steps[i] <= options.renderDistance) idx = i;
             options.renderDistance = steps[Math.floorMod(idx + (click ? 1 : -1), steps.length)];
+            if (g.multiplayer != null) g.multiplayer.sendViewDistance();
         }
         y += 24;
         if (gui.button("FOV: " + (int) options.fov, x, y, 98, bh, mx, my) && any) {
@@ -710,16 +748,6 @@ final class Screens {
             if (options.sensitivity > 1) options.sensitivity = 0.1f;
             if (options.sensitivity < 0.1f) options.sensitivity = 1f;
         }
-        y += 24;
-        if (gui.button("Game Mode: " + (g.player.creative ? "Creative" : "Survival"), x, y, bw, bh, mx, my) && click) {
-            g.sound.click();
-            g.setCreative(!g.player.creative);
-        }
-        y += 36;
-        if (gui.button("Save and Quit", x, y, bw, bh, mx, my) && click) {
-            g.sound.click();
-            g.running = false;
-        }
     }
 
     void renderDeath(Gui gui, Input input) {
@@ -733,8 +761,9 @@ final class Screens {
             g.sound.click();
             g.respawn();
         }
-        if (gui.button("Save and Quit", x, gui.height / 4 + 84, bw, 20, mx, my) && input.clicked(GLFW_MOUSE_BUTTON_LEFT)) {
-            g.running = false;
+        if (gui.button(g.isMultiplayer() ? "Disconnect" : "Title Screen", x, gui.height / 4 + 84, bw, 20, mx, my) && input.clicked(GLFW_MOUSE_BUTTON_LEFT)) {
+            g.sound.click();
+            g.quitToTitle();
         }
     }
 }

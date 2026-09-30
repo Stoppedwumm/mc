@@ -10,11 +10,23 @@ A from-scratch recreation of Minecraft: Java Edition's look and feel, built on *
 | LWJGL — STB | PNG screenshots | same (stb_image etc.) |
 | [JOML 1.10.5](https://github.com/JOML-CI/JOML) | matrices, frustum culling | same |
 | [fastutil 8.5](https://fastutil.di.unimi.it/) | primitive-keyed chunk maps | same |
-| [Gson 2.10](https://github.com/google/gson) | `options.json`, `level.json` | same |
+| [Gson 2.10](https://github.com/google/gson) | `options.json`, `level.json`, entity data on the wire | same |
+| [Netty 4.1](https://netty.io/) | multiplayer networking | same |
 
 All textures and sounds are generated procedurally at startup, so no Mojang assets are included or needed.
 
 ## Features
+
+**Menus and multiplayer**
+- Title screen over a slowly turning view of a generated landscape (like Minecraft's panorama), with a stone logo and splash texts
+- Singleplayer world list: play, create (name, seed, Survival/Creative) and delete worlds; "Save and Quit to Title"
+- Options screen with your multiplayer name and video settings
+- Multiplayer server list with live status (message of the day, players online, ping bars), Add Server, Direct Connection
+- **Open to LAN** from the pause menu: friends on the network see the game in their server list (Minecraft's LAN announcement on 224.0.2.60:4445) and join it
+- **Dedicated server** (`--server`): no window, 20 ticks per second, console commands, autosave, saved player data per name
+- The server simulates the world (mobs, redstone, water, crops, furnaces); each client moves its own player and sends its edits.
+  Other players appear with name tags and armor, and swing their arms. Chunks are streamed compressed. Mobs, items and projectiles are interpolated.
+  Mob hits, knockback, potion effects and teleports reach the right player. Item and experience pickups, chests and furnaces are shared, and chat is broadcast.
 
 **Graphics (shader-pack style renderer)**
 - HDR rendering with ACES filmic tonemapping, bloom, vignette and automatic eye adaptation (caves and nights adapt, stepping into daylight is briefly bright)
@@ -86,15 +98,30 @@ java -jar target/mc.jar
 
 On macOS the game relaunches itself with `-XstartOnFirstThread`, which GLFW requires.
 
+Without arguments the game opens the title screen. To host a dedicated server:
+
+```sh
+java -jar target/mc.jar --server --port 25565 --world world
+```
+
+Players join with Multiplayer → Direct Connection (or `--connect host:port`). The server console accepts
+`stop`, `save`, `list`, `say <message>`, `time set <day|night|ticks>`, `weather <clear|rain>`, `kick <player>` and `seed`.
+
 Command-line options:
 
 ```
---world <name>          world folder inside run/saves (default: world)
+--world <name>          open this world folder inside run/saves directly (skips the title screen)
 --seed <number|text>    seed for a new world
 --renderDistance <n>    override the render distance
 --gameDir <path>        where saves/options/screenshots go (default: ./run)
 --cmd "/command"        run a chat command after loading (repeatable; "/wait" waits for chunks)
 --screenshot <file>     render, save a screenshot once the world is idle, and exit
+--connect <host[:port]> join a server directly
+--server                run a dedicated server instead of the game
+--port <n>              server port (default 25565)
+--motd <text>           server description shown in the server list
+--maxPlayers <n>        player limit (default 8)
+--viewDistance <n>      furthest chunk distance the server sends (default 10)
 ```
 
 ## Controls
@@ -113,7 +140,7 @@ Command-line options:
 | Q / Ctrl+Q | drop one item / the whole stack |
 | E | inventory (creative: all items) |
 | T or / | chat / commands |
-| Esc | pause menu (settings, Save and Quit) |
+| Esc | pause menu (settings, Open to LAN, Save and Quit to Title / Disconnect) |
 | F1 | hide HUD |
 | F2 | screenshot (saved to `run/screenshots`) |
 | F3 | debug screen |
@@ -131,15 +158,20 @@ Command-line options:
 /xp <points>   /armor <material>   /dimension   /locate village [tp]   /perspective <0-2>
 /kill [@e]   /weather <clear|rain>   /heal   /clear   /spawnpoint
 /fill <x1> <y1> <z1> <x2> <y2> <z2> <block>
-/fly   /seed   /rd <chunks>   /help
+/fly   /seed   /rd <chunks>   /publish (open to LAN)   /menu <worlds|multiplayer|options>   /help
 ```
+
+In multiplayer, `/time`, `/weather`, `/list`, `/say`, `/kick` and `/tp <player>` run on the server; the other commands affect your own player.
 
 ## Code layout
 
 ```
 mc/Main.java                 entry point, arguments, macOS relaunch
-mc/client/                   Game loop, Interaction (mining/combat/items), Screens (containers, menus), Hud,
-                             Commands, Weather, Window (GLFW), Input, Sound (OpenAL), Options (Gson)
+mc/client/                   Game loop, Interaction (mining/combat/items), Screens (containers, pause), Menus (title,
+                             worlds, server list), MultiplayerSession, Hud, Commands, Weather, Window (GLFW), Input,
+                             Sound (OpenAL), Options (Gson)
+mc/net/                      Netty connections, packet ids and encoding, server list ping, LAN discovery
+mc/server/                   Server (LAN or dedicated), Session (one client), NetPlayer, DedicatedServer
 mc/entity/                   Entity physics, LivingEntity (health/damage), Player (hunger), Mob AI, items, arrows, TNT
 mc/item/                     Item registry, ItemStack, Inventory, Recipes (crafting + smelting)
 mc/world/                    Block registry, Chunk, World (streaming, ticks, explosions), Liquids, Drops,
@@ -156,10 +188,12 @@ Run the tests with `mvn test`. They check:
 - water flow, draining, infinite sources and lava + water
 - harvest rules, falling sand, explosions, zombie AI, mob loot, hunger and fall damage
 - building blocks, animals, villages and dungeons, the Nether, redstone circuits, enchanting and brewing
+- multiplayer over a real local socket: login, chunk streaming, block edits both ways, chat, mob tracking,
+  forwarded damage, mining with item pickup, duplicate names, the status ping, and client-side remote worlds
 
 ## Not implemented
 
 The real game is far larger than this project. Missing so far:
 - the End, nether fortresses, strongholds
 - fishing, boats, minecarts and rails, signs, paintings, maps
-- multiplayer
+- Nether travel in multiplayer (a server hosts the Overworld only), sleeping through the night in multiplayer

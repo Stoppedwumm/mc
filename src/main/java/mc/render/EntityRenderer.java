@@ -98,6 +98,16 @@ public final class EntityRenderer {
         glEnable(GL_CULL_FACE);
     }
 
+    /** Another player in multiplayer (arm swing from its swing events). */
+    public void renderOtherPlayer(Player p, WorldRenderer wr, float pt, float light) {
+        if (p.removed) return;
+        float swing = p.swingTicks > 0 ? Math.min(1, (6 - p.swingTicks + pt) / 6f) : 0;
+        mc.item.ItemStack held = p.inventory.held();
+        if (p.fireTicks > 0) light = Math.max(light, 1.5f);
+        renderPlayer(p, wr, pt, light, swing, mc.item.ItemStack.isEmpty(held) ? null : held.item);
+        glDisable(GL_CULL_FACE);
+    }
+
     /** Inventory preview: the player (with armor) turned towards the mouse. Size is the model height in GUI pixels. */
     public void renderPlayerGui(Gui gui, Player p, float cx, float bottom, float size, float lookX, float lookY) {
         if (playerModel == null) playerModel = MobModel.createPlayer();
@@ -164,7 +174,8 @@ public final class EntityRenderer {
             if (ex * ex + ey * ey + ez * ez > wr.fogEnd * wr.fogEnd) continue;
             float l = light.light(e.x, e.y + e.height * 0.5, e.z);
             if (e.fireTicks > 0) l = Math.max(l, 1.5f);
-            if (e instanceof Mob m) renderMob(m, wr, pt, ex, ey, ez, l);
+            if (e instanceof Player op) renderOtherPlayer(op, wr, pt, l);
+            else if (e instanceof Mob m) renderMob(m, wr, pt, ex, ey, ez, l);
             else if (e instanceof ItemEntity it) renderItem(it, wr, pt, ex, ey, ez, l);
             else if (e instanceof XpOrbEntity o) renderOrb(o, wr, pt, ex, ey, ez);
             else if (e instanceof ThrownEntity t) renderSprite(t.item, t.potionMeta, wr, pt, ex, ey, ez, l, 0.25f);

@@ -21,6 +21,8 @@ public final class ChunkMesher {
         public final byte[] meta = new byte[REGION];
         public final int[] grass = new int[256], foliage = new int[256];
         public int height;
+        /** Only compute light (dedicated server: no geometry). */
+        public boolean lightOnly;
 
         public Job(int cx, int cz) {
             this.cx = cx;
@@ -122,6 +124,11 @@ public final class ChunkMesher {
         this.m = job.meta;
         this.h = Math.min(Chunk.HEIGHT, job.height + 2);
         computeLight();
+        if (job.lightOnly) {
+            MeshData data = new MeshData(job.cx, job.cz, null, 0, null, 0);
+            exportLight(data);
+            return data;
+        }
 
         VertexBuilder solid = new VertexBuilder(4096);
         VertexBuilder translucent = new VertexBuilder(512);
@@ -156,7 +163,14 @@ public final class ChunkMesher {
         MeshData data = new MeshData(job.cx, job.cz,
                 solid.isEmpty() ? null : solid.finish(), solid.quads(),
                 translucent.isEmpty() ? null : translucent.finish(), translucent.quads());
-        // Export the centre chunk's light for gameplay (spawning, entity brightness)
+        exportLight(data);
+        solid.free();
+        translucent.free();
+        return data;
+    }
+
+    /** Copies the centre chunk's light out for gameplay (spawning, entity brightness). */
+    private void exportLight(MeshData data) {
         int lh = Math.min(h, Chunk.HEIGHT);
         byte[] light = new byte[lh * 256];
         for (int y = 0; y < lh; y++)
@@ -167,9 +181,6 @@ public final class ChunkMesher {
                 }
         data.light = light;
         data.lightHeight = lh;
-        solid.free();
-        translucent.free();
-        return data;
     }
 
     // ------------------------------------------------------------------ light

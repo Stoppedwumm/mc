@@ -24,6 +24,9 @@ public final class Input {
             if (key < 0 || key > GLFW_KEY_LAST) return;
             if (action == GLFW_PRESS) { keys[key] = true; pressed[key] = true; }
             else if (action == GLFW_RELEASE) keys[key] = false;
+            // Text editing keys repeat while held
+            else if (action == GLFW_REPEAT && (key == GLFW_KEY_BACKSPACE || key == GLFW_KEY_DELETE || key == GLFW_KEY_LEFT
+                    || key == GLFW_KEY_RIGHT || key == GLFW_KEY_UP || key == GLFW_KEY_DOWN)) pressed[key] = true;
         });
         glfwSetMouseButtonCallback(w.handle, (win, button, action, mods) -> {
             if (button < 0 || button >= buttons.length) return;

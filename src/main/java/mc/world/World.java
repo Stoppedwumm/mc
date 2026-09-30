@@ -56,6 +56,31 @@ public final class World implements Shapes.Getter {
     }
 
     public Listener listener;
+
+    /**
+     * Set on a client connected to a server. Block edits, broken blocks and new entities are sent to the server
+     * instead of being simulated here; the server's answer comes back as block and entity updates.
+     */
+    public interface Remote {
+        void setBlock(int x, int y, int z, int id, int meta);
+        void breakBlock(int x, int y, int z, ItemStack tool, boolean drop);
+        void addEntity(Entity e);
+    }
+
+    public Remote remote;
+    /** True while applying changes that came from the server (they are not sent back). */
+    public boolean applyingRemote;
+
+    /** Server hook: told about every block change so it can be sent to the players who see it. */
+    public interface BlockWatcher { void blockChanged(int x, int y, int z, int id, int meta); }
+
+    public BlockWatcher blockWatcher;
+    /** No rendering (dedicated server): meshing only computes light, nothing is uploaded to the GPU. */
+    public boolean headless;
+    /** Players connected over the network (the local player, if any, is separate). */
+    private final List<Player> extraPlayers = new ArrayList<>();
+    /** Extra chunk-loading centres {x, z, radius} around network players. */
+    private List<double[]> extraCenters = new ArrayList<>();
     private Player player;
     private final List<Entity> entities = new ArrayList<>();
     private final List<Entity> pendingEntities = new ArrayList<>();
@@ -197,13 +222,19 @@ public final class World implements Shapes.Getter {
         int old = c.blocks[Chunk.index(x & 15, y, z & 15)] & 255;
         c.set(x & 15, y, z & 15, id, meta);
         c.touched = true;
+        if (blockWatcher != null) blockWatcher.blockChanged(x, y, z, id, meta);
+        if (remote != null) {
+            // Clients only show the change; the server runs the physics and sends the results back
+            if (!applyingRemote) remote.setBlock(x, y, z, id, meta);
+            notify = false;
+        }
         if (id == Block.FIRE.id && old != id) scheduleTick(x, y, z, 30 + random.nextInt(10));
         if (old != id) {
             long key = posKey(x, y, z);
             boolean furnaceSwap = (old == Block.FURNACE.id || old == Block.LIT_FURNACE.id) && (id == Block.FURNACE.id || id == Block.LIT_FURNACE.id);
             if (!furnaceSwap && blockEntities.containsKey(key)) {
                 BlockEntity be = blockEntities.remove(key);
-                if (be != null) for (ItemStack s : be.slots) if (!ItemStack.isEmpty(s)) spawnItem(x + 0.5, y + 0.5, z + 0.5, s);
+                if (be != null && remote == null) for (ItemStack s : be.slots) if (!ItemStack.isEmpty(s)) spawnItem(x + 0.5, y + 0.5, z + 0.5, s);
             }
         }
         int lx = x & 15, lz = z & 15;
@@ -379,6 +410,13 @@ public final class World implements Shapes.Getter {
         Block b = Block.get(id);
         int meta = getMeta(x, y, z);
         if (listener != null) listener.blockBroken(x, y, z, b, meta);
+        if (remote != null && !applyingRemote) {
+            applyingRemote = true;
+            setBlock(x, y, z, 0);
+            applyingRemote = false;
+            remote.breakBlock(x, y, z, tool, drop);
+            return;
+        }
         // Two-block structures lose their other half without a second drop
         int ox = x, oy = y, oz = z;
         if (b.shape == Block.Shape.DOOR) oy += (meta & 8) != 0 ? -1 : 1;
@@ -427,6 +465,7 @@ public final class World implements Shapes.Getter {
     }
 
     public void scheduleTick(int x, int y, int z, int delay) {
+        if (remote != null) return;
         long key = posKey(x, y, z);
         long due = tickCount + delay;
         if (scheduledSet.containsKey(key) && scheduledSet.get(key) <= due) return;
@@ -442,6 +481,42 @@ public final class World implements Shapes.Getter {
     }
 
     public Player player() { return player; }
+
+    /** Every player in the world: the local one (if any) and those connected over the network. */
+    public List<Player> players() {
+        List<Player> out = new ArrayList<>(extraPlayers.size() + 1);
+        if (player != null) out.add(player);
+        out.addAll(extraPlayers);
+        return out;
+    }
+
+    public List<Player> networkPlayers() { return extraPlayers; }
+
+    public void addNetworkPlayer(Player p) {
+        p.world = this;
+        extraPlayers.add(p);
+    }
+
+    public void removeNetworkPlayer(Player p) {
+        extraPlayers.remove(p);
+    }
+
+    /** The closest living player (mobs chase and look at this one), or null. */
+    public Player nearestPlayer(double x, double y, double z) {
+        Player best = null;
+        double bd = Double.MAX_VALUE;
+        for (Player p : players()) {
+            if (p.isDead() || p.removed) continue;
+            double d = p.distanceSq(x, y, z);
+            if (d < bd) { bd = d; best = p; }
+        }
+        return best != null ? best : player;
+    }
+
+    /** Chunk loading centres for network players: {x, z, radius in chunks}. */
+    public void updateExtraCenters(List<double[]> centers) {
+        extraCenters = centers == null ? new ArrayList<>() : centers;
+    }
 
     public Random random() { return random; }
 
@@ -492,11 +567,15 @@ public final class World implements Shapes.Getter {
     public List<LivingEntity> livingEntities() {
         List<LivingEntity> out = new ArrayList<>();
         for (Entity e : entities) if (e instanceof LivingEntity le && !e.removed) out.add(le);
-        if (player != null && !player.removed) out.add(player);
+        for (Player p : players()) if (!p.removed) out.add(p);
         return out;
     }
 
     public void addEntity(Entity e) {
+        if (remote != null && !applyingRemote) {
+            remote.addEntity(e);
+            return;
+        }
         e.world = this;
         pendingEntities.add(e);
     }
@@ -507,6 +586,14 @@ public final class World implements Shapes.Getter {
 
     public void addParticle(String type, double x, double y, double z) {
         if (listener != null) listener.addParticle(type, x, y, z);
+    }
+
+    /** Sky brightness 0 (night) to 1 (day) for a time of day, dimmed by rain (0-1). */
+    public static float dayFactor(long time, float rain) {
+        double f = (time % 24000) / 24000.0 - 0.25;
+        f = f - Math.floor(f);
+        f = f + (1 - (Math.cos(f * Math.PI) + 1) / 2 - f) / 3;
+        return (float) Math.max(0, Math.min(1, Math.cos(f * Math.PI * 2) * 2 + 0.5)) * (1 - rain * 0.3f);
     }
 
     public boolean isDaytime() {
@@ -537,6 +624,17 @@ public final class World implements Shapes.Getter {
     public void tick() {
         time++;
         tickCount++;
+        if (remote != null) {
+            // Client of a server: entities only follow the positions the server sends
+            entities.addAll(pendingEntities);
+            pendingEntities.clear();
+            for (Iterator<Entity> it = entities.iterator(); it.hasNext(); ) {
+                Entity e = it.next();
+                if (!e.removed) e.netTick();
+                if (e.removed) it.remove();
+            }
+            return;
+        }
         int processed = 0;
         while (!scheduled.isEmpty() && scheduled.peek()[1] <= tickCount && processed < 2000) {
             long[] e = scheduled.poll();
@@ -552,7 +650,7 @@ public final class World implements Shapes.Getter {
             } else Redstone.scheduledTick(this, x, y, z);
             processed++;
         }
-        if (player != null) randomTicks();
+        if (!players().isEmpty()) randomTicks();
         for (BlockEntity be : new ArrayList<>(blockEntities.values())) {
             if (isLoaded(be.x, be.z)) be.tick(this);
         }
@@ -562,8 +660,9 @@ public final class World implements Shapes.Getter {
             Entity e = it.next();
             boolean frozen = !isLoaded((int) Math.floor(e.x), (int) Math.floor(e.z));
             if (!e.removed && !frozen) {
-                if (e instanceof Mob m && (m.type.hostile || (dimension == Dimension.NETHER && m.type == MobType.ZOMBIE_PIGMAN)) && player != null) {
-                    double d = m.distanceSq(player.x, player.y, player.z);
+                Player near = e instanceof Mob ? nearestPlayer(e.x, e.y, e.z) : null;
+                if (e instanceof Mob m && (m.type.hostile || (dimension == Dimension.NETHER && m.type == MobType.ZOMBIE_PIGMAN)) && near != null) {
+                    double d = m.distanceSq(near.x, near.y, near.z);
                     if (d > 128 * 128 || (d > 40 * 40 && random.nextInt(800) == 0)) m.remove();
                 }
             }
@@ -573,13 +672,14 @@ public final class World implements Shapes.Getter {
         entities.addAll(pendingEntities);
         pendingEntities.clear();
         checkPlates();
-        if (player != null) spawner.tick(this, player, random);
+        for (Player p : players()) if (!p.isDead()) spawner.tick(this, p, random);
+        tickNetworkPlayers();
     }
 
     /** Entities standing on pressure plates press them. */
     private void checkPlates() {
         List<Entity> all = new ArrayList<>(entities);
-        if (player != null && !player.isDead()) all.add(player);
+        for (Player p : players()) if (!p.isDead()) all.add(p);
         for (Entity e : all) {
             if (e.removed) continue;
             int bx = (int) Math.floor(e.x), by = (int) Math.floor(e.y + 0.05), bz = (int) Math.floor(e.z);
@@ -591,19 +691,35 @@ public final class World implements Shapes.Getter {
         }
     }
 
+    /** Network players are simulated by their own clients; here they only age and recover from hits. */
+    private void tickNetworkPlayers() {
+        for (Player p : extraPlayers) {
+            p.age++;
+            if (p.hurtTime > 0) p.hurtTime--;
+            if (p.invulnerableTime > 0) p.invulnerableTime--;
+            if (p.swingTicks > 0) p.swingTicks--;
+        }
+    }
+
     private void randomTicks() {
-        int pcx = (int) Math.floor(player.x) >> 4, pcz = (int) Math.floor(player.z) >> 4;
-        for (int dx = -6; dx <= 6; dx++)
-            for (int dz = -6; dz <= 6; dz++) {
-                Chunk c = chunks.get(Chunk.key(pcx + dx, pcz + dz));
-                if (c == null || c.state != Chunk.STATE_DECORATED) continue;
-                int sections = (c.maxY + 15) / 16;
-                for (int s = 0; s < sections; s++)
-                    for (int k = 0; k < 3; k++) {
-                        int x = c.cx * 16 + random.nextInt(16), y = s * 16 + random.nextInt(16), z = c.cz * 16 + random.nextInt(16);
-                        int id = c.blocks[Chunk.index(x & 15, y, z & 15)] & 255;
-                        if (id != 0) randomTick(x, y, z, Block.get(id));
-                    }
+        LongOpenHashSet done = new LongOpenHashSet();
+        for (Player p : players()) {
+            int pcx = (int) Math.floor(p.x) >> 4, pcz = (int) Math.floor(p.z) >> 4;
+            for (int dx = -6; dx <= 6; dx++)
+                for (int dz = -6; dz <= 6; dz++)
+                    if (done.add(Chunk.key(pcx + dx, pcz + dz))) randomTickChunk(pcx + dx, pcz + dz);
+        }
+    }
+
+    private void randomTickChunk(int ccx, int ccz) {
+        Chunk c = chunks.get(Chunk.key(ccx, ccz));
+        if (c == null || c.state != Chunk.STATE_DECORATED) return;
+        int sections = (c.maxY + 15) / 16;
+        for (int s = 0; s < sections; s++)
+            for (int k = 0; k < 3; k++) {
+                int x = c.cx * 16 + random.nextInt(16), y = s * 16 + random.nextInt(16), z = c.cz * 16 + random.nextInt(16);
+                int id = c.blocks[Chunk.index(x & 15, y, z & 15)] & 255;
+                if (id != 0) randomTick(x, y, z, Block.get(id));
             }
     }
 
@@ -740,7 +856,7 @@ public final class World implements Shapes.Getter {
         // Damage and push entities
         double radius = power * 2;
         List<Entity> all = new ArrayList<>(entities);
-        if (player != null && !all.contains(player)) all.add(player);
+        for (Player p : players()) if (!all.contains(p)) all.add(p);
         for (Entity e : all) {
             if (e == source) continue;
             double dx = e.x - cx, dy = e.eyeY() - cy, dz = e.z - cz;
@@ -812,68 +928,104 @@ public final class World implements Shapes.Getter {
         return true;
     }
 
-    /** Called every frame on the main thread. */
+    /** Called every frame on the main thread: the local player's surroundings plus any network players'. */
     public void update(double px, double pz, int renderDistance, long frameBudgetNanos) {
+        List<double[]> centers = new ArrayList<>(1 + extraCenters.size());
+        centers.add(new double[]{px, pz, renderDistance});
+        centers.addAll(extraCenters);
+        updateCenters(centers, frameBudgetNanos);
+    }
+
+    /** Whether the chunk is complete and will not change through decoration any more (safe to send to clients). */
+    public boolean isChunkFinal(int cx, int cz) {
+        return isFinal(cx, cz);
+    }
+
+    /**
+     * Generates, decorates and meshes chunks around each centre {x, z, radius in chunks} and unloads the rest.
+     * The first centre is the camera (meshed for rendering); on a headless server every centre gets light only.
+     */
+    public void updateCenters(List<double[]> centers, long frameBudgetNanos) {
         long start = System.nanoTime();
-        int pcx = (int) Math.floor(px) >> 4, pcz = (int) Math.floor(pz) >> 4;
-        // Meshing needs decorated neighbours two chunks out, and a village centre needs its own
-        // neighbourhood generated before it can be decorated, hence the margin
-        int genR = renderDistance + 2 + mc.world.gen.Structures.VILLAGE_RADIUS;
-        int unloadR = genR + 2;
-        ensureOffsets(genR);
+        int n = centers.size();
+        int[] ccx = new int[n], ccz = new int[n], view = new int[n], gen = new int[n];
+        int maxGen = 0;
+        for (int i = 0; i < n; i++) {
+            double[] c = centers.get(i);
+            ccx[i] = (int) Math.floor(c[0]) >> 4;
+            ccz[i] = (int) Math.floor(c[1]) >> 4;
+            view[i] = (int) c[2];
+            // Meshing needs decorated neighbours two chunks out, and a village centre needs its own
+            // neighbourhood generated before it can be decorated, hence the margin
+            gen[i] = view[i] + 2 + mc.world.gen.Structures.VILLAGE_RADIUS;
+            maxGen = Math.max(maxGen, gen[i]);
+        }
+        ensureOffsets(Math.max(maxGen, 1));
 
-        // 1. Collect generated chunks
-        Chunk g;
-        while ((g = generated.poll()) != null) {
-            generating.remove(g.key());
-            int dx = g.cx - pcx, dz = g.cz - pcz;
-            if (dx * dx + dz * dz > (unloadR + 1) * (unloadR + 1)) continue;
-            chunks.put(g.key(), g);
-            spawnSavedEntities(g);
+        if (remote == null) {
+            // 1. Collect generated chunks
+            Chunk g;
+            while ((g = generated.poll()) != null) {
+                generating.remove(g.key());
+                if (n > 0 && !nearAny(g.cx, g.cz, ccx, ccz, gen, 3)) continue;
+                chunks.put(g.key(), g);
+                spawnSavedEntities(g);
+            }
+
+            // 2. Request generation, nearest first
+            int maxJobs = threads * 3;
+            for (int i = 0; i < n; i++) {
+                int lim = gen[i] * gen[i] + gen[i];
+                for (int[] o : offsets) {
+                    if (generating.size() >= maxJobs || o[2] > lim) break;
+                    int cx = ccx[i] + o[0], cz = ccz[i] + o[1];
+                    long key = Chunk.key(cx, cz);
+                    if (chunks.containsKey(key) || generating.contains(key)) continue;
+                    generating.add(key);
+                    workers.execute(new Task(10 + o[2] + i * 4, () -> generated.add(loadOrGenerate(cx, cz))));
+                }
+            }
+
+            // 3. Decorate chunks whose neighbours exist
+            outer:
+            for (int i = 0; i < n; i++) {
+                int lim = (gen[i] - 1) * (gen[i] - 1) + gen[i];
+                for (int[] o : offsets) {
+                    if (o[2] > lim) break;
+                    int cx = ccx[i] + o[0], cz = ccz[i] + o[1];
+                    Chunk c = chunks.get(Chunk.key(cx, cz));
+                    if (c == null || c.state != Chunk.STATE_TERRAIN) continue;
+                    boolean ok = true;
+                    int r = decorator.structures.decorationRadius(cx, cz);
+                    for (int dx = -r; dx <= r && ok; dx++)
+                        for (int dz = -r; dz <= r; dz++)
+                            if (!chunks.containsKey(Chunk.key(cx + dx, cz + dz))) { ok = false; break; }
+                    if (!ok) continue;
+                    decorator.decorate(c);
+                    c.touched = true;
+                    if (System.nanoTime() - start > frameBudgetNanos / 2) break outer;
+                }
+            }
         }
 
-        // 2. Request generation, nearest first
-        int maxGen = threads * 3;
-        for (int[] o : offsets) {
-            if (generating.size() >= maxGen) break;
-            int cx = pcx + o[0], cz = pcz + o[1];
-            long key = Chunk.key(cx, cz);
-            if (chunks.containsKey(key) || generating.contains(key)) continue;
-            generating.add(key);
-            workers.execute(new Task(10 + o[2], () -> generated.add(loadOrGenerate(cx, cz))));
-        }
-
-        // 3. Decorate chunks whose neighbours exist
-        for (int[] o : offsets) {
-            if (o[2] > (genR - 1) * (genR - 1) + genR) break;
-            int cx = pcx + o[0], cz = pcz + o[1];
-            Chunk c = chunks.get(Chunk.key(cx, cz));
-            if (c == null || c.state != Chunk.STATE_TERRAIN) continue;
-            boolean ok = true;
-            int r = decorator.structures.decorationRadius(cx, cz);
-            for (int dx = -r; dx <= r && ok; dx++)
-                for (int dz = -r; dz <= r; dz++)
-                    if (!chunks.containsKey(Chunk.key(cx + dx, cz + dz))) { ok = false; break; }
-            if (!ok) continue;
-            decorator.decorate(c);
-            c.touched = true;
-            if (System.nanoTime() - start > frameBudgetNanos / 2) break;
-        }
-
-        // 4. Urgent remeshes (player edits) first, then everything else nearest first
+        // 4. Urgent remeshes (player edits) first, then everything else nearest first. A headless server only
+        // needs light (for mob spawning), around every player.
         int maxMesh = threads * 2;
-        for (int[] o : offsets) {
-            if (o[2] > renderDistance * renderDistance + renderDistance) break;
-            Chunk c = chunks.get(Chunk.key(pcx + o[0], pcz + o[1]));
-            if (c != null && c.urgentMesh && c.needsMesh && !c.meshInFlight && canMesh(c.cx, c.cz)) submitMesh(c, -1000 + o[2]);
-        }
-        for (int[] o : offsets) {
-            if (meshJobsInFlight >= maxMesh) break;
-            if (o[2] > renderDistance * renderDistance + renderDistance) break;
-            Chunk c = chunks.get(Chunk.key(pcx + o[0], pcz + o[1]));
-            if (c == null || !c.needsMesh || c.meshInFlight) continue;
-            if (!canMesh(c.cx, c.cz)) continue;
-            submitMesh(c, o[2] + (c.mesh != null ? -500 : 0));
+        for (int i = 0; i < (headless ? n : Math.min(1, n)); i++) {
+            int rd = view[i];
+            int lim = rd * rd + rd;
+            for (int[] o : offsets) {
+                if (o[2] > lim) break;
+                Chunk c = chunks.get(Chunk.key(ccx[i] + o[0], ccz[i] + o[1]));
+                if (c != null && c.urgentMesh && c.needsMesh && !c.meshInFlight && canMesh(c.cx, c.cz)) submitMesh(c, -1000 + o[2]);
+            }
+            for (int[] o : offsets) {
+                if (meshJobsInFlight >= maxMesh || o[2] > lim) break;
+                Chunk c = chunks.get(Chunk.key(ccx[i] + o[0], ccz[i] + o[1]));
+                if (c == null || !c.needsMesh || c.meshInFlight) continue;
+                if (!canMesh(c.cx, c.cz)) continue;
+                submitMesh(c, o[2] + (c.mesh != null || c.light != null ? -500 : 0));
+            }
         }
 
         // 5. Upload finished meshes
@@ -881,31 +1033,75 @@ public final class World implements Shapes.Getter {
         while ((m = meshed.poll()) != null) {
             meshJobsInFlight--;
             Chunk c = chunks.get(Chunk.key(m.cx, m.cz));
-            if (c == null) {
+            if (c == null || headless) {
                 if (m.solid != null) MemoryUtil.memFree(m.solid);
                 if (m.translucent != null) MemoryUtil.memFree(m.translucent);
-                continue;
+                if (c == null) continue;
+            } else {
+                if (c.mesh == null) c.mesh = new ChunkMesh();
+                c.mesh.upload(m);
             }
             c.meshInFlight = false;
-            if (c.mesh == null) c.mesh = new ChunkMesh();
-            c.mesh.upload(m);
             c.light = m.light;
             c.lightHeight = m.lightHeight;
         }
 
-        // 6. Unload far chunks
-        if (chunks.size() > offsets.length + 64) {
+        // 6. Unload far chunks (a server with nobody online keeps what it has)
+        if (n > 0 && chunks.size() > offsets.length + 64) {
             var it = chunks.long2ObjectEntrySet().fastIterator();
             while (it.hasNext()) {
                 Long2ObjectMap.Entry<Chunk> e = it.next();
                 Chunk c = e.getValue();
-                int dx = c.cx - pcx, dz = c.cz - pcz;
-                if (dx * dx + dz * dz > unloadR * unloadR) {
+                boolean keep = remote != null ? nearAny(c.cx, c.cz, ccx, ccz, view, 3) : nearAny(c.cx, c.cz, ccx, ccz, gen, 2);
+                if (!keep) {
                     unload(c);
                     it.remove();
                 }
             }
         }
+    }
+
+    private static boolean nearAny(int cx, int cz, int[] ccx, int[] ccz, int[] radius, int margin) {
+        for (int i = 0; i < ccx.length; i++) {
+            int dx = cx - ccx[i], dz = cz - ccz[i], r = radius[i] + margin;
+            if (dx * dx + dz * dz <= r * r) return true;
+        }
+        return false;
+    }
+
+    // ------------------------------------------------------------------ chunks from a server
+
+    /** Adds a chunk received from the server (replacing any old copy) and remeshes it and its neighbours. */
+    public void putNetChunk(Chunk c) {
+        c.state = Chunk.STATE_DECORATED;
+        c.recomputeMaxY();
+        Chunk old = chunks.put(c.key(), c);
+        if (old != null && old.mesh != null) old.mesh.delete();
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dz = -1; dz <= 1; dz++) {
+                Chunk nb = chunks.get(Chunk.key(c.cx + dx, c.cz + dz));
+                if (nb != null) nb.needsMesh = true;
+            }
+    }
+
+    /** Drops a chunk the server stopped sending. */
+    public void removeNetChunk(int cx, int cz) {
+        Chunk c = chunks.remove(Chunk.key(cx, cz));
+        if (c == null) return;
+        if (c.mesh != null) c.mesh.delete();
+        entities.removeIf(e -> ((int) Math.floor(e.x) >> 4) == cx && ((int) Math.floor(e.z) >> 4) == cz && !(e instanceof Player));
+    }
+
+    /** Adds an entity sent by the server, bypassing the Remote hook. */
+    public void addNetEntity(Entity e) {
+        e.world = this;
+        entities.add(e);
+    }
+
+    /** Colours for grass and leaves in a chunk that arrived over the network. */
+    public void computeBiomeData(Chunk c) {
+        if (nether != null) nether.computeBiomeData(c);
+        else generator.computeBiomeData(c);
     }
 
     private void spawnSavedEntities(Chunk c) {
@@ -935,6 +1131,11 @@ public final class World implements Shapes.Getter {
     }
 
     private void unload(Chunk c) {
+        if (remote != null) {
+            if (c.mesh != null) c.mesh.delete();
+            c.mesh = null;
+            return;
+        }
         // Entities go to disk with their chunk
         List<Entity> inside = new ArrayList<>();
         for (List<Entity> list : List.of(entities, pendingEntities))
@@ -963,6 +1164,7 @@ public final class World implements Shapes.Getter {
             for (int dz = -1; dz <= 1; dz++)
                 height = Math.max(height, chunks.get(Chunk.key(c.cx + dx, c.cz + dz)).maxY);
         job.height = height;
+        job.lightOnly = headless;
         byte[] region = job.region, metaRegion = job.meta;
         for (int dx = -1; dx <= 1; dx++) {
             for (int dz = -1; dz <= 1; dz++) {
@@ -1027,6 +1229,7 @@ public final class World implements Shapes.Getter {
 
     /** Saves every modified chunk; called on exit. */
     public void saveAll() {
+        if (remote != null) return;
         Long2ObjectOpenHashMap<List<Entity>> byChunk = entitiesByChunk();
         for (Chunk c : chunks.values()) if (c.entityJson == null) saveEntities(c, byChunk.get(c.key()));
         for (Chunk c : chunks.values()) {
@@ -1046,6 +1249,6 @@ public final class World implements Shapes.Getter {
     public void shutdown() {
         workers.shutdownNow();
         for (Chunk c : chunks.values()) if (c.mesh != null) c.mesh.delete();
-        storage.flush();
+        if (storage != null) storage.flush();
     }
 }

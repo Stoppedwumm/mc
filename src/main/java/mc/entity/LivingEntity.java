@@ -250,6 +250,35 @@ public abstract class LivingEntity extends Entity {
         if (y < -64) damage(DamageSource.VOID, 4, null);
     }
 
+    @Override
+    public void netTick() {
+        prevLimbSwingAmount = limbSwingAmount;
+        prevBodyYaw = bodyYaw;
+        prevHeadYaw = headYaw;
+        float oldYaw = yaw;
+        super.netTick();
+        if (hurtTime > 0) hurtTime--;
+        if (isDead()) deathTime++;
+        headYaw += wrapDegrees(netHeadYaw - headYaw) * 0.5f;
+        // Bodies turn towards where they walk, like the server's
+        double dx = x - prevX, dz = z - prevZ;
+        float dist = (float) Math.sqrt(dx * dx + dz * dz);
+        if (dist > 0.02f) bodyYaw += wrapDegrees((float) Math.toDegrees(Math.atan2(-dx, dz)) - bodyYaw) * 0.4f;
+        else bodyYaw += wrapDegrees(yaw - bodyYaw) * 0.3f;
+        if (Math.abs(wrapDegrees(headYaw - bodyYaw)) > 75) bodyYaw = headYaw - Math.signum(wrapDegrees(headYaw - bodyYaw)) * 75;
+        float swing = Math.min(1, dist * 4);
+        limbSwingAmount += (swing - limbSwingAmount) * 0.4f;
+        limbSwing += limbSwingAmount;
+        int color = effectColor();
+        if (color >= 0 && world != null && random.nextInt(3) == 0)
+            world.addParticle("effect:" + Integer.toHexString(color), x + (random.nextDouble() - 0.5) * width, y + random.nextDouble() * height, z + (random.nextDouble() - 0.5) * width);
+    }
+
+    @Override
+    protected void netTargetReached() {
+        bodyYaw = prevBodyYaw = headYaw = prevHeadYaw = netHeadYaw;
+    }
+
     protected boolean canDrown() { return true; }
 
     /** Nether mobs don't burn. */

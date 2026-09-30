@@ -39,7 +39,7 @@ public final class XpOrbEntity extends Entity {
         if (pickupDelay > 0) pickupDelay--;
         motionY -= 0.03;
         if (inLava) { motionY = 0.2; motionX = (random.nextDouble() - 0.5) * 0.2; motionZ = (random.nextDouble() - 0.5) * 0.2; }
-        Player p = world.player();
+        Player p = world.nearestPlayer(x, y, z);
         if (p != null && !p.isDead()) {
             double dx = p.x - x, dy = p.y + p.eyeHeight / 2 - y, dz = p.z - z;
             double d2 = dx * dx + dy * dy + dz * dz;

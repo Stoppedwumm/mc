@@ -4,7 +4,7 @@ import mc.item.Inventory;
 import mc.world.Block;
 
 /** The local player, simulated at 20 ticks per second with Minecraft's movement constants. */
-public final class Player extends LivingEntity {
+public class Player extends LivingEntity {
     public static final double WIDTH = 0.6, HEIGHT = 1.8, EYE = 1.62, SNEAK_EYE = 1.27;
 
     public boolean flying, sneaking, sprinting;
@@ -28,7 +28,18 @@ public final class Player extends LivingEntity {
     /** Seed for the enchanting table's offers (changes after every enchantment, like Minecraft). */
     public int enchantSeed = new java.util.Random().nextInt();
 
+    /** Name shown above the head in multiplayer. */
+    public String name = "Player";
+    /** Arm swing of another player seen over the network (ticks left). */
+    public int swingTicks;
+
     public boolean inPortal() { return touching(Block.NETHER_PORTAL.id); }
+
+    @Override
+    public void netTick() {
+        super.netTick();
+        if (swingTicks > 0) swingTicks--;
+    }
     /** Progress towards the next level, 0-1. */
     public float xpProgress;
 

@@ -8,11 +8,13 @@ import java.util.List;
 
 public final class Main {
     public static void main(String[] args) throws Exception {
-        if (relaunchOnMac(args)) return;
-        String world = "world";
+        String world = null;
         Long seed = null;
         int rd = 0;
-        String screenshot = null;
+        String screenshot = null, connect = null;
+        boolean server = false;
+        int port = mc.net.Net.DEFAULT_PORT, maxPlayers = 8, viewDistance = 10;
+        String motd = "A Minecraft-like Server";
         List<String> commands = new ArrayList<>();
         Path dir = Path.of(System.getProperty("user.dir"), "run");
         for (int i = 0; i < args.length; i++) {
@@ -26,11 +28,24 @@ public final class Main {
                 case "--gameDir" -> dir = Path.of(args[++i]);
                 case "--screenshot" -> screenshot = args[++i];
                 case "--cmd" -> commands.add(args[++i]);
+                case "--connect" -> connect = args[++i];
+                case "--server", "--nogui" -> server = true;
+                case "--port" -> port = Integer.parseInt(args[++i]);
+                case "--motd" -> motd = args[++i];
+                case "--maxPlayers" -> maxPlayers = Integer.parseInt(args[++i]);
+                case "--viewDistance" -> viewDistance = Integer.parseInt(args[++i]);
                 default -> System.err.println("Unknown argument " + args[i]);
             }
         }
         java.nio.file.Files.createDirectories(dir);
-        new Game(dir, world, seed, rd, screenshot, commands).run();
+        if (server) {
+            new mc.server.DedicatedServer(dir, world != null ? world : "world", port, seed, motd, maxPlayers, viewDistance).run();
+            System.exit(0);
+        }
+        if (relaunchOnMac(args)) return;
+        // A seed without a world name keeps the old behaviour of opening "world" directly
+        if (world == null && seed != null && connect == null) world = "world";
+        new Game(dir, world, seed, rd, screenshot, commands, connect).run();
         System.exit(0);
     }
 

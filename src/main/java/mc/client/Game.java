@@ -25,9 +25,10 @@ import static org.lwjgl.opengl.GL33C.*;
 public final class Game implements World.Listener {
     private static final double TICK = 0.05;
 
-    enum Screen { LOADING, NONE, PAUSE, INVENTORY, CRAFTING, FURNACE, CHEST, CREATIVE, CHAT, DEATH, TRADING, ENCHANTING, ANVIL, BREWING }
+    enum Screen { LOADING, NONE, TITLE, WORLDS, CREATE_WORLD, DELETE_WORLD, MULTIPLAYER, ADD_SERVER, DIRECT_CONNECT, CONNECTING, DISCONNECTED, OPTIONS, PAUSE, INVENTORY, CRAFTING, FURNACE, CHEST, CREATIVE, CHAT, DEATH, TRADING, ENCHANTING, ANVIL, BREWING }
 
-    private final Path gameDir, worldDir;
+    final Path gameDir;
+    private Path worldDir;
     final Options options;
     private Options.Level level;
     Window window;
@@ -41,7 +42,7 @@ public final class Game implements World.Listener {
     final Weather weather = new Weather();
     final Particles particles = new Particles();
     World world;
-    final Player player = new Player();
+    Player player = new Player();
     Interaction interaction;
     Screens screens;
     Hud hud;
@@ -68,9 +69,17 @@ public final class Game implements World.Listener {
     private final List<String> startupCommands = new ArrayList<>();
     private boolean deathHandled;
 
-    public Game(Path gameDir, String worldName, Long seed, int renderDistance, String screenshotAfter, List<String> commands) {
+    /** World given on the command line (null: start at the title screen). */
+    private final String startWorld;
+    private final String startServer;
+    Menus menus;
+    /** True while the title screens are shown (world is then the panorama world). */
+    boolean inMenu;
+
+    public Game(Path gameDir, String worldName, Long seed, int renderDistance, String screenshotAfter, List<String> commands, String connect) {
         this.gameDir = gameDir;
-        this.worldDir = gameDir.resolve("saves").resolve(worldName);
+        this.startWorld = worldName;
+        this.startServer = connect;
         this.options = Options.load(gameDir.resolve("options.json"));
         this.seedGiven = seed != null;
         this.seedArg = seed != null ? seed : new Random().nextLong();
@@ -111,25 +120,13 @@ public final class Game implements World.Listener {
     }
 
     private void init() throws Exception {
-        Files.createDirectories(worldDir);
         if (rdArg > 0) options.renderDistance = rdArg;
         window = new Window("Minecraft-like (LWJGL)", 1280, 720);
         window.setVsync(options.vsync);
         input = new Input(window);
         sound = new Sound();
         sound.volume = options.volume;
-
-        level = Options.Level.load(worldDir.resolve("level.json"));
-        if (level == null) {
-            level = new Options.Level();
-            level.seed = seedArg;
-        } else if (seedGiven && level.seed != seedArg) {
-            System.out.println("World already exists with seed " + level.seed + "; ignoring --seed");
-        }
-        Dimension startDim;
-        try { startDim = Dimension.valueOf(level.dimension == null ? "OVERWORLD" : level.dimension); } catch (IllegalArgumentException e) { startDim = Dimension.OVERWORLD; }
-        world = createWorld(startDim, level.time);
-        renderer = new WorldRenderer(level.seed);
+        renderer = new WorldRenderer(0);
         post = new PostProcess(window.width, window.height);
         itemRenderer = new ItemRenderer();
         itemRenderer.setBlockPixels(new TextureGen().generate());
@@ -140,51 +137,224 @@ public final class Game implements World.Listener {
         screens = new Screens(this);
         hud = new Hud(this);
         commands = new Commands(this);
+        menus = new Menus(this);
+        if (startWorld != null) loadWorld(startWorld, seedGiven ? seedArg : null, null, null);
+        else if (startServer != null) menus.connect(startServer);
+        else openTitle();
+    }
 
+    /** Folder of the world being played (null in multiplayer and on the title screen). */
+    Path worldDir() { return worldDir; }
+
+    /**
+     * Opens (or creates) a singleplayer world. seed/creative/displayName only apply to a new world;
+     * a null seed picks a random one.
+     */
+    void loadWorld(String folder, Long seed, Boolean creative, String displayName) {
+        try {
+            if (!inMenu && world != null && multiplayer == null) {
+                saveWorld();
+                world.shutdown();
+                world = null;
+            }
+            closeMenuWorld();
+            worldDir = gameDir.resolve("saves").resolve(folder);
+            Files.createDirectories(worldDir);
+            player = new Player();
+            interaction = new Interaction(this);
+            particles.clear();
+            hud.clearChat();
+            sleepTicks = 0;
+            perspective = 0;
+            deathHandled = false;
+            spawnNeeded = false;
+            loadedTick = Long.MAX_VALUE / 2;
+            level = Options.Level.load(worldDir.resolve("level.json"));
+            if (level == null) {
+                level = new Options.Level();
+                level.seed = seed != null ? seed : new Random().nextLong();
+                level.creative = creative != null && creative;
+                level.name = displayName != null ? displayName : folder;
+            } else if (seed != null && level.seed != seed) {
+                System.out.println("World already exists with seed " + level.seed + "; ignoring --seed");
+            }
+            if (level.name == null) level.name = folder;
+            player.name = options.playerName;
+            weather.raining = false;
+            weather.timer = 12000 + random.nextInt(12000);
+            Dimension startDim;
+            try { startDim = Dimension.valueOf(level.dimension == null ? "OVERWORLD" : level.dimension); } catch (IllegalArgumentException e) { startDim = Dimension.OVERWORLD; }
+            world = createWorld(startDim, level.time);
+            loadingMessage = "Generating terrain...";
+            setScreen(Screen.LOADING);
+            startPlayer();
+        } catch (java.io.IOException e) {
+            worldDir = null;
+            menus.error("Could not open world", e.getMessage());
+        }
+    }
+
+    private void startPlayer() {
         if (level.spawned) {
-            player.setPos(level.x, level.y, level.z);
-            player.yaw = level.yaw;
-            player.pitch = level.pitch;
-            player.flying = level.flying;
-            player.creative = level.creative;
-            player.health = level.health;
-            player.food = level.food;
-            player.saturation = level.saturation;
-            player.spawnX = level.spawnX;
-            player.spawnY = level.spawnY;
-            player.spawnZ = level.spawnZ;
+            level.readPlayer(player);
             weather.raining = level.raining;
             if (level.weatherTimer > 0) weather.timer = level.weatherTimer;
-            if (level.inventory != null) {
-                for (int i = 0; i < Math.min(36, level.inventory.length); i++) {
-                    int[] e = level.inventory[i];
-                    if (e != null) player.inventory.slots[i] = ItemStack.fromArray(e);
-                }
-            } else if (level.hotbar != null) {
-                for (int i = 0; i < 9 && i < level.hotbar.length; i++) if (Item.get(level.hotbar[i]) != null) player.inventory.slots[i] = new ItemStack(Item.get(level.hotbar[i]), 64);
-            }
-            if (level.armor != null) {
-                for (int i = 0; i < Math.min(4, level.armor.length); i++) {
-                    int[] e = level.armor[i];
-                    if (e != null) player.inventory.armor[i] = ItemStack.fromArray(e);
-                }
-            }
-            player.xpLevel = level.xpLevel;
-            player.xpProgress = level.xpProgress;
-            player.xpTotal = level.xpTotal;
-            if (level.effects != null)
-                for (int[] e : level.effects)
-                    if (e != null && e.length == 3 && e[0] >= 0 && e[0] < Effect.values().length)
-                        player.effects.put(Effect.values()[e[0]], new Effect.Instance(Effect.values()[e[0]], e[1], e[2]));
-            player.absorption = level.absorption;
-            player.inventory.selected = Math.max(0, Math.min(8, level.selected));
         } else {
             int[] spawn = findSpawn(world.generator);
             player.setPos(spawn[0] + 0.5, 120, spawn[1] + 0.5);
+            player.creative = level.creative;
             spawnNeeded = true;
         }
         System.out.println("World seed: " + level.seed);
     }
+
+    /** Saves and leaves the current world (or server) and returns to the title screen. */
+    void leaveWorld() {
+        if (isContainer(screen)) screens.onClose();
+        if (worldDir != null && world != null && !inMenu) saveWorld();
+        if (world != null) world.shutdown();
+        world = null;
+        worldDir = null;
+        level = null;
+        openTitle();
+    }
+
+    // ------------------------------------------------------------------ multiplayer
+
+    /** Starts connecting to a server (the CONNECTING screen shows progress). */
+    void startMultiplayer(String address) {
+        if (multiplayer != null) multiplayer.disconnect("Reconnecting");
+        multiplayer = new MultiplayerSession(this, address);
+    }
+
+    /** Called by the session once logged in: switches from the title screen to the server's world. */
+    void enterRemoteWorld(World w, Options.Level data, boolean fresh) {
+        closeMenuWorld();
+        worldDir = null;
+        level = data;
+        world = w;
+        w.listener = this;
+        player = new Player();
+        player.name = options.playerName;
+        w.setPlayer(player);
+        data.readPlayer(player);
+        interaction = new Interaction(this);
+        particles.clear();
+        hud.clearChat();
+        sleepTicks = 0;
+        perspective = 0;
+        deathHandled = false;
+        spawnNeeded = fresh;
+        weather.raining = w.raining;
+        loadedTick = Long.MAX_VALUE / 2;
+        loadingMessage = "Downloading terrain...";
+        setScreen(Screen.LOADING);
+    }
+
+    /** The connection failed or was closed by the server. */
+    void multiplayerEnded(String title, String reason) {
+        multiplayer = null;
+        if (isContainer(screen)) screens.onClose();
+        if (world != null && !inMenu) world.shutdown();
+        world = null;
+        level = null;
+        openTitle();
+        menus.error(title, reason);
+    }
+
+    /** Pause menu: leave the world (singleplayer saves; multiplayer disconnects). */
+    void quitToTitle() {
+        if (multiplayer != null) {
+            MultiplayerSession m = multiplayer;
+            multiplayer = null;
+            if (isContainer(screen)) screens.onClose();
+            m.afterTick();
+            m.disconnect("Quit");
+            if (world != null) world.shutdown();
+            world = null;
+            level = null;
+            openTitle();
+            return;
+        }
+        if (lanServer != null) {
+            lanServer.stop();
+            lanServer = null;
+        }
+        leaveWorld();
+    }
+
+    /** Pause menu: lets other players on the network join this singleplayer world. */
+    void openToLan() {
+        if (lanServer != null || worldDir == null) return;
+        if (world.dimension != Dimension.OVERWORLD) { hud.chat("Open to LAN from the Overworld"); return; }
+        try {
+            player.name = options.playerName;
+            mc.server.Server s;
+            try {
+                s = new mc.server.Server(world, mc.net.Net.DEFAULT_PORT, worldDir.resolve("players"), player, m -> System.out.println("[Server] " + m),
+                        options.playerName + " - " + level.name, true);
+            } catch (java.io.IOException busy) {
+                s = new mc.server.Server(world, 0, worldDir.resolve("players"), player, m -> System.out.println("[Server] " + m), options.playerName + " - " + level.name, true);
+            }
+            s.chatSink = hud::chat;
+            s.spawnX = player.spawnY > 0 ? player.spawnX : player.x;
+            s.spawnY = player.spawnY > 0 ? player.spawnY : player.y;
+            s.spawnZ = player.spawnY > 0 ? player.spawnZ : player.z;
+            lanServer = s;
+            hud.chat("Local game hosted on port " + s.port());
+            closeScreen();
+        } catch (java.io.IOException e) {
+            hud.chat("Could not open to LAN: " + e.getMessage());
+        }
+    }
+
+    // ------------------------------------------------------------------ title screen panorama
+
+    private Path menuDir;
+    private int[] panoramaSpot;
+
+    /** Shows the title screen over a slowly turning view of a generated landscape. */
+    void openTitle() {
+        inMenu = true;
+        player = new Player();
+        interaction = new Interaction(this);
+        particles.clear();
+        sleepTicks = 0;
+        perspective = 0;
+        if (world == null) {
+            try {
+                menuDir = Files.createTempDirectory("mc-panorama");
+                World w = new World(Menus.PANORAMA_SEED, new WorldStorage(menuDir), Dimension.OVERWORLD);
+                w.time = 2500;
+                w.listener = this;
+                w.setPlayer(player);
+                world = w;
+                if (panoramaSpot == null) panoramaSpot = Menus.panoramaSpot(w.generator);
+                player.setPos(panoramaSpot[0] + 0.5, panoramaSpot[2], panoramaSpot[1] + 0.5);
+                player.pitch = 16;
+                player.yaw = 30;
+                player.creative = true;
+                player.flying = true;
+            } catch (java.io.IOException e) {
+                System.err.println("No panorama: " + e);
+            }
+        }
+        setScreen(Screen.TITLE);
+    }
+
+    private void closeMenuWorld() {
+        if (!inMenu) return;
+        inMenu = false;
+        if (world != null) world.shutdown();
+        world = null;
+        if (menuDir != null) {
+            try (var paths = Files.walk(menuDir)) {
+                paths.sorted(java.util.Comparator.reverseOrder()).forEach(q -> q.toFile().delete());
+            } catch (java.io.IOException ignored) { }
+            menuDir = null;
+        }
+    }
+
 
     private Path dimensionDir(Dimension d) {
         return d.folder.isEmpty() ? worldDir : worldDir.resolve(d.folder);
@@ -198,12 +368,9 @@ public final class Game implements World.Listener {
         w.time = time;
         w.listener = this;
         w.setPlayer(player);
-        World previous = world;
-        world = w;
         List<Options.BlockEntityData> bes = Options.BlockEntityData.loadList(dir.resolve("blockentities.json"));
         if (bes == null && d == Dimension.OVERWORLD) bes = level.blockEntities;
-        if (bes != null) loadBlockEntities(bes);
-        world = previous;
+        if (bes != null) Options.BlockEntityData.apply(w, bes);
         return w;
     }
 
@@ -238,32 +405,6 @@ public final class Game implements World.Listener {
 
     private String loadingMessage = "Generating terrain...";
 
-    private void loadBlockEntities(List<Options.BlockEntityData> list) {
-        for (Options.BlockEntityData d : list) {
-            BlockEntity be = switch (d.type) {
-                case "chest" -> new BlockEntity.Chest(d.x, d.y, d.z);
-                case "spawner" -> { BlockEntity.Spawner sp = new BlockEntity.Spawner(d.x, d.y, d.z); if (d.mob != null) sp.mob = d.mob; yield sp; }
-                case "brewing" -> { BlockEntity.BrewingStand bs = new BlockEntity.BrewingStand(d.x, d.y, d.z); bs.brewTime = d.cookTime; bs.fuel = d.burnTime; yield bs; }
-                default -> new BlockEntity.Furnace(d.x, d.y, d.z);
-            };
-            for (int i = 0; d.slots != null && i < Math.min(be.slots.length, d.slots.length); i++) {
-                int[] e = d.slots[i];
-                if (e != null) be.slots[i] = ItemStack.fromArray(e);
-            }
-            if (be instanceof BlockEntity.Furnace f) { f.burnTime = d.burnTime; f.burnTotal = d.burnTotal; f.cookTime = d.cookTime; }
-            world.blockEntities.put(World.posKey(d.x, d.y, d.z), be);
-        }
-    }
-
-    private static int[][] saveSlots(ItemStack[] slots) {
-        int[][] out = new int[slots.length][];
-        for (int i = 0; i < slots.length; i++) {
-            ItemStack s = slots[i];
-            if (!ItemStack.isEmpty(s)) out[i] = s.toArray();
-        }
-        return out;
-    }
-
     private static int[] findSpawn(TerrainGenerator gen) {
         for (int r = 0; r < 4000; r += 16) {
             for (int a = 0; a < Math.max(1, r / 4); a++) {
@@ -278,52 +419,31 @@ public final class Game implements World.Listener {
 
     private void shutdown() {
         if (isContainer(screen)) screens.onClose();
-        saveWorld();
+        if (multiplayer != null) multiplayer.disconnect("Quit");
+        if (lanServer != null) lanServer.stop();
+        if (inMenu) closeMenuWorld();
+        else if (world != null) {
+            if (worldDir != null) saveWorld();
+            world.shutdown();
+        }
         options.save(gameDir.resolve("options.json"));
-        world.shutdown();
         sound.destroy();
         window.destroy();
     }
 
-    private void saveWorld() {
-        if (screen == Screen.LOADING && spawnNeeded) return;
+    void saveWorld() {
+        if (worldDir == null || inMenu || (screen == Screen.LOADING && spawnNeeded)) return;
         world.saveAll();
         level.time = world.time;
-        level.x = player.x; level.y = player.y; level.z = player.z;
-        level.yaw = player.yaw; level.pitch = player.pitch;
-        level.flying = player.flying;
-        level.creative = player.creative;
-        level.inventory = saveSlots(player.inventory.slots);
-        level.armor = saveSlots(player.inventory.armor);
-        level.xpLevel = player.xpLevel;
-        level.xpProgress = player.xpProgress;
-        level.xpTotal = player.xpTotal;
-        level.effects = player.effects.values().stream().map(e -> new int[]{e.effect.ordinal(), e.amplifier, e.duration}).toArray(int[][]::new);
-        level.absorption = player.absorption;
-        level.hotbar = null;
-        level.selected = player.inventory.selected;
-        level.health = player.isDead() ? player.maxHealth : player.health;
-        level.food = player.food;
-        level.saturation = player.saturation;
-        level.spawnX = player.spawnX; level.spawnY = player.spawnY; level.spawnZ = player.spawnZ;
+        level.writePlayer(player);
         level.raining = weather.raining;
         level.weatherTimer = weather.timer;
-        level.spawned = true;
-        List<Options.BlockEntityData> bes = new ArrayList<>();
-        for (BlockEntity be : world.blockEntities.values()) {
-            Options.BlockEntityData d = new Options.BlockEntityData();
-            d.x = be.x; d.y = be.y; d.z = be.z;
-            d.type = be instanceof BlockEntity.Chest ? "chest" : be instanceof BlockEntity.Spawner ? "spawner" : be instanceof BlockEntity.BrewingStand ? "brewing" : "furnace";
-            if (be instanceof BlockEntity.BrewingStand bs) { d.cookTime = bs.brewTime; d.burnTime = bs.fuel; }
-            if (be instanceof BlockEntity.Spawner sp) d.mob = sp.mob;
-            d.slots = saveSlots(be.slots);
-            if (be instanceof BlockEntity.Furnace f) { d.burnTime = f.burnTime; d.burnTotal = f.burnTotal; d.cookTime = f.cookTime; }
-            bes.add(d);
-        }
+        level.lastPlayed = System.currentTimeMillis();
         level.blockEntities = null;
         level.dimension = world.dimension.name();
-        Options.BlockEntityData.saveList(dimensionDir(world.dimension).resolve("blockentities.json"), bes);
+        Options.BlockEntityData.saveList(dimensionDir(world.dimension).resolve("blockentities.json"), Options.BlockEntityData.capture(world));
         level.save(worldDir.resolve("level.json"));
+        if (lanServer != null) lanServer.savePlayers();
     }
 
     // ------------------------------------------------------------------ screens
@@ -359,26 +479,44 @@ public final class Game implements World.Listener {
         }
         player.respawn();
         deathHandled = false;
+        if (multiplayer != null) multiplayer.respawned();
         closeScreen();
     }
 
     // ------------------------------------------------------------------ ticking
 
+    /** Connection to a server when playing multiplayer (null in singleplayer). */
+    MultiplayerSession multiplayer;
+    /** Server hosting this singleplayer world for LAN players (null unless opened to LAN). */
+    mc.server.Server lanServer;
+
+    boolean isMultiplayer() { return multiplayer != null; }
+
     private void tick() {
         ticks++;
+        if (inMenu) {
+            menus.tick();
+            runStartupCommands();
+            return;
+        }
+        if (multiplayer != null) {
+            multiplayer.tick();
+            if (multiplayer == null || world == null) return;
+        }
         if (screen == Screen.LOADING) {
             checkLoaded();
+            if (lanServer != null) lanServer.tick();
             return;
         }
         runStartupCommands();
-        if (screen == Screen.PAUSE) return;
+        // Like Minecraft, the game only pauses in singleplayer
+        if (screen == Screen.PAUSE && multiplayer == null && lanServer == null) return;
 
+        if (multiplayer != null) weather.raining = world.raining; // the server decides
         weather.tick();
+        if (multiplayer != null) weather.timer = Integer.MAX_VALUE;
         world.raining = weather.raining;
-        double f = (world.time % 24000) / 24000.0 - 0.25;
-        f = f - Math.floor(f);
-        f = f + (1 - (Math.cos(f * Math.PI) + 1) / 2 - f) / 3;
-        world.dayFactor = (float) Math.max(0, Math.min(1, Math.cos(f * Math.PI * 2) * 2 + 0.5)) * (1 - weather.rain(1) * 0.3f);
+        world.dayFactor = World.dayFactor(world.time, weather.rain(1));
 
         boolean play = screen == Screen.NONE && sleepTicks == 0;
         if (sleepTicks > 0) tickSleep();
@@ -407,7 +545,8 @@ public final class Game implements World.Listener {
                 for (int i = 0; i < 20; i++) particles.spawn("splash", player.x + random.nextGaussian() * 0.3, player.y + 0.5, player.z + random.nextGaussian() * 0.3);
             }
             if (player.eyeInBlock(Block.WATER.id) && random.nextInt(8) == 0) particles.spawn("bubble", player.x, player.eyeY(), player.z);
-            boolean inPortal = player.inPortal();
+            // Portals only work in singleplayer for now (a server hosts one dimension)
+            boolean inPortal = player.inPortal() && multiplayer == null && lanServer == null;
             // After travelling, the portal only works again once the player has stepped out of it
             if (player.portalCooldown > 0) {
                 if (inPortal) player.portalCooldown = Math.max(player.portalCooldown, 20);
@@ -437,6 +576,8 @@ public final class Game implements World.Listener {
 
         interaction.tick(play);
         world.tick();
+        if (lanServer != null) lanServer.tick();
+        if (multiplayer != null) multiplayer.afterTick();
         animateBlocks();
         particles.tick(world);
         if (ticks % 6000 == 0) saveWorld();
@@ -491,6 +632,12 @@ public final class Game implements World.Listener {
 
     void sleep(int x, int y, int z) {
         if (sleepTicks > 0) return;
+        if (multiplayer != null || lanServer != null) {
+            // Everyone would have to sleep to skip the night: in multiplayer beds only set the respawn point
+            player.spawnX = x + 0.5; player.spawnY = y + 0.6; player.spawnZ = z + 0.5;
+            hud.chat("Respawn point set");
+            return;
+        }
         long t = world.time % 24000;
         boolean night = t >= 12542 && t <= 23459;
         if (!night && !weather.raining) { hud.chat("You can only sleep at night or during thunderstorms"); return; }
@@ -563,6 +710,7 @@ public final class Game implements World.Listener {
     }
 
     private void pickupItems() {
+        if (multiplayer != null) return; // the server hands items over
         var box = player.box();
         box.minX -= 1; box.maxX += 1; box.minY -= 0.5; box.maxY += 0.5; box.minZ -= 1; box.maxZ += 1;
         for (Entity e : world.entities()) {
@@ -689,11 +837,30 @@ public final class Game implements World.Listener {
             input.resized = false;
         }
         handleInput();
-
-        world.update(player.x, player.z, options.renderDistance, 6_000_000L);
-        if (screen != Screen.LOADING && screen != Screen.PAUSE) interaction.pick(pt);
-
         glViewport(0, 0, window.width, window.height);
+        if (world == null) {
+            // Connecting to a server, or no panorama: menus over a plain background
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glClearColor(0.1f, 0.08f, 0.06f, 1);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            gui.begin(window.width, window.height);
+            menus.render(gui, true);
+            return;
+        }
+        if (inMenu) {
+            // Slowly turn the panorama camera
+            player.prevX = player.x; player.prevY = player.y; player.prevZ = player.z;
+            player.prevYaw = player.yaw;
+            player.yaw += (float) dt * 2.2f;
+            player.prevPitch = player.pitch;
+            player.prevEyeHeight = player.eyeHeight;
+            world.update(player.x, player.z, Math.min(options.renderDistance, 8), 4_000_000L);
+        } else {
+            world.update(player.x, player.z, options.renderDistance, 6_000_000L);
+            if (multiplayer == null) world.updateExtraCenters(lanServer != null ? lanServer.playerCenters() : null);
+            if (screen != Screen.LOADING && screen != Screen.PAUSE) interaction.pick(pt);
+        }
+
         if (screen == Screen.LOADING) {
             renderLoading();
             return;
@@ -736,7 +903,10 @@ public final class Game implements World.Listener {
         renderer.renderSky();
         renderer.renderOpaque(world);
         entityRenderer.render(world, renderer, pt, this::lightValue);
-        if (perspective != 0 && sleepTicks == 0) {
+        for (Player np : world.networkPlayers())
+            entityRenderer.renderOtherPlayer(np, renderer, pt, lightValue(np.x, np.y + 1, np.z));
+        lastPt = pt;
+        if (perspective != 0 && sleepTicks == 0 && !inMenu) {
             float sw = interaction.prevSwing + (interaction.swing - interaction.prevSwing) * pt;
             ItemStack heldStack = player.inventory.held();
             entityRenderer.renderPlayer(player, renderer, pt, lightValue(player.x, player.y + 1, player.z), sw,
@@ -744,11 +914,11 @@ public final class Game implements World.Listener {
         }
         renderer.renderParticles(particles, player, pt);
         if (!renderer.nether) weather.render(renderer, world, pt);
-        if (!hideGui) renderer.renderSelection(world, interaction.hit, interaction.breakProgress);
+        if (!hideGui && !inMenu) renderer.renderSelection(world, interaction.hit, interaction.breakProgress);
         post.copyDepth();
         renderer.renderTranslucent(post.depthCopy.depth);
 
-        if (!hideGui && !player.isDead() && perspective == 0) {
+        if (!hideGui && !inMenu && !player.isDead() && perspective == 0) {
             float sw = interaction.prevSwing + (interaction.swing - interaction.prevSwing) * pt;
             float eq = interaction.prevEquip + (interaction.equip - interaction.prevEquip) * pt;
             float br = lightValue(renderer.camX, renderer.camY, renderer.camZ);
@@ -763,11 +933,39 @@ public final class Game implements World.Listener {
         post.finish(window.width, window.height, renderer.time, underwater || inLava, Math.max(damageFlash, 0));
         renderGui();
 
+        if (screenshotAfter != null && inMenu && startupCommands.isEmpty() && ticks > 100 && (world.pendingJobs() == 0 || ticks > 220)) {
+            screenshot(Path.of(screenshotAfter));
+            running = false;
+            return;
+        }
         if (screenshotAfter != null && startupCommands.isEmpty() && ticks - loadedTick > 60 && (world.pendingJobs() == 0 || ticks - loadedTick > 300) && ticks % 20 == 0) {
             screenshot(Path.of(screenshotAfter));
             running = false;
         }
     }
+
+    private float lastPt;
+
+    /** Names above other players' heads (seen through walls unless they sneak, like Minecraft). */
+    private void renderNameTags() {
+        List<Player> others = new ArrayList<>(world.networkPlayers());
+        for (Entity e : world.entities()) if (e instanceof Player op) others.add(op);
+        for (Player o : others) {
+            if (o.isDead() || o.removed) continue;
+            double ex = o.interpX(lastPt) - renderer.camX, ey = o.interpY(lastPt) + (o.sneaking ? 1.9 : 2.1) - renderer.camY, ez = o.interpZ(lastPt) - renderer.camZ;
+            double dist = Math.sqrt(ex * ex + ey * ey + ez * ez);
+            if (dist > 64) continue;
+            org.joml.Vector4f v = new org.joml.Vector4f((float) ex, (float) ey, (float) ez, 1);
+            renderer.projView.transform(v);
+            if (v.w <= 0.05f) continue;
+            float sx = (v.x / v.w * 0.5f + 0.5f) * gui.width, sy = (1 - (v.y / v.w * 0.5f + 0.5f)) * gui.height;
+            if (sx < -50 || sx > gui.width + 50 || sy < -20 || sy > gui.height + 20) continue;
+            int w = gui.textWidth(o.name);
+            gui.fill(sx - w / 2f - 2, sy - 1, w + 4, 10, 0x40000000);
+            gui.centered(o.name, sx, sy, o.sneaking ? 0x60FFFFFF : 0xFFFFFFFF, false);
+        }
+    }
+
 
     private void renderGui() {
         gui.begin(window.width, window.height);
@@ -780,7 +978,12 @@ public final class Game implements World.Listener {
             gui.fill(0, 0, gui.width, gui.height, (int) (a * 230) << 24 | 0x0a0a14);
             gui.centered("Sleeping... (Shift to leave bed)", gui.width / 2, gui.height - 70, 0xFFE0E0E0);
         }
-        if (!hideGui) hud.render(gui);
+        if (inMenu) { menus.render(gui, false); return; }
+        if (menus.isMenuScreen(screen)) { menus.render(gui, false); return; }
+        if (!hideGui) {
+            renderNameTags();
+            hud.render(gui);
+        }
         if (isContainer(screen)) screens.renderContainer(gui, input);
         else if (screen == Screen.PAUSE) screens.renderPause(gui, input);
         else if (screen == Screen.DEATH) screens.renderDeath(gui, input);
@@ -895,8 +1098,12 @@ public final class Game implements World.Listener {
             String msg = chatInput.toString().trim();
             closeScreen();
             if (!msg.isEmpty()) {
-                if (msg.startsWith("/")) commands.run(msg);
-                else hud.chat("<Player> " + msg);
+                if (multiplayer != null) {
+                    if (msg.startsWith("/") && !Commands.isServerCommand(msg)) commands.run(msg);
+                    else multiplayer.chat(msg);
+                } else if (msg.startsWith("/")) commands.run(msg);
+                else if (lanServer != null) lanServer.broadcastChat("<" + player.name + "> " + msg);
+                else hud.chat("<" + player.name + "> " + msg);
             }
         }
     }
