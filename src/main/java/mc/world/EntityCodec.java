@@ -56,6 +56,7 @@ public final class EntityCodec {
             o.addProperty("sitting", m.sitting);
             o.addProperty("size", m.slimeSize);
             o.addProperty("carried", m.carriedBlock);
+            o.addProperty("profession", m.profession);
             JsonArray armor = new JsonArray();
             for (ItemStack s : m.armor) armor.add(ItemStack.isEmpty(s) ? null : stack(s));
             o.add("armor", armor);
@@ -86,6 +87,7 @@ public final class EntityCodec {
                 if (o.has("growing")) m.setGrowingAge(o.get("growing").getAsInt());
                 if (o.has("sitting")) m.sitting = o.get("sitting").getAsBoolean();
                 if (o.has("carried")) m.carriedBlock = o.get("carried").getAsInt();
+                if (o.has("profession")) m.profession = o.get("profession").getAsInt();
                 if (m.tamed) m.maxHealth = 20;
                 java.util.Arrays.fill(m.armor, null);
                 if (o.has("armor")) {

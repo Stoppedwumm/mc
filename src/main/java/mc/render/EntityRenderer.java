@@ -246,6 +246,24 @@ public final class EntityRenderer {
                 mat.translate(0, 0.8f, 0).rotateX((float) Math.toRadians(90 - sp)).translate(0, -0.8f, 0);
             }
             case SLIME -> { }
+            case VILLAGER -> {
+                model.get("legL").rx = legA * 0.5f;
+                model.get("legR").rx = legB * 0.5f;
+                model.get("arms").rx = -0.75f;
+                model.get("body").tint = model.get("arms").tint = VILLAGER_ROBES[Math.floorMod(m.profession, VILLAGER_ROBES.length)];
+            }
+            case IRON_GOLEM -> {
+                model.get("legL").rx = legA * 0.6f;
+                model.get("legR").rx = legB * 0.6f;
+                float atk = m.attackAnim > 0 ? (m.attackAnim - pt) / 10f : 0;
+                float armSwing = (float) Math.sin(swing * 0.33) * 0.6f * amount;
+                model.get("armL").rx = atk > 0 ? -2f * (float) Math.sin(atk * Math.PI) : -armSwing;
+                model.get("armR").rx = atk > 0 ? -2f * (float) Math.sin(atk * Math.PI) : armSwing;
+            }
+            case SNOW_GOLEM -> {
+                model.get("armL").rz = -0.3f + (float) Math.sin(time * 0.1) * 0.1f;
+                model.get("armR").rz = 0.3f - (float) Math.sin(time * 0.1) * 0.1f;
+            }
             default -> {
                 MobModel.Part l0 = model.get("leg0");
                 if (l0 != null) {
@@ -351,6 +369,8 @@ public final class EntityRenderer {
     }
 
     private static final int[] SHEEP_COLORS = {0xFFFFFF, 0x404048, 0xf0d040, 0xd05050, 0x6060e0};
+    /** Robe colours: farmer, librarian, priest, smith, butcher. */
+    private static final int[] VILLAGER_ROBES = {0x8a6a44, 0xf0f0f0, 0x8a4ab0, 0x3a3a3a, 0xe0d8d0};
 
     private void renderItem(ItemEntity it, WorldRenderer wr, float pt, double ex, double ey, double ez, float light) {
         Item item = it.stack.item;

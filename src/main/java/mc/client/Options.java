@@ -48,6 +48,7 @@ public final class Options {
         public String type;
         public int[][] slots;
         public int burnTime, burnTotal, cookTime;
+        public String mob;
     }
 
     /** World metadata (level.json). */

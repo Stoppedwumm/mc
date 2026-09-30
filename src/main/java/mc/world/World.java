@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class World implements Shapes.Getter {
     public final TerrainGenerator generator;
     public final WorldStorage storage;
-    private final Decorator decorator;
+    public final Decorator decorator;
     public final long seed;
 
     private final Long2ObjectOpenHashMap<Chunk> chunks = new Long2ObjectOpenHashMap<>();
@@ -189,7 +189,8 @@ public final class World implements Shapes.Getter {
         c.touched = true;
         if (old != id) {
             long key = posKey(x, y, z);
-            if (old == Block.CHEST.id || ((old == Block.FURNACE.id || old == Block.LIT_FURNACE.id) && id != Block.FURNACE.id && id != Block.LIT_FURNACE.id)) {
+            boolean furnaceSwap = (old == Block.FURNACE.id || old == Block.LIT_FURNACE.id) && (id == Block.FURNACE.id || id == Block.LIT_FURNACE.id);
+            if (!furnaceSwap && blockEntities.containsKey(key)) {
                 BlockEntity be = blockEntities.remove(key);
                 if (be != null) for (ItemStack s : be.slots) if (!ItemStack.isEmpty(s)) spawnItem(x + 0.5, y + 0.5, z + 0.5, s);
             }
@@ -287,7 +288,8 @@ public final class World implements Shapes.Getter {
         if (drop) {
             List<ItemStack> drops = Drops.of(b, meta, tool);
             for (ItemStack s : drops) spawnItem(x + 0.5, y + 0.5, z + 0.5, s);
-            int xp = drops.isEmpty() ? 0 : b == Block.COAL_ORE ? random.nextInt(3) : b == Block.DIAMOND_ORE ? 3 + random.nextInt(5) : 0;
+            int xp = drops.isEmpty() ? 0 : b == Block.COAL_ORE ? random.nextInt(3) : b == Block.DIAMOND_ORE || b == Block.EMERALD_ORE ? 3 + random.nextInt(5) : 0;
+            if (b == Block.SPAWNER) xp = 15 + random.nextInt(29);
             if (xp > 0) XpOrbEntity.spawn(this, x + 0.5, y + 0.5, z + 0.5, xp);
         }
     }
@@ -323,7 +325,42 @@ public final class World implements Shapes.Getter {
 
     public Player player() { return player; }
 
+    public Random random() { return random; }
+
     public List<Entity> entities() { return entities; }
+
+    /**
+     * A pumpkin placed on two snow blocks makes a snow golem; on a T of four iron blocks, an iron golem.
+     * Returns true if a golem was built.
+     */
+    public boolean trySpawnGolem(int x, int y, int z) {
+        if (getBlock(x, y, z) != Block.PUMPKIN.id) return false;
+        if (getBlock(x, y - 1, z) == Block.SNOW.id && getBlock(x, y - 2, z) == Block.SNOW.id) {
+            for (int k = 0; k < 3; k++) setBlock(x, y - k, z, 0);
+            Mob golem = new Mob(MobType.SNOW_GOLEM);
+            golem.setPos(x + 0.5, y - 2, z + 0.5);
+            addEntity(golem);
+            for (int i = 0; i < 20; i++) addParticle("poof", x + random.nextDouble(), y - 2 + random.nextDouble() * 3, z + random.nextDouble());
+            return true;
+        }
+        if (getBlock(x, y - 1, z) == Block.IRON_BLOCK.id && getBlock(x, y - 2, z) == Block.IRON_BLOCK.id) {
+            for (int axis = 0; axis < 2; axis++) {
+                int ax = axis == 0 ? 1 : 0, az = axis == 0 ? 0 : 1;
+                if (getBlock(x + ax, y - 1, z + az) != Block.IRON_BLOCK.id || getBlock(x - ax, y - 1, z - az) != Block.IRON_BLOCK.id) continue;
+                setBlock(x, y, z, 0);
+                setBlock(x, y - 1, z, 0);
+                setBlock(x, y - 2, z, 0);
+                setBlock(x + ax, y - 1, z + az, 0);
+                setBlock(x - ax, y - 1, z - az, 0);
+                Mob golem = new Mob(MobType.IRON_GOLEM);
+                golem.setPos(x + 0.5, y - 2, z + 0.5);
+                addEntity(golem);
+                for (int i = 0; i < 30; i++) addParticle("poof", x + random.nextDouble(), y - 2 + random.nextDouble() * 3, z + random.nextDouble());
+                return true;
+            }
+        }
+        return false;
+    }
 
     /** Tamed wolves near the player join the fight against target. */
     public void commandWolves(LivingEntity target) {
@@ -370,6 +407,7 @@ public final class World implements Shapes.Getter {
         if (be == null) {
             if (id == Block.CHEST.id) be = new BlockEntity.Chest(x, y, z);
             else if (id == Block.FURNACE.id || id == Block.LIT_FURNACE.id) be = new BlockEntity.Furnace(x, y, z);
+            else if (id == Block.SPAWNER.id) be = new BlockEntity.Spawner(x, y, z);
             if (be != null) blockEntities.put(key, be);
         }
         return be;
@@ -615,8 +653,10 @@ public final class World implements Shapes.Getter {
     public void update(double px, double pz, int renderDistance, long frameBudgetNanos) {
         long start = System.nanoTime();
         int pcx = (int) Math.floor(px) >> 4, pcz = (int) Math.floor(pz) >> 4;
-        int genR = renderDistance + 3;
-        int unloadR = renderDistance + 5;
+        // Meshing needs decorated neighbours two chunks out, and a village centre needs its own
+        // neighbourhood generated before it can be decorated, hence the margin
+        int genR = renderDistance + 2 + mc.world.gen.Structures.VILLAGE_RADIUS;
+        int unloadR = genR + 2;
         ensureOffsets(genR);
 
         // 1. Collect generated chunks
@@ -647,8 +687,9 @@ public final class World implements Shapes.Getter {
             Chunk c = chunks.get(Chunk.key(cx, cz));
             if (c == null || c.state != Chunk.STATE_TERRAIN) continue;
             boolean ok = true;
-            for (int dx = -1; dx <= 1 && ok; dx++)
-                for (int dz = -1; dz <= 1; dz++)
+            int r = decorator.structures.decorationRadius(cx, cz);
+            for (int dx = -r; dx <= r && ok; dx++)
+                for (int dz = -r; dz <= r; dz++)
                     if (!chunks.containsKey(Chunk.key(cx + dx, cz + dz))) { ok = false; break; }
             if (!ok) continue;
             decorator.decorate(c);

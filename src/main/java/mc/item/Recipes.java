@@ -122,6 +122,8 @@ public final class Recipes {
         shaped(Item.of(Block.IRON_BLOCK), 1, new String[]{"###", "###", "###"}, '#', Item.IRON_INGOT);
         shaped(Item.of(Block.GOLD_BLOCK), 1, new String[]{"###", "###", "###"}, '#', Item.GOLD_INGOT);
         shaped(Item.of(Block.DIAMOND_BLOCK), 1, new String[]{"###", "###", "###"}, '#', Item.DIAMOND);
+        shaped(Item.of(Block.EMERALD_BLOCK), 1, new String[]{"###", "###", "###"}, '#', Item.EMERALD);
+        shapeless(Item.EMERALD, 9, Block.EMERALD_BLOCK);
         shapeless(Item.IRON_INGOT, 9, Block.IRON_BLOCK);
         shapeless(Item.GOLD_INGOT, 9, Block.GOLD_BLOCK);
         shapeless(Item.DIAMOND, 9, Block.DIAMOND_BLOCK);
@@ -131,6 +133,7 @@ public final class Recipes {
         smelt(Block.IRON_ORE, Item.IRON_INGOT);
         smelt(Block.GOLD_ORE, Item.GOLD_INGOT);
         smelt(Block.DIAMOND_ORE, Item.DIAMOND);
+        smelt(Block.EMERALD_ORE, Item.EMERALD);
         smelt(Block.COAL_ORE, Item.COAL);
         smelt(Block.SAND, Item.of(Block.GLASS));
         smelt(Block.COBBLESTONE, Item.of(Block.STONE));

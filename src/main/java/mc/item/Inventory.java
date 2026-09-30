@@ -39,6 +39,18 @@ public final class Inventory {
         return n;
     }
 
+    /** Removes up to n of an item from the inventory. */
+    public void remove(Item item, int n) {
+        for (int i = 0; i < slots.length && n > 0; i++) {
+            ItemStack s = slots[i];
+            if (s == null || s.item != item) continue;
+            int k = Math.min(n, s.count);
+            s.count -= k;
+            n -= k;
+        }
+        cleanup();
+    }
+
     public void cleanup() {
         for (int i = 0; i < slots.length; i++) if (slots[i] != null && slots[i].count <= 0) slots[i] = null;
         for (int i = 0; i < 4; i++) if (armor[i] != null && armor[i].count <= 0) armor[i] = null;

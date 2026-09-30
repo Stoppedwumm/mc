@@ -284,6 +284,53 @@ public final class MobModel {
                 m.part("legL", -2, 28, 0).box(-1, -28, -1, 2, 28, 2, black);
                 m.part("legR", 2, 28, 0).box(-1, -28, -1, 2, 28, 2, black);
             }
+            case VILLAGER -> {
+                Painter skin = (f, x, y, w, h, r) -> {
+                    if (f == FRONT && y == 4 && (x == 1 || x == 2 || x == 5 || x == 6)) return (x == 2 || x == 5) ? 0xFF2a6a2a : 0xFFf0f0f0;
+                    if (f == FRONT && y == 3 && x >= 1 && x <= 6) return noise(0x6a4a30, r, 0.1);
+                    return noise(0xb48a6a, r, 0.06);
+                };
+                Painter robe = (f, x, y, w, h, r) -> noise(y % 6 == 5 ? 0xc0c0c0 : 0xe0e0e0, r, 0.08);
+                m.part("head", 0, 24, 0).box(-4, 0, -4, 8, 10, 8, skin).box(-1, 0, 4, 2, 4, 2, solid(0xa87a5a, 0.06));
+                m.part("body", 0, 12, 0).box(-4, -6, -3, 8, 18, 6, robe);
+                m.part("arms", 0, 21, 0).box(-8, -8, -2, 4, 8, 4, robe).box(4, -8, -2, 4, 8, 4, robe).box(-4, -4, -2, 8, 4, 4, solid(0xb48a6a, 0.06));
+                m.part("legL", -2, 12, 0).box(-2, -12, -2, 4, 12, 4, solid(0x5a4a3a, 0.08));
+                m.part("legR", 2, 12, 0).box(-2, -12, -2, 4, 12, 4, solid(0x5a4a3a, 0.08));
+            }
+            case IRON_GOLEM -> {
+                Painter iron = (f, x, y, w, h, r) -> {
+                    double v = r.nextDouble();
+                    if (v < 0.05) return 0xFF3a8a2a; // vines
+                    if (v < 0.1) return 0xFF9a9088;
+                    return noise(0xd8d0c8, r, 0.06);
+                };
+                Painter head = (f, x, y, w, h, r) -> {
+                    if (f == FRONT && y == 3 && (x == 1 || x == 2 || x == 5 || x == 6)) return (x == 2 || x == 5) ? 0xFFa01010 : 0xFF3a3a3a;
+                    return noise(0xd8d0c8, r, 0.06);
+                };
+                m.part("legL", -4, 16, 0).box(-3, -16, -2.5f, 6, 16, 5, iron);
+                m.part("legR", 4, 16, 0).box(-3, -16, -2.5f, 6, 16, 5, iron);
+                m.part("waist", 0, 16, 0).box(-4.5f, 0, -3, 9, 5, 6, iron);
+                m.part("body", 0, 21, 0).box(-9, 0, -5.5f, 18, 12, 11, iron);
+                m.part("head", 0, 31, 2).box(-4, 0, -4, 8, 10, 8, head).box(-1, 1, 4, 2, 4, 2, solid(0xc8c0b8, 0.05));
+                m.part("armL", -11, 31, 0).box(-2, -29, -3, 4, 30, 6, iron);
+                m.part("armR", 11, 31, 0).box(-2, -29, -3, 4, 30, 6, iron);
+            }
+            case SNOW_GOLEM -> {
+                Painter snow = solid(0xf4f8fc, 0.05);
+                Painter pumpkin = (f, x, y, w, h, r) -> {
+                    if (f == FRONT) {
+                        if (y == 2 && (x == 1 || x == 2 || x == 5 || x == 6)) return 0xFF201008;
+                        if (y == 5 && x >= 1 && x <= 6 && x != 3) return 0xFF201008;
+                    }
+                    if (f == TOP) return noise(0xc88a2a, r, 0.08);
+                    return noise(x % 3 == 0 ? 0xc06a10 : 0xe38a1d, r, 0.06);
+                };
+                m.part("body", 0, 0, 0).box(-6, 0, -6, 12, 12, 12, snow).box(-5, 11, -5, 10, 10, 10, snow);
+                m.part("head", 0, 20, 0).box(-4, 0, -4, 8, 8, 8, pumpkin);
+                m.part("armL", -5, 17, 0).box(-12, -0.5f, -0.5f, 12, 1, 1, solid(0x5a3a1a, 0.1));
+                m.part("armR", 5, 17, 0).box(0, -0.5f, -0.5f, 12, 1, 1, solid(0x5a3a1a, 0.1));
+            }
             case SLIME -> {
                 Painter core = (f, x, y, w, h, r) -> {
                     if (f == FRONT && y == 1 && (x == 0 || x == 4)) return 0xFF102810;

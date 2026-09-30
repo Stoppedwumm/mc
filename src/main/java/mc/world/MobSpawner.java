@@ -16,7 +16,7 @@ public final class MobSpawner {
         for (Entity e : world.entities()) {
             if (e instanceof Mob m) {
                 if (m.type.hostile) hostile++;
-                else passive++;
+                else if (m.type.isAnimal() || m.type == MobType.SQUID) passive++;
             }
         }
         int squid = 0;

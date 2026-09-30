@@ -72,6 +72,10 @@ public final class ThrownEntity extends Entity {
                     world.addEntity(chick);
                 }
             }
+        } else if (item == Item.EXPERIENCE_BOTTLE) {
+            for (int i = 0; i < 12; i++) world.addParticle("happy", x + random.nextGaussian() * 0.3, y + random.nextDouble(), z + random.nextGaussian() * 0.3);
+            world.playSound("glass", x, y, z, 1, 1);
+            XpOrbEntity.spawn(world, x, y, z, 3 + random.nextInt(5) + random.nextInt(5));
         } else if (item == Item.ENDER_PEARL) {
             for (int i = 0; i < 32; i++) world.addParticle("portal", x + random.nextGaussian() * 0.5, y + random.nextDouble() * 2, z + random.nextGaussian() * 0.5);
             if (thrower instanceof LivingEntity le && !le.isDead()) {

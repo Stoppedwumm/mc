@@ -134,6 +134,10 @@ public final class Item {
     public static final Item CARROT = item(298, "Carrot", 87).food(3, 3.6f);
     public static final Item POTATO = item(299, "Potato", 88).food(1, 0.6f);
     public static final Item BAKED_POTATO = item(325, "Baked Potato", 89).food(5, 6f);
+    public static final Item EMERALD = item(326, "Emerald", 90);
+    public static final Item REDSTONE = item(327, "Redstone Dust", 91);
+    public static final Item ENCHANTED_BOOK = item(328, "Enchanted Book", 92).stack(1);
+    public static final Item EXPERIENCE_BOTTLE = item(329, "Bottle o' Enchanting", 93);
 
     // Tools: icon = 40 + type*5 + material
     public static final Item WOODEN_PICKAXE = tool(300, "Wooden Pickaxe", 40, Tool.PICKAXE, 0, 59, 2, 2);
@@ -198,7 +202,8 @@ public final class Item {
     public static Tool effectiveTool(Block b) {
         if (b == Block.STONE || b == Block.COBBLESTONE || b == Block.MOSSY_COBBLESTONE || b == Block.SANDSTONE || b == Block.BRICKS
                 || b == Block.STONE_BRICKS || b == Block.FURNACE || b == Block.LIT_FURNACE || b == Block.OBSIDIAN || b == Block.GRANITE
-                || b == Block.DIORITE || b == Block.ANDESITE || b == Block.TERRACOTTA || b == Block.ICE || b.name.endsWith("Ore"))
+                || b == Block.DIORITE || b == Block.ANDESITE || b == Block.TERRACOTTA || b == Block.ICE || b.name.endsWith("Ore")
+                || b == Block.SPAWNER || b.name.startsWith("Block of"))
             return Tool.PICKAXE;
         if (b.base != null && b.shape != Block.Shape.CARPET) return effectiveTool(b.base);
         if (b == Block.IRON_DOOR || b == Block.IRON_BARS) return Tool.PICKAXE;
@@ -211,7 +216,8 @@ public final class Item {
     /** Minimum pickaxe tier needed for the block to drop anything (-1 = no tool needed). */
     public static int requiredTier(Block b) {
         if (b == Block.OBSIDIAN) return 3;
-        if (b == Block.DIAMOND_ORE || b == Block.GOLD_ORE) return 2;
+        if (b == Block.DIAMOND_ORE || b == Block.GOLD_ORE || b == Block.EMERALD_ORE || b == Block.EMERALD_BLOCK || b == Block.DIAMOND_BLOCK) return 2;
+        if (b == Block.IRON_BLOCK) return 1;
         if (b == Block.IRON_ORE) return 1;
         if (effectiveTool(b) == Tool.PICKAXE) return 0;
         return -1;

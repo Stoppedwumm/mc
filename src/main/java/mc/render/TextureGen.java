@@ -113,6 +113,10 @@ public final class TextureGen {
         paint(Tex.CAKE_INNER, () -> cake(2));
         paint(Tex.CAKE_BOTTOM, () -> cake(3));
         paint(Tex.CAKE_ITEM, this::cakeItem);
+        paint(Tex.EMERALD_ORE, () -> ore(0x41f384, 0x0f9a3a));
+        paint(Tex.EMERALD_BLOCK, () -> metalBlock(0x51e37a, 0x17a64a));
+        paint(Tex.SPAWNER, this::spawner);
+        paint(Tex.GRAVEL_PATH, this::gravel);
         paint(Tex.OAK_DOOR_TOP, () -> woodDoor(true));
         paint(Tex.OAK_DOOR_BOTTOM, () -> woodDoor(false));
         paint(Tex.IRON_DOOR_TOP, () -> ironDoor(true));
@@ -938,6 +942,15 @@ public final class TextureGen {
                 int c = y < 8 ? 0xf8f4f0 : y == 8 ? 0xe8e0d8 : scale(0xb06a3a, jitter(0.08));
                 if (y == 6 && x % 4 == 1) c = 0xd02020;
                 set(x, y, c);
+            }
+    }
+
+    private void spawner() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                boolean bar = x % 4 == 0 || y % 4 == 0 || x == 15 || y == 15;
+                if (bar) set(x, y, (x + y) % 3 == 0 ? 0x2a3440 : 0x1a2028);
+                else set(x, y, 0, 0);
             }
     }
 }

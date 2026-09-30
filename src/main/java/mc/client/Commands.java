@@ -73,6 +73,13 @@ final class Commands {
                         case "pause" -> g.setScreen(Game.Screen.PAUSE);
                         case "inventory" -> g.screens.openInventory();
                         case "crafting" -> g.screens.openCrafting();
+                        case "trading" -> {
+                            Mob v = new Mob(MobType.VILLAGER);
+                            v.profession = a.length > 2 ? Integer.parseInt(a[2]) : 0;
+                            v.setPos(p.x + 2, p.y, p.z);
+                            world.addEntity(v);
+                            g.screens.openTrading(v);
+                        }
                         case "creative" -> {
                             p.creative = true;
                             g.screens.openInventory();
@@ -166,6 +173,18 @@ final class Commands {
                     chat("Successfully filled " + vol + " blocks");
                 }
                 case "seed" -> chat("Seed: [" + world.seed + "]");
+                case "locate" -> {
+                    int[] v = world.decorator.structures.nearestVillage((int) p.x, (int) p.z);
+                    if (v == null) chat("Could not find a village nearby");
+                    else {
+                        chat("The nearest village is at [" + v[0] + ", ~, " + v[1] + "] (" + (int) Math.hypot(v[0] - p.x, v[1] - p.z) + " blocks away)");
+                        if (a.length > 2 && a[2].equals("tp")) {
+                            p.setPos(v[0] + 0.5, world.generator.estimateHeight(v[0], v[1]) + 30, v[1] + 0.5);
+                            p.flying = true;
+                            p.motionX = p.motionY = p.motionZ = 0;
+                        }
+                    }
+                }
                 case "fly" -> { p.flying = !p.flying; chat("Flying " + (p.flying ? "enabled" : "disabled")); }
                 case "rd", "renderdistance" -> { g.options.renderDistance = Math.max(2, Math.min(32, Integer.parseInt(a[1]))); chat("Render distance: " + g.options.renderDistance); }
                 case "help" -> {

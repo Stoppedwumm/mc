@@ -70,6 +70,10 @@ public final class ItemTextureGen {
             shape((x, y) -> dist(x, y, 7.5, 7.5) < 5.5, 0x1a6a5a, 0x0a3a30, 0x3aa890);
             for (int y = 5; y <= 10; y++) for (int x = 5; x <= 10; x++) if (dist(x, y, 7.5, 7.5) < 2.2) set(x, y, 0x0a2a24);
         });
+        tile(90, () -> shape((x, y) -> Math.abs(x - 7.5) / 4.5 + Math.abs(y - 7.5) / 6.5 < 1, 0x3ad86a, 0x0a7a2a, 0xa8ffc0));
+        tile(91, () -> pile(0xd01010, 0x6a0000, 0xff5a5a));
+        tile(92, () -> { book(); for (int y = 2; y < 14; y += 3) set(5 + (y % 5), y, 0xe070ff); });
+        tile(93, this::xpBottle);
         tile(85, () -> shape((x, y) -> dist(x, y, 8, 8.5) < 5 && !(x > 9 && y < 6), 0x6ac05a, 0x2a7a2a, 0xb0f0a0));
         tile(86, () -> shape((x, y) -> sq((x - 8) / 5.0) + sq((y - 9) / 5.5) < 1 || (y < 5 && Math.abs(x - 8) < 2 && y > 1), 0x2a2a3a, 0x0a0a14, 0x5a5a6a));
         tile(87, this::carrot);
@@ -287,6 +291,11 @@ public final class ItemTextureGen {
         for (int x = 3; x <= 12; x++) set(x, 4, fill == 0 ? 0x3a3a3a : fill);
         for (int x = 4; x <= 11; x++) set(x, 5, fill == 0 ? 0x2a2a2a : fill);
         for (int x = 4; x <= 11; x++) set(x, 2, 0x8a8a8a);
+    }
+
+    private void xpBottle() {
+        shape((x, y) -> (y >= 6 && dist(x, y, 7.5, 10) < 5) || (y >= 2 && y < 6 && Math.abs(x - 7.5) < 2), 0x9ae05a, 0x3a7a1a, 0xe0ffc0);
+        for (int x = 6; x <= 9; x++) set(x, 2, 0x8a6a4a);
     }
 
     private void shears() {

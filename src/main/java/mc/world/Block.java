@@ -91,8 +91,9 @@ public final class Block {
                 IRON_BARS = 99, BED_HEAD = 100, BED_FOOT = 101, BED_SIDE = 102, OAK_DOOR_ITEM = 103, IRON_DOOR_ITEM = 104,
                 BED_ITEM = 105, SMOOTH_STONE = 106, GLASS_PANE_TOP = 107, CARROTS_0 = 108, POTATOES_0 = 112,
                 CAKE_TOP = 116, CAKE_SIDE = 117, CAKE_INNER = 118, CAKE_BOTTOM = 119, CAKE_ITEM = 120,
+                EMERALD_ORE = 121, EMERALD_BLOCK = 122, SPAWNER = 123, GRAVEL_PATH = 124,
                 BREAK_0 = 240; // 240..249 crack stages
-        public static final int COUNT = 121;
+        public static final int COUNT = 125;
     }
 
     public static final Block AIR = new Block(0, "Air", 0);
@@ -200,6 +201,9 @@ public final class Block {
     public static final Block CARROTS = new Block(100, "Carrots", Tex.CARROTS_0).plant();
     public static final Block POTATOES = new Block(101, "Potatoes", Tex.POTATOES_0).plant();
     public static final Block CAKE = new Block(102, "Cake", 0).tex(Tex.CAKE_TOP, Tex.CAKE_BOTTOM, Tex.CAKE_SIDE).shape(Shape.CAKE).sound(SoundType.CLOTH).hardness(0.5f).itemTex(Tex.CAKE_ITEM);
+    public static final Block EMERALD_ORE = new Block(103, "Emerald Ore", Tex.EMERALD_ORE).hardness(3f);
+    public static final Block EMERALD_BLOCK = new Block(104, "Block of Emerald", Tex.EMERALD_BLOCK).hardness(5f);
+    public static final Block SPAWNER = new Block(105, "Monster Spawner", Tex.SPAWNER).cutout().hardness(5f);
 
     static {
         AIR.model = Model.NONE; AIR.opaque = false; AIR.solid = false; AIR.replaceable = true; AIR.inCreativeInventory = false; AIR.sound = SoundType.NONE;

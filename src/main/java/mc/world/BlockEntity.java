@@ -18,6 +18,48 @@ public abstract class BlockEntity {
 
     public void tick(World world) { }
 
+    /** Monster spawner: spawns its mob type around itself while a player is within 16 blocks. */
+    public static final class Spawner extends BlockEntity {
+        public String mob = "ZOMBIE";
+        public int delay = 20;
+        /** Spin of the little mob shown inside (render only). */
+        public float spin;
+
+        public Spawner(int x, int y, int z) {
+            super(x, y, z, 0);
+        }
+
+        @Override
+        public void tick(World world) {
+            mc.entity.Player p = world.player();
+            if (p == null || p.distanceSq(x + 0.5, y + 0.5, z + 0.5) > 16 * 16) return;
+            spin += 10;
+            if (world.random().nextInt(4) == 0) world.addParticle("smoke", x + world.random().nextDouble(), y + world.random().nextDouble(), z + world.random().nextDouble());
+            if (world.random().nextInt(8) == 0) world.addParticle("flame", x + world.random().nextDouble(), y + world.random().nextDouble(), z + world.random().nextDouble());
+            if (--delay > 0) return;
+            delay = 200 + world.random().nextInt(600);
+            mc.entity.MobType type;
+            try { type = mc.entity.MobType.valueOf(mob); } catch (IllegalArgumentException e) { return; }
+            int nearby = 0;
+            for (mc.entity.Entity e : world.entities())
+                if (e instanceof mc.entity.Mob m && m.type == type && Math.abs(m.x - x) < 9 && Math.abs(m.y - y) < 5 && Math.abs(m.z - z) < 9) nearby++;
+            for (int i = 0; i < 4 && nearby < 6; i++) {
+                double sx = x + 0.5 + (world.random().nextDouble() - world.random().nextDouble()) * 4;
+                double sy = y + world.random().nextInt(3) - 1;
+                double sz = z + 0.5 + (world.random().nextDouble() - world.random().nextDouble()) * 4;
+                int bx = (int) Math.floor(sx), by = (int) Math.floor(sy), bz = (int) Math.floor(sz);
+                if (world.getBlock(bx, by, bz) != 0 || world.getBlock(bx, by + 1, bz) != 0 || !Block.get(world.getBlock(bx, by - 1, bz)).solid) continue;
+                mc.entity.Mob m = new mc.entity.Mob(type);
+                java.util.Arrays.fill(m.armor, null);
+                m.setPos(sx, by, sz);
+                m.yaw = world.random().nextFloat() * 360;
+                world.addEntity(m);
+                nearby++;
+                for (int k = 0; k < 10; k++) world.addParticle("poof", sx, by + 0.5, sz);
+            }
+        }
+    }
+
     public static final class Chest extends BlockEntity {
         public Chest(int x, int y, int z) {
             super(x, y, z, 27);

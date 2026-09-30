@@ -310,6 +310,10 @@ final class Interaction {
         Player p = p();
         ItemStack h = held();
         lastUseWasPlace = false;
+        if (fresh && targetEntity instanceof Mob v && v.type == MobType.VILLAGER && !v.isBaby()) {
+            g.screens.openTrading(v);
+            return;
+        }
         if (fresh && targetEntity instanceof Mob m && m.interact(p)) {
             startSwing();
             return;
@@ -360,7 +364,7 @@ final class Interaction {
             if (fresh && (p.creative || p.inventory.count(Item.ARROW) > 0)) { useType = 2; useTicks = 0; }
             return;
         }
-        if (item == Item.EGG || item == Item.SNOWBALL || item == Item.ENDER_PEARL) {
+        if (item == Item.EGG || item == Item.SNOWBALL || item == Item.ENDER_PEARL || item == Item.EXPERIENCE_BOTTLE) {
             if (fresh) throwItem(h);
             return;
         }
@@ -601,6 +605,7 @@ final class Interaction {
         startSwing();
         consume(h);
         w().checkFalling(x, y, z);
+        if (b == Block.PUMPKIN) w().trySpawnGolem(x, y, z);
         return true;
     }
 

@@ -38,6 +38,13 @@ public final class Mob extends LivingEntity {
     public float tentacleAngle, prevTentacleAngle, squidPitch, prevSquidPitch;
     private double swimX, swimY, swimZ;
     private int teleportCooldown, dryTicks;
+    /** Villager profession: 0 farmer, 1 librarian, 2 priest, 3 smith, 4 butcher. */
+    public int profession;
+    /** Iron golem arm swing after an attack. */
+    public int attackAnim;
+    private int targetScan;
+
+    public static final String[] PROFESSIONS = {"Farmer", "Librarian", "Priest", "Smith", "Butcher"};
 
     public static final Block[] WOOL = {Block.WHITE_WOOL, Block.BLACK_WOOL, Block.YELLOW_WOOL, Block.RED_WOOL, Block.BLUE_WOOL};
 
@@ -63,6 +70,8 @@ public final class Mob extends LivingEntity {
         }
         if (type == MobType.SLIME) setSlimeSize(1 << random.nextInt(3));
         if (type == MobType.SQUID) stepHeight = 0;
+        if (type == MobType.VILLAGER) profession = random.nextInt(PROFESSIONS.length);
+        if (type == MobType.IRON_GOLEM) stepHeight = 1;
     }
 
     public void setGrowingAge(int age) {
@@ -105,7 +114,7 @@ public final class Mob extends LivingEntity {
 
     @Override
     protected void onLanded(float distance) {
-        if (type != MobType.CHICKEN && type != MobType.SLIME) super.onLanded(distance);
+        if (type != MobType.CHICKEN && type != MobType.SLIME && type != MobType.IRON_GOLEM) super.onLanded(distance);
         if (type == MobType.SLIME) {
             squish = -0.5f;
             for (int i = 0; i < slimeSize * 8; i++) world.addParticle("slime", x + (random.nextDouble() - 0.5) * width, y + 0.1, z + (random.nextDouble() - 0.5) * width);
@@ -124,7 +133,13 @@ public final class Mob extends LivingEntity {
             return false;
         }
         if (type == MobType.WOLF && tamed && sitting) sitting = false;
+        if (type == MobType.IRON_GOLEM && (source == DamageSource.FALL || source == DamageSource.DROWN)) return false;
         return super.damage(source, amount, attacker);
+    }
+
+    @Override
+    public void knockback(double strength, double dx, double dz) {
+        if (type != MobType.IRON_GOLEM) super.knockback(strength, dx, dz);
     }
 
     @Override
@@ -134,6 +149,12 @@ public final class Mob extends LivingEntity {
         if (type == MobType.WOLF) {
             if (!tamed && byPlayer) angerNearbyWolves();
             if (tamed && lastAttacker instanceof LivingEntity le && !(le instanceof Player)) attackTarget = le;
+        } else if (type == MobType.VILLAGER || type == MobType.IRON_GOLEM) {
+            if (type == MobType.VILLAGER) panicTicks = 60;
+            if (byPlayer) {
+                for (Entity e : world.entities())
+                    if (e instanceof Mob m && m.type == MobType.IRON_GOLEM && m.distanceTo(this) < 24) m.angerTicks = 1200;
+            }
         } else if (type == MobType.ENDERMAN) {
             if (byPlayer) angerTicks = 600;
             if (random.nextInt(3) == 0) teleportRandomly();
@@ -164,7 +185,7 @@ public final class Mob extends LivingEntity {
         boolean byPlayer = lastAttacker instanceof Player || (lastAttacker instanceof ArrowEntity a && a.shooter instanceof Player)
                 || (lastAttacker instanceof Mob m && m.type == MobType.WOLF && m.tamed);
         if (!isBaby()) dropLoot(fireTicks > 0, byPlayer);
-        if (byPlayer && !isBaby()) {
+        if (byPlayer && !isBaby() && !type.isGolem() && type != MobType.VILLAGER) {
             int xp = type == MobType.SLIME ? slimeSize : type.hostile ? 5 + armorPieces() * (1 + random.nextInt(3)) : 1 + random.nextInt(3);
             XpOrbEntity.spawn(world, x, y + 0.5, z, xp);
         }
@@ -209,6 +230,8 @@ public final class Mob extends LivingEntity {
             case SQUID -> drop(Item.INK_SAC, 1, 3);
             case ENDERMAN -> drop(Item.ENDER_PEARL, 0, 1);
             case SLIME -> { if (slimeSize == 1) drop(Item.SLIMEBALL, 0, 2); }
+            case IRON_GOLEM -> { drop(Item.IRON_INGOT, 3, 5); drop(Item.of(Block.POPPY), 0, 2); }
+            case SNOW_GOLEM -> drop(Item.SNOWBALL, 0, 15);
             default -> { }
         }
         if (type.isUndead() && byPlayer && random.nextInt(40) == 0) drop(Item.IRON_INGOT, 1, 1);
@@ -353,6 +376,15 @@ public final class Mob extends LivingEntity {
             fireTicks = Math.max(fireTicks, 160);
         }
         if (type == MobType.ENDERMAN) tickEnderman();
+        if (attackAnim > 0) attackAnim--;
+        if (type == MobType.SNOW_GOLEM) {
+            int bx = (int) Math.floor(x), by = (int) Math.floor(y), bz = (int) Math.floor(z);
+            mc.world.gen.Biome biome = world.biomeAt(bx, bz);
+            boolean hot = biome == mc.world.gen.Biome.DESERT || biome == mc.world.gen.Biome.BADLANDS;
+            if ((inWater || hot || (world.raining && world.getSkyLight(bx, by + 1, bz) >= 15)) && age % 20 == 0) damage(DamageSource.DROWN, 1, null);
+            // Leaves a trail of snow
+            if (!hot && world.getBlock(bx, by, bz) == 0 && Block.get(world.getBlock(bx, by - 1, bz)).opaque) world.setBlock(bx, by, bz, Block.SNOW_LAYER.id);
+        }
         if (type == MobType.CHICKEN && !isBaby() && --eggTimer <= 0) {
             world.spawnItem(x, y + 0.3, z, new ItemStack(Item.EGG, 1));
             world.playSound("pop", x, y, z, 0.5f, 1.4f);
@@ -426,6 +458,27 @@ public final class Mob extends LivingEntity {
                 case SLIME -> {
                     if (slimeSize > 1) meleeIfClose(target, dist, slimeSize == 4 ? 4 : 2);
                 }
+                case IRON_GOLEM -> {
+                    forward = dist > 2 ? 1 : 0;
+                    if (dist < 2.2 + target.width / 2 && attackCooldown == 0) {
+                        target.damage(DamageSource.ATTACK, 7 + random.nextInt(15), this);
+                        target.motionY += 0.4;
+                        attackCooldown = 20;
+                        attackAnim = 10;
+                        world.playSound("golem_attack", x, y + 1, z, 1, 1);
+                    }
+                }
+                case SNOW_GOLEM -> {
+                    forward = dist > 8 ? 1 : 0;
+                    if (attackCooldown == 0 && canSee(target)) {
+                        ThrownEntity ball = new ThrownEntity(Item.SNOWBALL, this);
+                        ball.setPos(x, eyeY() - 0.1, z);
+                        double dx = target.x - x, dz = target.z - z, dy = target.eyeY() - 1.1 - ball.y;
+                        ball.shoot(dx, dy + Math.sqrt(dx * dx + dz * dz) * 0.2, dz, 1.6);
+                        world.addEntity(ball);
+                        attackCooldown = 20;
+                    }
+                }
                 default -> {
                     forward = 1;
                     meleeIfClose(target, dist, 3);
@@ -481,6 +534,21 @@ public final class Mob extends LivingEntity {
             case ENDERMAN -> {
                 return angerTicks > 0 && playerValid && distanceTo(player) < 64 ? player : null;
             }
+            case IRON_GOLEM, SNOW_GOLEM -> {
+                if (type == MobType.IRON_GOLEM && angerTicks > 0 && playerValid && distanceTo(player) < 24) return player;
+                if (attackTarget != null && (attackTarget.isDead() || attackTarget.removed || attackTarget.distanceTo(this) > 20)) attackTarget = null;
+                if (attackTarget == null && --targetScan <= 0) {
+                    targetScan = 10;
+                    double best = type == MobType.IRON_GOLEM ? 16 : 10;
+                    for (Entity e : world.entities()) {
+                        if (!(e instanceof Mob m) || !m.type.hostile || m.isDead() || (type == MobType.IRON_GOLEM && m.type == MobType.CREEPER)) continue;
+                        double d = distanceTo(m);
+                        if (d < best && canSee(m)) { best = d; attackTarget = m; }
+                    }
+                }
+                return attackTarget;
+            }
+            case VILLAGER -> { return null; }
             default -> {
                 if (!type.hostile || !playerValid) return null;
                 if (type == MobType.SPIDER && !aggressive && world.isDaytime()) return null;

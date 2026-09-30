@@ -43,7 +43,8 @@ public final class Drops {
             case 101 -> {
                 add(out, Item.POTATO, (meta & 7) >= 7 ? 1 + RANDOM.nextInt(4) : 1);
             }
-            case 102 -> { }
+            case 102, 105 -> { }
+            case 103 -> add(out, Item.EMERALD, 1);
             case 63 -> {
                 if ((meta & 7) >= 7) {
                     add(out, Item.WHEAT, 1);

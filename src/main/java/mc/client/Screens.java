@@ -39,7 +39,8 @@ final class Screens {
     }
 
     boolean isContainer(Game.Screen s) {
-        return s == Game.Screen.INVENTORY || s == Game.Screen.CRAFTING || s == Game.Screen.FURNACE || s == Game.Screen.CHEST || s == Game.Screen.CREATIVE;
+        return s == Game.Screen.INVENTORY || s == Game.Screen.CRAFTING || s == Game.Screen.FURNACE || s == Game.Screen.CHEST
+                || s == Game.Screen.CREATIVE || s == Game.Screen.TRADING;
     }
 
     void openInventory() {
@@ -55,6 +56,51 @@ final class Screens {
     void openFurnace(BlockEntity.Furnace f) {
         furnace = f;
         g.setScreen(Game.Screen.FURNACE);
+    }
+
+    private mc.entity.Mob trader;
+    private List<mc.item.Trades.Offer> offers = List.of();
+    private int offerScroll;
+
+    void openTrading(mc.entity.Mob villager) {
+        trader = villager;
+        offers = mc.item.Trades.offers(villager.profession);
+        offerScroll = 0;
+        g.setScreen(Game.Screen.TRADING);
+        g.sound.play("villager_say", villager.x, villager.y + 1.5, villager.z, 1, 1);
+    }
+
+    /** Offer grid in the top part of the trading screen: 2 columns x 3 rows. */
+    private void renderOffers(Gui gui, Input input, float px, float py, double mx, double my) {
+        var inv = g.player.inventory;
+        int pages = (offers.size() + 1) / 2 - 2;
+        if (input.scroll != 0) offerScroll = Math.max(0, Math.min(Math.max(0, pages), offerScroll - (int) Math.signum(input.scroll)));
+        for (int k = 0; k < 6; k++) {
+            int i = k + offerScroll * 2;
+            if (i >= offers.size()) break;
+            var o = offers.get(i);
+            float ox = px + 8 + (k % 2) * 82, oy = py + 16 + (k / 2) * 18;
+            boolean afford = mc.item.Trades.canAfford(inv, o);
+            boolean hover = mx >= ox && mx < ox + 80 && my >= oy && my < oy + 17;
+            gui.fill(ox, oy, 80, 17, hover ? 0xFFB0B0B0 : 0xFF9A9A9A);
+            gui.frame(ox, oy, 80, 17, 1, afford ? 0xFF404040 : 0xFF7A3030);
+            gui.stack(o.cost(), ox + 2, oy + 0.5f);
+            if (o.cost2() != null) gui.stack(o.cost2(), ox + 20, oy + 0.5f);
+            gui.hudIcon(mc.render.ItemTextureGen.PROGRESS, ox + 40, oy + 4, 14, 9);
+            gui.stack(o.result(), ox + 60, oy + 0.5f);
+            if (!afford) gui.fill(ox + 1, oy + 1, 78, 15, 0x60501010);
+            if (hover && input.clicked(GLFW_MOUSE_BUTTON_LEFT)) {
+                input.consumeClick(GLFW_MOUSE_BUTTON_LEFT);
+                ItemStack r = mc.item.Trades.trade(inv, o);
+                if (r == null) {
+                    g.sound.play("villager_no", trader.x, trader.y + 1.5, trader.z, 1, 1);
+                } else {
+                    giveOrDrop(r);
+                    g.sound.play("villager_yes", trader.x, trader.y + 1.5, trader.z, 1, 1);
+                    mc.entity.XpOrbEntity.spawn(g.world, trader.x, trader.y + 0.5, trader.z, 1 + g.random.nextInt(3));
+                }
+            }
+        }
     }
 
     void openChest(BlockEntity.Chest c) {
@@ -292,6 +338,7 @@ final class Screens {
             case FURNACE -> "Furnace";
             case CHEST -> "Chest";
             case CREATIVE -> "Creative Inventory";
+            case TRADING -> trader == null ? "Villager" : mc.entity.Mob.PROFESSIONS[trader.profession];
             default -> "";
         };
         gui.text(title, px + (screen == Game.Screen.INVENTORY ? 97 : 8), py + 6, 0xFF404040);
@@ -314,6 +361,8 @@ final class Screens {
             if (cook > 0) {
                 gui.fill(px + 79, py + 40, 24 * cook, 5, 0xFFFFFFFF);
             }
+        } else if (screen == Game.Screen.TRADING) {
+            renderOffers(gui, input, px, py, mx, my);
         } else if (screen == Game.Screen.CREATIVE) {
             int rows = (creativeItems.size() + 8) / 9;
             gui.text("Scroll for more (" + (creativeScroll + 1) + "/" + Math.max(1, rows - 5) + ")", px + 8, py + 128, 0xFF404040);

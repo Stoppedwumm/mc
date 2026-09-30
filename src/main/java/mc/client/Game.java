@@ -24,7 +24,7 @@ import static org.lwjgl.opengl.GL33C.*;
 public final class Game implements World.Listener {
     private static final double TICK = 0.05;
 
-    enum Screen { LOADING, NONE, PAUSE, INVENTORY, CRAFTING, FURNACE, CHEST, CREATIVE, CHAT, DEATH }
+    enum Screen { LOADING, NONE, PAUSE, INVENTORY, CRAFTING, FURNACE, CHEST, CREATIVE, CHAT, DEATH, TRADING }
 
     private final Path gameDir, worldDir;
     final Options options;
@@ -59,7 +59,7 @@ public final class Game implements World.Listener {
     private int frameCounter;
     private double fpsTimer;
     final StringBuilder chatInput = new StringBuilder();
-    private final Random random = new Random();
+    final Random random = new Random();
     private final long seedArg;
     private final boolean seedGiven;
     private final int rdArg;
@@ -182,8 +182,12 @@ public final class Game implements World.Listener {
 
     private void loadBlockEntities(List<Options.BlockEntityData> list) {
         for (Options.BlockEntityData d : list) {
-            BlockEntity be = d.type.equals("chest") ? new BlockEntity.Chest(d.x, d.y, d.z) : new BlockEntity.Furnace(d.x, d.y, d.z);
-            for (int i = 0; i < Math.min(be.slots.length, d.slots.length); i++) {
+            BlockEntity be = switch (d.type) {
+                case "chest" -> new BlockEntity.Chest(d.x, d.y, d.z);
+                case "spawner" -> { BlockEntity.Spawner sp = new BlockEntity.Spawner(d.x, d.y, d.z); if (d.mob != null) sp.mob = d.mob; yield sp; }
+                default -> new BlockEntity.Furnace(d.x, d.y, d.z);
+            };
+            for (int i = 0; d.slots != null && i < Math.min(be.slots.length, d.slots.length); i++) {
                 int[] e = d.slots[i];
                 if (e != null && Item.get(e[0]) != null) be.slots[i] = new ItemStack(Item.get(e[0]), e[1], e[2]);
             }
@@ -248,7 +252,8 @@ public final class Game implements World.Listener {
         for (BlockEntity be : world.blockEntities.values()) {
             Options.BlockEntityData d = new Options.BlockEntityData();
             d.x = be.x; d.y = be.y; d.z = be.z;
-            d.type = be instanceof BlockEntity.Chest ? "chest" : "furnace";
+            d.type = be instanceof BlockEntity.Chest ? "chest" : be instanceof BlockEntity.Spawner ? "spawner" : "furnace";
+            if (be instanceof BlockEntity.Spawner sp) d.mob = sp.mob;
             d.slots = saveSlots(be.slots);
             if (be instanceof BlockEntity.Furnace f) { d.burnTime = f.burnTime; d.burnTotal = f.burnTotal; d.cookTime = f.cookTime; }
             bes.add(d);
@@ -690,7 +695,7 @@ public final class Game implements World.Listener {
         switch (screen) {
             case NONE -> handleGameInput();
             case PAUSE -> { if (input.pressed(GLFW_KEY_ESCAPE)) closeScreen(); }
-            case INVENTORY, CRAFTING, FURNACE, CHEST, CREATIVE -> {
+            case INVENTORY, CRAFTING, FURNACE, CHEST, CREATIVE, TRADING -> {
                 if (input.pressed(GLFW_KEY_ESCAPE) || input.pressed(GLFW_KEY_E)) closeScreen();
             }
             case CHAT -> handleChatInput();

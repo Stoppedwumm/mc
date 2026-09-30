@@ -202,6 +202,17 @@ public final class Sound {
         named("slime_hurt", voice(220, 0.2, 0.9, 0, 0, -0.3, 0, 0.12, 61));
         named("slime_death", voice(200, 0.3, 0.9, 0, 0, -0.5, 0, 0.12, 62));
         named("shear", voice(2500, 0.12, 0.95, 0, 0, 0, 30, 0.7, 63));
+        named("glass", synth(Block.SoundType.GLASS, 0.3f, 7));
+        named("villager_say", voice(230, 0.35, 0.15, 0.06, 0, 0.25, 0, 0.2, 64), voice(210, 0.4, 0.15, 0.06, 0, -0.2, 0, 0.2, 65));
+        named("villager_yes", voice(260, 0.3, 0.15, 0.05, 0, 0.35, 0, 0.2, 66));
+        named("villager_no", voice(200, 0.35, 0.15, 0.05, 0, -0.35, 0, 0.2, 67));
+        named("villager_hurt", voice(300, 0.25, 0.2, 0.1, 0, -0.4, 0, 0.25, 68));
+        named("villager_death", voice(240, 0.7, 0.2, 0.1, 0, -0.6, 0, 0.25, 69));
+        named("iron_golem_hurt", voice(90, 0.35, 0.9, 0, 0, -0.3, 0, 0.3, 70));
+        named("iron_golem_death", voice(70, 0.9, 0.9, 0, 0, -0.5, 0, 0.25, 71));
+        named("golem_attack", voice(80, 0.3, 0.9, 0, 0, 0.2, 0, 0.3, 72));
+        named("snow_golem_hurt", synth(Block.SoundType.SNOW, 0.3f, 8));
+        named("snow_golem_death", synth(Block.SoundType.SNOW, 0.5f, 9));
         named("armor", voice(700, 0.18, 0.85, 0, 20, -0.2, 0, 0.5, 46));
         named("levelup", chime(new double[]{523, 659, 784, 1046}, 0.9));
         named("orb", chime(new double[]{1320, 1760}, 0.18));

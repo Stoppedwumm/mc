@@ -14,9 +14,12 @@ public final class Decorator {
     private final World world;
     private final long seed;
 
+    public final Structures structures;
+
     public Decorator(World world, long seed) {
         this.world = world;
         this.seed = seed;
+        this.structures = new Structures(world, seed, world.generator);
     }
 
     public void decorate(Chunk chunk) {
@@ -120,6 +123,7 @@ public final class Decorator {
             }
         }
 
+        structures.decorate(chunk, rand);
         chunk.state = Chunk.STATE_DECORATED;
     }
 

@@ -13,7 +13,10 @@ public enum MobType {
     WOLF("Wolf", false, 8, 0.6f, 0.85f, 0.035f, 0.09f),
     SQUID("Squid", false, 10, 0.8f, 0.8f, 0.02f, 0.02f),
     ENDERMAN("Enderman", true, 40, 0.6f, 2.9f, 0.03f, 0.1f),
-    SLIME("Slime", true, 16, 2.04f, 2.04f, 0.04f, 0.06f);
+    SLIME("Slime", true, 16, 2.04f, 2.04f, 0.04f, 0.06f),
+    VILLAGER("Villager", false, 20, 0.6f, 1.95f, 0.03f, 0.06f),
+    IRON_GOLEM("Iron Golem", false, 100, 1.4f, 2.7f, 0.025f, 0.05f),
+    SNOW_GOLEM("Snow Golem", false, 4, 0.7f, 1.9f, 0.03f, 0.04f);
 
     public final String displayName;
     public final boolean hostile;
@@ -34,6 +37,8 @@ public enum MobType {
     public boolean isAnimal() { return this == PIG || this == COW || this == SHEEP || this == CHICKEN || this == WOLF; }
 
     public boolean isUndead() { return this == ZOMBIE || this == SKELETON; }
+
+    public boolean isGolem() { return this == IRON_GOLEM || this == SNOW_GOLEM; }
 
     public static final MobType[] PASSIVE = {PIG, COW, SHEEP, CHICKEN};
     public static final MobType[] HOSTILE = {ZOMBIE, ZOMBIE, SKELETON, SKELETON, CREEPER, SPIDER, ZOMBIE, SKELETON, CREEPER, SPIDER, ENDERMAN};
