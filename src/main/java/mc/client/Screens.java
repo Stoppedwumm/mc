@@ -151,7 +151,7 @@ final class Screens {
             craft[i].count--;
             if (craft[i].count <= 0) craft[i] = null;
             // Buckets are returned when used as ingredients
-            if (it == Item.WATER_BUCKET || it == Item.LAVA_BUCKET) craft[i] = new ItemStack(Item.BUCKET, 1);
+            if (it == Item.WATER_BUCKET || it == Item.LAVA_BUCKET || it == Item.MILK_BUCKET) craft[i] = new ItemStack(Item.BUCKET, 1);
         }
     }
 

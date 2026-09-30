@@ -76,6 +76,8 @@ public final class Particles {
             case "splash" -> { p.tint = 0x6090e0; p.vy = 0.2 + random.nextDouble() * 0.1; p.vx *= 4; p.vz *= 4; p.gravity = 0.04; p.size = 0.05f; p.life = 14; }
             case "heart" -> { p.tint = 0xff2040; p.vy = 0.05; p.size = 0.1f; p.life = 20; p.brightness = 1.5f; }
             case "happy" -> { p.tint = 0x40ff40; p.vy = 0.02; p.size = 0.05f; p.life = 20; p.brightness = 1.5f; }
+            case "portal" -> { p.tint = 0xa040e0 + random.nextInt(40); p.vx *= 8; p.vy = (random.nextDouble() - 0.5) * 0.4; p.vz *= 8; p.size = 0.05f; p.life = 30 + random.nextInt(20); p.brightness = 2.5f; p.grow = -0.001f; }
+            case "slime" -> { p.tint = 0x70c860; p.vx *= 4; p.vy = 0.15; p.vz *= 4; p.gravity = 0.04; p.size = 0.06f; p.life = 16; }
             case "drip" -> { p.tint = 0x3060e0; p.vx = p.vz = 0; p.vy = -0.2; p.gravity = 0.02; p.size = 0.03f; p.life = 12; }
             default -> p.tint = 0xffffff;
         }

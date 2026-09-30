@@ -64,6 +64,8 @@ public final class World implements Shapes.Getter {
     private final Long2LongOpenHashMap scheduledSet = new Long2LongOpenHashMap();
     private final Random random = new Random();
     private final MobSpawner spawner = new MobSpawner();
+    /** Set by the client from the weather each tick. */
+    public boolean raining;
     /** 0 at night, 1 during the day (sky light multiplier used by spawning and burning). */
     public float dayFactor = 1;
 
@@ -244,7 +246,7 @@ public final class World implements Shapes.Getter {
         }
         else if (b.shape == Block.Shape.CARPET) ok = below != Block.AIR && !below.isLiquid();
         else if (b.shape == Block.Shape.SNOW_LAYER) ok = below.opaque;
-        else if (b == Block.WHEAT) ok = below == Block.FARMLAND;
+        else if (b.isCrop()) ok = below == Block.FARMLAND;
         else if (b == Block.SUGAR_CANE) ok = below == Block.SUGAR_CANE || below == Block.GRASS || below == Block.DIRT || below == Block.SAND;
         else if (b == Block.CACTUS) ok = below == Block.CACTUS || below == Block.SAND;
         else if (b == Block.DEAD_BUSH) ok = below == Block.SAND || below == Block.TERRACOTTA || below == Block.DIRT;
@@ -322,6 +324,22 @@ public final class World implements Shapes.Getter {
     public Player player() { return player; }
 
     public List<Entity> entities() { return entities; }
+
+    /** Tamed wolves near the player join the fight against target. */
+    public void commandWolves(LivingEntity target) {
+        if (target == null || player == null || target == player) return;
+        for (Entity e : entities)
+            if (e instanceof Mob m && m.type == MobType.WOLF && m.tamed && !m.sitting && m != target
+                    && !(target instanceof Mob t && t.type == MobType.WOLF && t.tamed) && m.distanceTo(player) < 16) m.attackTarget = target;
+    }
+
+    /** Every living entity including the player (who is not in the entity list). */
+    public List<LivingEntity> livingEntities() {
+        List<LivingEntity> out = new ArrayList<>();
+        for (Entity e : entities) if (e instanceof LivingEntity le && !e.removed) out.add(le);
+        if (player != null && !player.removed) out.add(player);
+        return out;
+    }
 
     public void addEntity(Entity e) {
         e.world = this;
@@ -423,7 +441,7 @@ public final class World implements Shapes.Getter {
                 if (getBlock(tx, ty, tz) == Block.DIRT.id && !Block.get(getBlock(tx, ty + 1, tz)).opaque
                         && getSkyLight(tx, ty + 1, tz) >= 4) setBlock(tx, ty, tz, Block.GRASS.id);
             }
-        } else if (b == Block.WHEAT) {
+        } else if (b.isCrop()) {
             int age = getMeta(x, y, z);
             boolean wet = getMeta(x, y - 1, z) > 0;
             if (age < 7 && lightAbove(x, y - 1, z) >= 9 && random.nextInt(wet ? 3 : 7) == 0) setBlock(x, y, z, b.id, age + 1, false);

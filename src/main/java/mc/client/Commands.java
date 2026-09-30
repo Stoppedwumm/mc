@@ -101,9 +101,23 @@ final class Commands {
                     double x = a.length > 4 ? coord(a[2], p.x) : p.x + 3, y = a.length > 4 ? coord(a[3], p.y) : p.y, z = a.length > 4 ? coord(a[4], p.z) : p.z;
                     m.setPos(x, y, z);
                     m.yaw = m.bodyYaw = m.headYaw = (float) Math.random() * 360;
-                    if (a.length > 5) {
-                        int mat = java.util.Arrays.asList("leather", "chainmail", "iron", "golden", "diamond").indexOf(a[5]);
+                    for (int k = 5; k < a.length; k++) {
+                        int mat = java.util.Arrays.asList("leather", "chainmail", "iron", "golden", "diamond").indexOf(a[k]);
                         if (mat >= 0) for (int i = 0; i < 4; i++) m.armor[i] = new ItemStack(Item.armor(mat, i), 1);
+                        switch (a[k]) {
+                            case "baby" -> m.setGrowingAge(-24000);
+                            case "tamed" -> { m.tamed = true; m.maxHealth = m.health = 20; }
+                            case "sitting" -> m.sitting = true;
+                            case "sheared" -> m.sheared = true;
+                            case "angry" -> m.angerTicks = 600;
+                            default -> {
+                                if (a[k].matches("\\d+")) {
+                                    if (t == MobType.SLIME) m.setSlimeSize(Integer.parseInt(a[k]));
+                                    else if (t == MobType.SHEEP) m.sheepColor = Integer.parseInt(a[k]) % 5;
+                                    else if (t == MobType.ENDERMAN) m.carriedBlock = Integer.parseInt(a[k]);
+                                }
+                            }
+                        }
                     }
                     world.addEntity(m);
                     chat("Summoned new " + t.displayName);

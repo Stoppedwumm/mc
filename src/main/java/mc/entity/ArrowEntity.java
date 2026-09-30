@@ -49,8 +49,9 @@ public final class ArrowEntity extends Entity {
         // Entity hits along the path
         Entity target = null;
         double best = travel;
-        for (Entity e : world.entities()) {
-            if (e == this || e.removed || !(e instanceof LivingEntity le) || le.isDead()) continue;
+        for (LivingEntity e : world.livingEntities()) {
+            if (e.removed || e.isDead()) continue;
+            if (e == shooter && age < 5) continue;
             if (e == shooter && age < 5) continue;
             AABB b = e.box();
             b.minX -= 0.3; b.minY -= 0.3; b.minZ -= 0.3; b.maxX += 0.3; b.maxY += 0.3; b.maxZ += 0.3;

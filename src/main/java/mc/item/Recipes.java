@@ -74,6 +74,9 @@ public final class Recipes {
             if (armorMats[m] == null) continue;
             for (int slot = 0; slot < 4; slot++) shaped(Item.armor(m, slot), 1, armorShapes[slot], 'X', armorMats[m]);
         }
+        shaped(Item.SHEARS, 1, new String[]{" I", "I "}, 'I', Item.IRON_INGOT);
+        shaped(Item.of(Block.CAKE), 1, new String[]{"MMM", "SES", "WWW"}, 'M', Item.MILK_BUCKET, 'S', Item.SUGAR, 'E', Item.EGG, 'W', Item.WHEAT);
+        shapeless(Item.of(Block.BLACK_WOOL), 1, Block.WHITE_WOOL, Item.INK_SAC);
         shaped(Item.BREAD, 1, new String[]{"WWW"}, 'W', Item.WHEAT);
         shaped(Item.BUCKET, 1, new String[]{"I I", " I "}, 'I', Item.IRON_INGOT);
         shaped(Item.BOW, 1, new String[]{" TS", "T S", " TS"}, 'T', Item.STICK, 'S', Item.STRING);
@@ -140,6 +143,7 @@ public final class Recipes {
         smelt(Item.RAW_BEEF, Item.STEAK);
         smelt(Item.RAW_CHICKEN, Item.COOKED_CHICKEN);
         smelt(Block.CACTUS, Item.of(Block.GREEN_WOOL));
+        smelt(Item.POTATO, Item.BAKED_POTATO);
     }
 
     /** Finds the crafting result for a square grid (size 2 or 3), or null. */

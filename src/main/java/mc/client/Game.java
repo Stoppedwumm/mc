@@ -301,6 +301,7 @@ public final class Game implements World.Listener {
         if (screen == Screen.PAUSE) return;
 
         weather.tick();
+        world.raining = weather.raining;
         double f = (world.time % 24000) / 24000.0 - 0.25;
         f = f - Math.floor(f);
         f = f + (1 - (Math.cos(f * Math.PI) + 1) / 2 - f) / 3;

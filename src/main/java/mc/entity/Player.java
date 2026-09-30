@@ -80,6 +80,10 @@ public final class Player extends LivingEntity {
         if (creative && source != DamageSource.VOID) return false;
         boolean ok = super.damage(source, amount, attacker);
         if (ok) exhaustion += 0.1f;
+        if (ok && world != null) {
+            if (attacker instanceof LivingEntity le) world.commandWolves(le);
+            else if (attacker instanceof ArrowEntity a && a.shooter instanceof LivingEntity le) world.commandWolves(le);
+        }
         return ok;
     }
 

@@ -53,6 +53,9 @@ public final class EntityCodec {
             o.addProperty("sheared", m.sheared);
             o.addProperty("tamed", m.tamed);
             o.addProperty("growing", m.growingAge);
+            o.addProperty("sitting", m.sitting);
+            o.addProperty("size", m.slimeSize);
+            o.addProperty("carried", m.carriedBlock);
             JsonArray armor = new JsonArray();
             for (ItemStack s : m.armor) armor.add(ItemStack.isEmpty(s) ? null : stack(s));
             o.add("armor", armor);
@@ -76,10 +79,14 @@ public final class EntityCodec {
                 try { type = MobType.valueOf(o.get("mob").getAsString()); } catch (IllegalArgumentException ex) { return null; }
                 Mob m = new Mob(type);
                 m.health = o.get("health").getAsFloat();
+                if (type == MobType.SLIME && o.has("size")) { m.setSlimeSize(o.get("size").getAsInt()); m.health = o.get("health").getAsFloat(); }
                 m.sheepColor = o.get("color").getAsInt();
                 if (o.has("sheared")) m.sheared = o.get("sheared").getAsBoolean();
                 if (o.has("tamed")) m.tamed = o.get("tamed").getAsBoolean();
                 if (o.has("growing")) m.setGrowingAge(o.get("growing").getAsInt());
+                if (o.has("sitting")) m.sitting = o.get("sitting").getAsBoolean();
+                if (o.has("carried")) m.carriedBlock = o.get("carried").getAsInt();
+                if (m.tamed) m.maxHealth = 20;
                 java.util.Arrays.fill(m.armor, null);
                 if (o.has("armor")) {
                     JsonArray a = o.getAsJsonArray("armor");

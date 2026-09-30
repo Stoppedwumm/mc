@@ -121,7 +121,7 @@ public final class Gui {
             glDisable(GL_DEPTH_TEST);
         } else {
             int tex = block.spriteTex();
-            if (block == Block.WHEAT) tex = Block.Tex.WHEAT_0 + 7;
+            if (block.isCrop()) tex = block.textureForFace(2, 7);
             float u0 = (tex & 15) / 16f, v0 = (tex >> 4) / 16f;
             shader(ortho, true, 0.3f);
             batch.begin(GL_TRIANGLES);

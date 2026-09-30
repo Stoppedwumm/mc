@@ -19,8 +19,30 @@ public final class MobSpawner {
                 else passive++;
             }
         }
-        if (world.tickCount % 40 == 0 && passive < PASSIVE_CAP) spawnPassive(world, player, random);
+        int squid = 0;
+        for (Entity e : world.entities()) if (e instanceof Mob m && m.type == MobType.SQUID) squid++;
+        if (world.tickCount % 40 == 0 && passive - squid < PASSIVE_CAP) spawnPassive(world, player, random);
+        if (world.tickCount % 40 == 20 && squid < 5) spawnSquid(world, player, random);
         if (hostile < HOSTILE_CAP) for (int i = 0; i < 2; i++) spawnHostile(world, player, random);
+    }
+
+    private void spawnSquid(World world, Player player, Random random) {
+        double ang = random.nextDouble() * Math.PI * 2;
+        double dist = 24 + random.nextDouble() * 40;
+        int x = (int) Math.floor(player.x + Math.cos(ang) * dist), z = (int) Math.floor(player.z + Math.sin(ang) * dist);
+        if (!world.isLoaded(x, z)) return;
+        int y = 62 - random.nextInt(10);
+        if (world.getBlock(x, y, z) != Block.WATER.id || world.getBlock(x, y + 1, z) != Block.WATER.id || world.getBlock(x, y - 2, z) != Block.WATER.id) return;
+        for (int i = 0; i < 2 + random.nextInt(3); i++) {
+            int gx = x + random.nextInt(3) - 1, gz = z + random.nextInt(3) - 1;
+            if (world.getBlock(gx, y, gz) == Block.WATER.id) spawn(world, MobType.SQUID, gx + 0.5, y, gz + 0.5, random);
+        }
+    }
+
+    /** Minecraft-style slime chunks: one in ten, decided by the world seed. */
+    public static boolean isSlimeChunk(long seed, int cx, int cz) {
+        Random r = new Random(seed + (long) cx * cx * 4987142 + cx * 5947611L + (long) cz * cz * 4392871L + cz * 389711L ^ 987234911L);
+        return r.nextInt(10) == 0;
     }
 
     private void spawnPassive(World world, Player player, Random random) {
@@ -32,13 +54,18 @@ public final class MobSpawner {
         int y = c.topSolid(x & 15, z & 15);
         if (y < 0 || world.getBlock(x, y, z) != Block.GRASS.id || world.getSkyLight(x, y + 1, z) < 9) return;
         MobType type = MobType.PASSIVE[random.nextInt(MobType.PASSIVE.length)];
-        int group = 2 + random.nextInt(3);
+        mc.world.gen.Biome biome = world.biomeAt(x, z);
+        boolean woods = biome == mc.world.gen.Biome.FOREST || biome == mc.world.gen.Biome.TAIGA || biome == mc.world.gen.Biome.SNOWY_TAIGA;
+        if (woods && random.nextInt(5) == 0) type = MobType.WOLF;
+        int group = type == MobType.WOLF ? 4 : 2 + random.nextInt(3);
         for (int i = 0; i < group; i++) {
             int gx = x + random.nextInt(5) - 2, gz = z + random.nextInt(5) - 2;
             Chunk gc = world.getChunk(gx >> 4, gz >> 4);
             if (gc == null) continue;
             int gy = gc.topSolid(gx & 15, gz & 15);
-            if (gy < 0 || world.getBlock(gx, gy, gz) != Block.GRASS.id || world.getBlock(gx, gy + 1, gz) != 0 && Block.get(world.getBlock(gx, gy + 1, gz)).solid) continue;
+            int ground = world.getBlock(gx, gy, gz);
+            if (type == MobType.WOLF && (ground == Block.SNOWY_GRASS.id || ground == Block.SNOW.id)) ground = Block.GRASS.id;
+            if (gy < 0 || ground != Block.GRASS.id || world.getBlock(gx, gy + 1, gz) != 0 && Block.get(world.getBlock(gx, gy + 1, gz)).solid) continue;
             spawn(world, type, gx + 0.5, gy + 1, gz + 0.5, random);
         }
     }
@@ -57,11 +84,17 @@ public final class MobSpawner {
         Block floor = Block.get(world.getBlock(x, y - 1, z));
         if (!floor.solid || !floor.opaque || floor == Block.BEDROCK) return;
         if (world.getBlock(x, y, z) != 0 || world.getBlock(x, y + 1, z) != 0) return;
+        if (y < 40 && random.nextInt(4) == 0 && isSlimeChunk(world.seed, x >> 4, z >> 4)) {
+            if (world.getBlock(x + 1, y, z) == 0 && world.getBlock(x, y, z + 1) == 0) spawn(world, MobType.SLIME, x + 0.5, y, z + 0.5, random);
+            return;
+        }
         int sky = world.getSkyLight(x, y, z), blk = world.getBlockLight(x, y, z);
         int effective = Math.max(blk, Math.round(sky * world.dayFactor));
         if (effective > 0) return;
         MobType type = MobType.HOSTILE[random.nextInt(MobType.HOSTILE.length)];
         if (type == MobType.SPIDER && (world.getBlock(x + 1, y, z) != 0 || world.getBlock(x - 1, y, z) != 0)) return;
+        if (type == MobType.SLIME) return;
+        if (type == MobType.ENDERMAN && (world.getBlock(x, y + 2, z) != 0 || random.nextInt(3) != 0)) return;
         spawn(world, type, x + 0.5, y, z + 0.5, random);
     }
 

@@ -6,7 +6,7 @@ package mc.world;
 public final class Block {
     public enum Model { NONE, CUBE, CROSS, LIQUID, TORCH, SHAPE }
     /** Non-cube geometry, see {@link Shapes}. */
-    public enum Shape { NONE, SLAB, STAIRS, FENCE, GATE, DOOR, TRAPDOOR, LADDER, PANE, BED, WALL, CARPET, SNOW_LAYER }
+    public enum Shape { NONE, SLAB, STAIRS, FENCE, GATE, DOOR, TRAPDOOR, LADDER, PANE, BED, WALL, CARPET, SNOW_LAYER, CAKE }
     public enum Layer { OPAQUE, CUTOUT, TRANSLUCENT }
     public enum Tint { NONE, GRASS, FOLIAGE, BIRCH, SPRUCE }
     public enum SoundType { STONE, WOOD, GRASS, GRAVEL, SAND, GLASS, CLOTH, SNOW, NONE }
@@ -89,9 +89,10 @@ public final class Block {
                 WHEAT_0 = 81, SAPLING = 89, IRON_BLOCK = 90, GOLD_BLOCK = 91, DIAMOND_BLOCK = 92,
                 OAK_DOOR_TOP = 93, OAK_DOOR_BOTTOM = 94, IRON_DOOR_TOP = 95, IRON_DOOR_BOTTOM = 96, TRAPDOOR = 97, LADDER = 98,
                 IRON_BARS = 99, BED_HEAD = 100, BED_FOOT = 101, BED_SIDE = 102, OAK_DOOR_ITEM = 103, IRON_DOOR_ITEM = 104,
-                BED_ITEM = 105, SMOOTH_STONE = 106, GLASS_PANE_TOP = 107,
+                BED_ITEM = 105, SMOOTH_STONE = 106, GLASS_PANE_TOP = 107, CARROTS_0 = 108, POTATOES_0 = 112,
+                CAKE_TOP = 116, CAKE_SIDE = 117, CAKE_INNER = 118, CAKE_BOTTOM = 119, CAKE_ITEM = 120,
                 BREAK_0 = 240; // 240..249 crack stages
-        public static final int COUNT = 108;
+        public static final int COUNT = 121;
     }
 
     public static final Block AIR = new Block(0, "Air", 0);
@@ -196,6 +197,9 @@ public final class Block {
     public static final Block YELLOW_CARPET = derived(97, "Yellow Carpet", YELLOW_WOOL, Shape.CARPET).hardness(0.1f);
     public static final Block BLACK_CARPET = derived(98, "Black Carpet", BLACK_WOOL, Shape.CARPET).hardness(0.1f);
     public static final Block SNOW_LAYER = derived(99, "Snow", SNOW, Shape.SNOW_LAYER).hardness(0.1f);
+    public static final Block CARROTS = new Block(100, "Carrots", Tex.CARROTS_0).plant();
+    public static final Block POTATOES = new Block(101, "Potatoes", Tex.POTATOES_0).plant();
+    public static final Block CAKE = new Block(102, "Cake", 0).tex(Tex.CAKE_TOP, Tex.CAKE_BOTTOM, Tex.CAKE_SIDE).shape(Shape.CAKE).sound(SoundType.CLOTH).hardness(0.5f).itemTex(Tex.CAKE_ITEM);
 
     static {
         AIR.model = Model.NONE; AIR.opaque = false; AIR.solid = false; AIR.replaceable = true; AIR.inCreativeInventory = false; AIR.sound = SoundType.NONE;
@@ -207,8 +211,7 @@ public final class Block {
         BEDROCK.inCreativeInventory = true;
         GRASS.tintTopOnly = true;
         LIT_FURNACE.inCreativeInventory = false;
-        WHEAT.inCreativeInventory = false;
-        WHEAT.replaceable = false;
+        for (Block crop : new Block[]{WHEAT, CARROTS, POTATOES}) { crop.inCreativeInventory = false; crop.replaceable = false; }
         SAPLING.replaceable = false;
         DANDELION.replaceable = false; POPPY.replaceable = false; BLUE_ORCHID.replaceable = false; SUGAR_CANE.replaceable = false;
         DEAD_BUSH.replaceable = true;
@@ -241,6 +244,9 @@ public final class Block {
         if (this == LIT_FURNACE && front) return Tex.FURNACE_FRONT_LIT;
         if (this == CHEST && front) return Tex.CHEST_FRONT;
         if (this == WHEAT) return Tex.WHEAT_0 + Math.min(7, meta & 7);
+        if (this == CARROTS) return Tex.CARROTS_0 + cropStage(meta);
+        if (this == POTATOES) return Tex.POTATOES_0 + cropStage(meta);
+        if (this == CAKE && face == 4 && (meta & 7) > 0) return Tex.CAKE_INNER;
         if (shape == Shape.DOOR) return (meta & 8) != 0 ? texTop : texBottom;
         if (this == BED) return face == 0 ? ((meta & 4) != 0 ? Tex.BED_HEAD : Tex.BED_FOOT) : face == 1 ? Tex.PLANKS : Tex.BED_SIDE;
         if (this == FARMLAND && face == 0 && meta > 0) return Tex.FARMLAND_WET;
@@ -256,10 +262,19 @@ public final class Block {
 
     public boolean isSlab() { return shape == Shape.SLAB; }
 
+    /** Crops grow through ages 0-7 on farmland. */
+    public boolean isCrop() { return this == WHEAT || this == CARROTS || this == POTATOES; }
+
+    /** Carrots and potatoes show 4 visual stages over 8 ages. */
+    private static int cropStage(int meta) {
+        int age = meta & 7;
+        return age < 2 ? 0 : age < 4 ? 1 : age < 7 ? 2 : 3;
+    }
+
     /** Items for these shapes are drawn as 3D models in the GUI and in hand; others use a flat sprite. */
     public boolean has3dItem() {
         return model == Model.CUBE || (model == Model.SHAPE && shape != Shape.DOOR && shape != Shape.LADDER
-                && shape != Shape.PANE && shape != Shape.BED);
+                && shape != Shape.PANE && shape != Shape.BED && shape != Shape.CAKE);
     }
 
     /** Tile used when the block is shown as a flat sprite. */

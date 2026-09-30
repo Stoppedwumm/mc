@@ -103,6 +103,7 @@ final class Interaction {
         boolean crit = p.fallDistance > 0 && !p.onGround && !p.inWater && p.motionY < 0;
         if (crit) dmg *= 1.5f;
         if (target.damage(DamageSource.ATTACK, dmg, p)) {
+            w().commandWolves(target);
             if (p.sprinting) {
                 double r = Math.toRadians(p.yaw);
                 target.knockback(0.5, Math.sin(r), -Math.cos(r));
@@ -154,7 +155,7 @@ final class Interaction {
         tickMining(in.button(GLFW_MOUSE_BUTTON_LEFT));
         boolean useHeld = in.button(GLFW_MOUSE_BUTTON_RIGHT);
         if (useType != 0) {
-            if (!useHeld || ItemStack.isEmpty(h) || (useType == 1 && !h.item.isFood()) || (useType == 2 && h.item != Item.BOW)) {
+            if (!useHeld || ItemStack.isEmpty(h) || (useType == 1 && !h.item.isFood() && h.item != Item.MILK_BUCKET) || (useType == 2 && h.item != Item.BOW)) {
                 if (useType == 2) releaseBow();
                 useType = 0;
                 useTicks = 0;
@@ -173,6 +174,14 @@ final class Interaction {
             g.sound.play("eat", p.x, p.y + 1.5, p.z, 0.5f, 0.9f + random.nextFloat() * 0.2f);
             double r = Math.toRadians(p.yaw);
             for (int i = 0; i < 3; i++) g.particles.spawn("poof", p.x - Math.sin(r) * 0.4, p.eyeY() - 0.2, p.z + Math.cos(r) * 0.4);
+        }
+        if (useTicks >= 32 && h.item == Item.MILK_BUCKET) {
+            p.fireTicks = 0;
+            if (!p.creative) p.inventory.setHeld(new ItemStack(Item.BUCKET, 1));
+            g.sound.play("burp", p.x, p.y + 1.5, p.z, 0.5f, 1.2f);
+            useType = 0;
+            useTicks = 0;
+            return;
         }
         if (useTicks >= 32) {
             p.eat(h.item.food, h.item.saturation);
@@ -263,6 +272,8 @@ final class Interaction {
         float speed = 1;
         if (t != null && t.tool != Item.Tool.NONE && t.tool == Item.effectiveTool(b)) speed = t.miningSpeed;
         if (t != null && t.tool == Item.Tool.SWORD) speed = 1.5f;
+        if (t == Item.SHEARS && (b.tint == Block.Tint.FOLIAGE || b.tint == Block.Tint.BIRCH || b.tint == Block.Tint.SPRUCE)) speed = 15;
+        if (t == Item.SHEARS && b.sound == Block.SoundType.CLOTH && b.shape == Block.Shape.NONE) speed = 5;
         float s = speed / b.hardness / (canHarvest ? 30f : 100f);
         if (p.eyeInBlock(Block.WATER.id)) s /= 5;
         if (!p.onGround && !p.flying) s /= 5;
@@ -299,12 +310,25 @@ final class Interaction {
         Player p = p();
         ItemStack h = held();
         lastUseWasPlace = false;
+        if (fresh && targetEntity instanceof Mob m && m.interact(p)) {
+            startSwing();
+            return;
+        }
         // Interactive blocks first (sneak to place against them instead)
         if (hit != null && !p.sneaking && fresh) {
             int id = w().getBlock(hit.x, hit.y, hit.z);
             if (id == Block.CRAFTING_TABLE.id) { g.screens.openCrafting(); startSwing(); return; }
             if (toggle(hit.x, hit.y, hit.z)) return;
             if (id == Block.BED.id) { g.sleep(hit.x, hit.y, hit.z); startSwing(); return; }
+            if (id == Block.CAKE.id && (p.food < 20 || p.creative)) {
+                int bites = w().getMeta(hit.x, hit.y, hit.z);
+                p.eat(2, 0.4f);
+                if (bites >= 6) w().setBlock(hit.x, hit.y, hit.z, 0);
+                else w().setBlock(hit.x, hit.y, hit.z, id, bites + 1, false);
+                g.sound.play("eat", hit.x + 0.5, hit.y + 0.5, hit.z + 0.5, 0.5f, 1);
+                startSwing();
+                return;
+            }
             if (id == Block.FURNACE.id || id == Block.LIT_FURNACE.id) {
                 g.screens.openFurnace((BlockEntity.Furnace) w().getOrCreateBlockEntity(hit.x, hit.y, hit.z));
                 return;
@@ -326,12 +350,22 @@ final class Interaction {
         }
         if (ItemStack.isEmpty(h)) return;
         Item item = h.item;
-        if (item.isFood()) {
+        if ((item == Item.CARROT || item == Item.POTATO) && hit != null && w().getBlock(hit.x, hit.y, hit.z) == Block.FARMLAND.id && hit.ny == 1) {
+            // Planting takes precedence over eating
+        } else if (item.isFood()) {
             if (fresh && (p.food < 20 || p.creative)) { useType = 1; useTicks = 0; }
             return;
         }
         if (item == Item.BOW) {
             if (fresh && (p.creative || p.inventory.count(Item.ARROW) > 0)) { useType = 2; useTicks = 0; }
+            return;
+        }
+        if (item == Item.EGG || item == Item.SNOWBALL || item == Item.ENDER_PEARL) {
+            if (fresh) throwItem(h);
+            return;
+        }
+        if (item == Item.MILK_BUCKET) {
+            if (fresh) { useType = 1; useTicks = 0; }
             return;
         }
         if (item.isArmor()) {
@@ -358,9 +392,10 @@ final class Interaction {
             }
             return;
         }
-        if (item == Item.SEEDS) {
+        if (item == Item.SEEDS || item == Item.CARROT || item == Item.POTATO) {
+            Block crop = item == Item.SEEDS ? Block.WHEAT : item == Item.CARROT ? Block.CARROTS : Block.POTATOES;
             if (target == Block.FARMLAND.id && hit.ny == 1 && w().getBlock(hit.x, hit.y + 1, hit.z) == 0) {
-                w().setBlock(hit.x, hit.y + 1, hit.z, Block.WHEAT.id);
+                w().setBlock(hit.x, hit.y + 1, hit.z, crop.id);
                 g.sound.dig(Block.TALL_GRASS, hit.x + 0.5, hit.y + 1, hit.z + 0.5);
                 consume(h);
                 startSwing();
@@ -379,9 +414,23 @@ final class Interaction {
         }
     }
 
+    private void throwItem(ItemStack h) {
+        Player p = p();
+        ThrownEntity t = new ThrownEntity(h.item, p);
+        t.setPos(p.x, p.eyeY() - 0.1, p.z);
+        double ry = Math.toRadians(p.yaw), rp = Math.toRadians(p.pitch);
+        t.shoot(-Math.sin(ry) * Math.cos(rp), -Math.sin(rp), Math.cos(ry) * Math.cos(rp), 1.5);
+        t.motionX += p.motionX;
+        t.motionZ += p.motionZ;
+        w().addEntity(t);
+        g.sound.play("bow", p.x, p.y + 1.5, p.z, 0.5f, 0.4f / (random.nextFloat() * 0.4f + 0.8f));
+        consume(h);
+        startSwing();
+    }
+
     private void boneMeal(ItemStack h, int target) {
         boolean used = false;
-        if (target == Block.WHEAT.id) {
+        if (Block.get(target).isCrop()) {
             int age = w().getMeta(hit.x, hit.y, hit.z);
             if (age < 7) { w().setBlock(hit.x, hit.y, hit.z, target, Math.min(7, age + 2 + random.nextInt(4)), false); used = true; }
         } else if (target == Block.SAPLING.id) {
@@ -615,7 +664,7 @@ final class Interaction {
         if (hit == null) return;
         int id = w().getBlock(hit.x, hit.y, hit.z);
         if (id == Block.LIT_FURNACE.id) id = Block.FURNACE.id;
-        Item it = id == Block.WHEAT.id ? Item.SEEDS : Item.get(id);
+        Item it = id == Block.WHEAT.id ? Item.SEEDS : id == Block.CARROTS.id ? Item.CARROT : id == Block.POTATOES.id ? Item.POTATO : Item.get(id);
         if (it == null) return;
         var inv = p().inventory;
         for (int i = 0; i < 9; i++) if (inv.slots[i] != null && inv.slots[i].item == it) { inv.selected = i; return; }

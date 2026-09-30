@@ -14,6 +14,11 @@ public final class Drops {
     public static List<ItemStack> of(Block b, int meta, ItemStack tool) {
         List<ItemStack> out = new ArrayList<>();
         Item t = tool == null ? null : tool.item;
+        // Shears harvest leaves and cobweb-like plants as themselves
+        if (t == Item.SHEARS && (b == Block.OAK_LEAVES || b == Block.BIRCH_LEAVES || b == Block.SPRUCE_LEAVES || b == Block.TALL_GRASS || b == Block.FERN || b == Block.DEAD_BUSH)) {
+            add(out, Item.of(b), 1);
+            return out;
+        }
         int required = Item.requiredTier(b);
         if (required >= 0 && (t == null || t.tool != Item.Tool.PICKAXE || t.tier < required)) return out;
         switch (b.id) {
@@ -34,6 +39,11 @@ public final class Drops {
             case 38 -> add(out, Item.STICK, RANDOM.nextInt(3));
             case 35 -> add(out, Item.BOOK, 3);
             case 60 -> add(out, Item.of(Block.FURNACE), 1);
+            case 100 -> add(out, Item.CARROT, (meta & 7) >= 7 ? 1 + RANDOM.nextInt(4) : 1);
+            case 101 -> {
+                add(out, Item.POTATO, (meta & 7) >= 7 ? 1 + RANDOM.nextInt(4) : 1);
+            }
+            case 102 -> { }
             case 63 -> {
                 if ((meta & 7) >= 7) {
                     add(out, Item.WHEAT, 1);

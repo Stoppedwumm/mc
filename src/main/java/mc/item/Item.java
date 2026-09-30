@@ -126,6 +126,14 @@ public final class Item {
     public static final Item PAPER = item(290, "Paper", 34);
     public static final Item BOOK = item(291, "Book", 35);
     public static final Item SNOWBALL = item(292, "Snowball", 36).stack(16);
+    public static final Item SHEARS = tool(293, "Shears", 37, Tool.NONE, 0, 238, 1, 1);
+    public static final Item MILK_BUCKET = item(294, "Milk Bucket", 38).stack(1);
+    public static final Item ENDER_PEARL = item(295, "Ender Pearl", 39).stack(16);
+    public static final Item SLIMEBALL = item(296, "Slimeball", 85);
+    public static final Item INK_SAC = item(297, "Ink Sac", 86);
+    public static final Item CARROT = item(298, "Carrot", 87).food(3, 3.6f);
+    public static final Item POTATO = item(299, "Potato", 88).food(1, 0.6f);
+    public static final Item BAKED_POTATO = item(325, "Baked Potato", 89).food(5, 6f);
 
     // Tools: icon = 40 + type*5 + material
     public static final Item WOODEN_PICKAXE = tool(300, "Wooden Pickaxe", 40, Tool.PICKAXE, 0, 59, 2, 2);
@@ -181,6 +189,8 @@ public final class Item {
     static {
         for (int i = 300; i <= 324; i++) if (BY_ID[i].tier == 0 && !BY_ID[i].name.startsWith("Golden")) BY_ID[i].fuelTicks = 200;
         STICK.handheld = true;
+        SHEARS.handheld = false;
+        BY_ID[Block.CAKE.id].maxStack = 1;
         BONE.handheld = true;
     }
 

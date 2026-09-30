@@ -103,6 +103,16 @@ public final class TextureGen {
         paint(Tex.GOLD_BLOCK, () -> metalBlock(0xf8d840, 0xc89a18));
         paint(Tex.DIAMOND_BLOCK, () -> metalBlock(0x68e8e0, 0x2aa8a4));
         paint(Tex.SMOOTH_STONE, this::smoothStone);
+        for (int i = 0; i < 4; i++) {
+            final int stage = i;
+            paint(Tex.CARROTS_0 + i, () -> rootCrop(stage, 0xf08a20));
+            paint(Tex.POTATOES_0 + i, () -> rootCrop(stage, 0xc8a060));
+        }
+        paint(Tex.CAKE_TOP, () -> cake(0));
+        paint(Tex.CAKE_SIDE, () -> cake(1));
+        paint(Tex.CAKE_INNER, () -> cake(2));
+        paint(Tex.CAKE_BOTTOM, () -> cake(3));
+        paint(Tex.CAKE_ITEM, this::cakeItem);
         paint(Tex.OAK_DOOR_TOP, () -> woodDoor(true));
         paint(Tex.OAK_DOOR_BOTTOM, () -> woodDoor(false));
         paint(Tex.IRON_DOOR_TOP, () -> ironDoor(true));
@@ -889,5 +899,45 @@ public final class TextureGen {
             for (int y = 10; y < 12; y++) set(x, y, scale(OAK, 0.85));
         }
         for (int y = 12; y < 14; y++) { set(0, y, scale(OAK, 0.7)); set(1, y, scale(OAK, 0.7)); set(14, y, scale(OAK, 0.7)); set(15, y, scale(OAK, 0.7)); }
+    }
+
+    // ------------------------------------------------------------------ food blocks
+
+    private void rootCrop(int stage, int rootColor) {
+        clearTile();
+        int h = 3 + stage * 3;
+        for (int p = 0; p < 4; p++) {
+            int x = 2 + p * 4;
+            for (int k = 0; k < h; k++) {
+                int y = 15 - k;
+                set(x, y, scale(0x3a9a1a, jitter(0.15)));
+                if (k > 1 && k % 2 == 0) { set(x - 1, y, scale(0x4aaa2a, jitter(0.15))); set(x + 1, y - 1, scale(0x2a8a12, jitter(0.15))); }
+            }
+            if (stage == 3) { set(x, 15, rootColor); set(x + 1, 15, scale(rootColor, 0.8)); }
+        }
+    }
+
+    private void cake(int face) {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                int c;
+                switch (face) {
+                    case 0 -> c = (x + y * 3) % 11 == 0 ? 0xd02020 : scale(0xf8f4f0, jitter(0.03));
+                    case 1 -> c = y < 8 ? 0 : y < 10 ? scale(0xf4f0ec, jitter(0.03)) : scale(0xb06a3a, jitter(0.08));
+                    case 2 -> c = y < 8 ? 0 : y < 10 ? scale(0xf4f0ec, jitter(0.03)) : (y == 12 ? 0xd05050 : scale(0xe0c090, jitter(0.06)));
+                    default -> c = scale(0xa06030, jitter(0.08));
+                }
+                if (c == 0) set(x, y, 0, 0); else set(x, y, c);
+            }
+    }
+
+    private void cakeItem() {
+        clearTile();
+        for (int y = 6; y < 13; y++)
+            for (int x = 2; x < 14; x++) {
+                int c = y < 8 ? 0xf8f4f0 : y == 8 ? 0xe8e0d8 : scale(0xb06a3a, jitter(0.08));
+                if (y == 6 && x % 4 == 1) c = 0xd02020;
+                set(x, y, c);
+            }
     }
 }

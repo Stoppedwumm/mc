@@ -18,6 +18,7 @@ import java.util.List;
  * <li>ladder: facing (direction of the supporting wall)</li>
  * <li>bed: facing (foot to head), bit 2 head half</li>
  * <li>snow layer: layers - 1</li>
+ * <li>cake: slices eaten (0-6)</li>
  * <li>torch: 0 standing, 1-4 on a wall in direction (meta - 1)</li>
  * </ul>
  */
@@ -193,6 +194,7 @@ public final class Shapes {
                 }
             }
             case CARPET -> out.add(new int[]{0, 0, 0, 16, 1, 16});
+            case CAKE -> out.add(new int[]{1 + 2 * Math.min(6, meta & 7), 0, 1, 15, 8, 15});
             case SNOW_LAYER -> {
                 int layers = (meta & 7) + 1;
                 if (col) { if (layers > 1) out.add(new int[]{0, 0, 0, 16, 2 * (layers - 1), 16}); }

@@ -35,6 +35,19 @@ public final class MobModel {
         final float px, py, pz;
         final List<Box> boxes = new ArrayList<>();
         public float rx, ry, rz;
+        public boolean visible = true;
+        /** Extra scale around the pivot (baby heads). */
+        public float scale = 1;
+        /** Per-part colour multiplier (sheep wool, wolf collar), -1 = none. */
+        public int tint = -1;
+
+        /** Resets the per-frame pose. */
+        public void reset() {
+            rx = ry = rz = 0;
+            visible = true;
+            scale = 1;
+            tint = -1;
+        }
 
         Part(String name, float px, float py, float pz) {
             this.name = name; this.px = px; this.py = py; this.pz = pz;
@@ -128,8 +141,12 @@ public final class MobModel {
     public void render(Batch batch, Matrix4f base, int tint, int slotMask) {
         Matrix4f m = new Matrix4f();
         float iw = 1f / texW, ih = 1f / texH;
+        int modelTint = tint;
         for (Part p : parts) {
+            if (!p.visible) continue;
             m.set(base).translate(p.px, p.py, p.pz).rotateY(p.ry).rotateX(p.rx).rotateZ(p.rz);
+            if (p.scale != 1) m.scale(p.scale);
+            tint = p.tint >= 0 ? multiply(modelTint, p.tint) : modelTint;
             for (Box b : p.boxes) {
                 if (slotMask != -1 && (b.slot < 0 || (slotMask & (1 << b.slot)) == 0)) continue;
                 float x0 = b.x0, y0 = b.y0, z0 = b.z0, x1 = b.x0 + b.w, y1 = b.y0 + b.h, z1 = b.z0 + b.d;
@@ -152,6 +169,11 @@ public final class MobModel {
                 face(batch, c[6], c[2], c[1], c[5], (u + d + w) * iw, (v + d) * ih, (u + d + w + d) * iw, (v + d + h) * ih, shade(tint, 0.65f), false);
             }
         }
+    }
+
+    private static int multiply(int a, int b) {
+        int r = (a >> 16 & 255) * (b >> 16 & 255) / 255, g = (a >> 8 & 255) * (b >> 8 & 255) / 255, bl = (a & 255) * (b & 255) / 255;
+        return r << 16 | g << 8 | bl;
     }
 
     private static int shade(int tint, float f) {
@@ -214,10 +236,62 @@ public final class MobModel {
             }
             case SHEEP -> {
                 Painter wool = solid(0xeaeaea, 0.12);
-                m.part("body", 0, 16, 0).box(-5, -5, -8, 10, 10, 16, wool);
-                m.part("head", 0, 18, 7).box(-3, -3, 0, 6, 6, 7, face(0xd8c8b0, 0xffffff, 0x000000, 1, false, 0))
-                        .box(-4, 1, 0, 8, 3, 5, wool);
-                legs4(m, 3, 11, 5, 4, 11, (f, x, y, w, h, r) -> y < 5 ? noise(0xeaeaea, r, 0.12) : noise(0xd8c8b0, r, 0.1));
+                m.part("body", 0, 16, 0).box(-4, -3, -7, 8, 6, 14, solid(0xe0b8a8, 0.08));
+                m.part("wool", 0, 16, 0).box(-5, -5, -8, 10, 10, 16, wool);
+                m.part("head", 0, 18, 7).box(-3, -3, 0, 6, 6, 7, face(0xd8c8b0, 0xffffff, 0x000000, 1, false, 0));
+                m.part("headWool", 0, 18, 7).box(-4, 1, 0, 8, 3, 5, wool);
+                legs4(m, 3, 11, 5, 4, 11, (f, x, y, w, h, r) -> noise(0xd8c8b0, r, 0.1));
+            }
+            case WOLF -> {
+                Painter fur = (f, x, y, w, h, r) -> noise(f == TOP ? 0xb8b0a8 : 0xd8d2cc, r, 0.1);
+                m.part("body", 0, 10, 0).box(-3, -3, -6, 6, 6, 8, fur).box(-4, -3.5f, 1, 8, 7, 6, fur);
+                m.part("collar", 0, 10, 0).box(-4.3f, -3.8f, 6.2f, 8.6f, 7.6f, 1, solid(0xffffff, 0.02));
+                m.part("head", 0, 11.5f, 7).box(-3, -3, 0, 6, 6, 4, (f, x, y, w, h, r) -> {
+                            if (f == FRONT && y == 2 && (x == 1 || x == 4)) return 0xFF201a14;
+                            return noise(0xd8d2cc, r, 0.08);
+                        })
+                        .box(-1.5f, -3, 4, 3, 3, 4, (f, x, y, w, h, r) -> f == FRONT && y == 0 && x == 1 ? 0xFF1a1a1a : noise(0xc8c0b8, r, 0.08))
+                        .box(-3, 3, 1, 2, 2, 1, fur).box(1, 3, 1, 2, 2, 1, fur);
+                m.part("tail", 0, 11, -6).box(-1, -8, -1, 2, 8, 2, fur);
+                m.part("leg0", -1.5f, 8, -4).box(-1, -8, -1, 2, 8, 2, fur);
+                m.part("leg1", 1.5f, 8, -4).box(-1, -8, -1, 2, 8, 2, fur);
+                m.part("leg2", -1.5f, 8, 5).box(-1, -8, -1, 2, 8, 2, fur);
+                m.part("leg3", 1.5f, 8, 5).box(-1, -8, -1, 2, 8, 2, fur);
+            }
+            case SQUID -> {
+                Painter skin = (f, x, y, w, h, r) -> noise(y < 3 ? 0x3a4a8a : 0x2a3a6a, r, 0.15);
+                Painter head = (f, x, y, w, h, r) -> {
+                    if ((f == FRONT || f == BACK) && y == 11 && (x == 2 || x == w - 3)) return 0xFFf0f0f0;
+                    if ((f == FRONT || f == BACK) && y == 11 && (x == 3 || x == w - 4)) return 0xFF101010;
+                    return skin.color(f, x, y, w, h, r);
+                };
+                m.part("body", 0, 6, 0).box(-5, 0, -5, 10, 14, 10, head);
+                for (int i = 0; i < 8; i++) {
+                    double a = i * Math.PI / 4;
+                    m.part("t" + i, (float) Math.cos(a) * 4, 7, (float) Math.sin(a) * 4).box(-1, -14, -1, 2, 14, 2, skin);
+                }
+            }
+            case ENDERMAN -> {
+                Painter black = solid(0x151515, 0.25);
+                Painter head = (f, x, y, w, h, r) -> {
+                    if (f == FRONT && y == 4 && (x == 1 || x == 2 || x == 5 || x == 6)) return (x == 2 || x == 5) ? 0xFFf0a0ff : 0xFFc050e0;
+                    return noise(0x151515, r, 0.25);
+                };
+                m.part("body", 0, 28, 0).box(-4, 0, -2, 8, 12, 4, black);
+                m.part("head", 0, 40, 0).box(-4, 0, -4, 8, 8, 8, head);
+                m.part("armL", -5, 39, 0).box(-1, -29, -1, 2, 30, 2, black);
+                m.part("armR", 5, 39, 0).box(-1, -29, -1, 2, 30, 2, black);
+                m.part("legL", -2, 28, 0).box(-1, -28, -1, 2, 28, 2, black);
+                m.part("legR", 2, 28, 0).box(-1, -28, -1, 2, 28, 2, black);
+            }
+            case SLIME -> {
+                Painter core = (f, x, y, w, h, r) -> {
+                    if (f == FRONT && y == 1 && (x == 0 || x == 4)) return 0xFF102810;
+                    if (f == FRONT && y == 3 && x == 2) return 0xFF102810;
+                    return noise(0x5aa84a, r, 0.1);
+                };
+                m.part("inner", 0, 0, 0).box(-3, 1, -3, 6, 6, 6, core);
+                m.part("outer", 0, 0, 0).box(-4, 0, -4, 8, 8, 8, (f, x, y, w, h, r) -> (noise(0x78d060, r, 0.12) & 0xFFFFFF) | 0x90000000);
             }
             case CHICKEN -> {
                 Painter white = solid(0xf8f8f8, 0.06);

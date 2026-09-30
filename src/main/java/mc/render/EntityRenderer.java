@@ -120,6 +120,18 @@ public final class EntityRenderer {
         }
     }
 
+    /** A flat item sprite that always faces the camera. */
+    private void renderSprite(Item item, WorldRenderer wr, float pt, double ex, double ey, double ez, float light, float size) {
+        wr.setupBasic(wr.projView, true, 0, 0.1f);
+        wr.basicShader.set("uLight", light);
+        items.bindFor(item, wr);
+        Matrix4f m = new Matrix4f().translate((float) ex, (float) ey + 0.1f, (float) ez)
+                .rotateY((float) Math.toRadians(-wr.camYaw + 180)).rotateX((float) Math.toRadians(-wr.camPitch)).scale(size * 2);
+        wr.batch.begin(GL_TRIANGLES);
+        items.emit(wr.batch, m, item, ItemRenderer.tint(item));
+        wr.batch.end();
+    }
+
     private void renderOrb(XpOrbEntity o, WorldRenderer wr, float pt, double ex, double ey, double ez) {
         float t = o.age + pt + o.phase;
         float size = 0.12f + Math.min(0.2f, (float) Math.log(o.value + 1) * 0.05f);
@@ -150,6 +162,7 @@ public final class EntityRenderer {
             if (e instanceof Mob m) renderMob(m, wr, pt, ex, ey, ez, l);
             else if (e instanceof ItemEntity it) renderItem(it, wr, pt, ex, ey, ez, l);
             else if (e instanceof XpOrbEntity o) renderOrb(o, wr, pt, ex, ey, ez);
+            else if (e instanceof ThrownEntity t) renderSprite(t.item, wr, pt, ex, ey, ez, l, 0.25f);
             else if (e instanceof FallingBlockEntity fb) renderBlock(Block.get(fb.blockId), wr, ex, ey + 0.49, ez, 0.98f, l, 0xFFFFFF);
             else if (e instanceof TntEntity tnt) {
                 float s = tnt.fuse < 10 ? 1 + (10 - tnt.fuse) * 0.02f : 1;
@@ -177,12 +190,13 @@ public final class EntityRenderer {
         float legA = (float) Math.cos(swing * 0.6662) * 1.4f * amount;
         float legB = (float) Math.cos(swing * 0.6662 + Math.PI) * 1.4f * amount;
         float time = m.age + pt;
-        for (MobModel.Part p : model.parts) { p.rx = p.ry = p.rz = 0; }
+        for (MobModel.Part p : model.parts) p.reset();
         MobModel.Part head = model.get("head");
         if (head != null) {
             head.ry = (float) Math.toRadians(-headYaw);
             head.rx = (float) Math.toRadians(m.pitch);
         }
+        Matrix4f mat = new Matrix4f().translate((float) ex, (float) ey, (float) ez).rotateY((float) Math.toRadians(-bodyYaw));
         switch (m.type) {
             case ZOMBIE, SKELETON -> {
                 model.get("legL").rx = legA;
@@ -193,6 +207,15 @@ public final class EntityRenderer {
                 model.get("armR").rx = armBase + (aggressive ? 0 : legA) - (float) Math.sin(time * 0.067) * 0.05f;
                 model.get("armL").rz = -(float) (Math.cos(time * 0.09) * 0.05 + 0.05);
                 model.get("armR").rz = (float) (Math.cos(time * 0.09) * 0.05 + 0.05);
+            }
+            case ENDERMAN -> {
+                model.get("legL").rx = legA * 0.5f;
+                model.get("legR").rx = legB * 0.5f;
+                boolean carrying = m.carriedBlock != 0;
+                model.get("armL").rx = carrying ? -0.5f : legB * 0.5f;
+                model.get("armR").rx = carrying ? -0.5f : legA * 0.5f;
+                model.get("armL").rz = carrying ? 0.05f : -0.05f;
+                model.get("armR").rz = carrying ? -0.05f : 0.05f;
             }
             case CHICKEN -> {
                 model.get("legL").rx = legA;
@@ -211,6 +234,18 @@ public final class EntityRenderer {
                     model.get("legR" + i).rz = (float) Math.toRadians(40) - Math.abs(w) * 0.5f;
                 }
             }
+            case SQUID -> {
+                float tent = m.prevTentacleAngle + (m.tentacleAngle - m.prevTentacleAngle) * pt;
+                for (int i = 0; i < 8; i++) {
+                    MobModel.Part t = model.get("t" + i);
+                    double a = i * Math.PI / 4;
+                    t.ry = (float) (-a - Math.PI / 2);
+                    t.rx = tent;
+                }
+                float sp = m.prevSquidPitch + (m.squidPitch - m.prevSquidPitch) * pt;
+                mat.translate(0, 0.8f, 0).rotateX((float) Math.toRadians(90 - sp)).translate(0, -0.8f, 0);
+            }
+            case SLIME -> { }
             default -> {
                 MobModel.Part l0 = model.get("leg0");
                 if (l0 != null) {
@@ -221,12 +256,45 @@ public final class EntityRenderer {
                 }
             }
         }
-        Matrix4f mat = new Matrix4f().translate((float) ex, (float) ey, (float) ez).rotateY((float) Math.toRadians(-bodyYaw));
+        if (m.type == MobType.SHEEP) {
+            model.get("wool").visible = model.get("headWool").visible = !m.sheared;
+            int c = SHEEP_COLORS[m.sheepColor];
+            model.get("wool").tint = model.get("headWool").tint = c;
+            model.get("leg0").tint = model.get("leg1").tint = model.get("leg2").tint = model.get("leg3").tint = -1;
+            if (m.eatGrassTicks > 0) {
+                float e = Math.min(1, Math.min(m.eatGrassTicks, 40 - m.eatGrassTicks) / 4f);
+                head.rx = e * 1.2f;
+                model.get("headWool").rx = head.rx;
+            } else model.get("headWool").rx = head.rx;
+            model.get("headWool").ry = head.ry;
+        }
+        if (m.type == MobType.WOLF) {
+            MobModel.Part tail = model.get("tail");
+            float hp = m.health / m.maxHealth;
+            tail.rx = m.tamed ? 1.6f + hp * 0.8f : m.angerTicks > 0 ? 2.3f : 1.8f;
+            tail.ry = m.tamed ? (float) Math.sin(time * 0.6) * 0.3f * hp : 0;
+            model.get("collar").visible = m.tamed;
+            model.get("collar").tint = 0xd02020;
+            if (m.sitting) {
+                // Front raised, hind legs folded forward, front legs straight down
+                mat.translate(0, -0.18f, -0.12f).rotateX((float) Math.toRadians(-35));
+                model.get("leg0").rx = model.get("leg1").rx = -0.96f;
+                model.get("leg2").rx = model.get("leg3").rx = 0.61f;
+                tail.rx = 1.1f;
+                if (head != null) head.rx -= 0.6f;
+            }
+        }
         if (m.deathTime > 0) {
             float d = Math.min(1, (float) Math.sqrt((m.deathTime + pt - 1) / 20f * 1.6f));
             mat.rotateZ((float) (d * Math.PI / 2));
         }
         float scale = 1 / 16f;
+        if (m.isBaby()) {
+            scale *= 0.5f;
+            if (head != null) head.scale = 1.5f;
+            MobModel.Part hw = model.get("headWool");
+            if (hw != null) hw.scale = 1.5f;
+        }
         int tint = 0xFFFFFF;
         if (m.type == MobType.CREEPER && m.fuse > 0) {
             float f = (m.prevFuse + (m.fuse - m.prevFuse) * pt) / 30f;
@@ -236,23 +304,53 @@ public final class EntityRenderer {
             scale *= (1 + f * 0.4f) * s;
             if ((int) (f * 10) % 2 == 0) light *= 1 + f * 2;
         }
-        if (m.type == MobType.SHEEP && m.sheepColor != 0) {
-            tint = new int[]{0xFFFFFF, 0x404048, 0xf0d040, 0xd05050, 0x6060e0}[m.sheepColor];
-        }
         if (m.hurtTime > 0 || m.deathTime > 0) tint = 0xFF8080;
-        mat.scale(scale);
+        if (m.type == MobType.SLIME) {
+            float sq = m.prevSquish + (m.squish - m.prevSquish) * pt;
+            float k = m.slimeSize * 1.02f;
+            mat.scale(scale * k / (sq + 1), scale * k * (sq + 1), scale * k / (sq + 1));
+        } else mat.scale(scale);
         wr.setupBasic(wr.projView, true, 0, 0.1f);
         wr.basicShader.set("uLight", light);
         glActiveTexture(GL_TEXTURE0);
         model.skin.bind();
+        if (m.type == MobType.SLIME) {
+            // Opaque core first, then the translucent jelly
+            model.get("outer").visible = false;
+            wr.batch.begin(GL_TRIANGLES);
+            model.render(wr.batch, mat, tint);
+            wr.batch.end();
+            model.get("outer").visible = true;
+            model.get("inner").visible = false;
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            wr.basicShader.set("uAlphaCut", 0.01f);
+            wr.batch.begin(GL_TRIANGLES);
+            model.render(wr.batch, mat, tint);
+            wr.batch.end();
+            glDisable(GL_BLEND);
+            return;
+        }
         wr.batch.begin(GL_TRIANGLES);
         model.render(wr.batch, mat, tint);
         wr.batch.end();
-        if (m.type == MobType.ZOMBIE || m.type == MobType.SKELETON) {
+        if (m.type.isUndead()) {
             renderArmor(m.armor, model, mat, wr, tint);
             if (m.type == MobType.SKELETON) renderHandItem(Item.BOW, model, mat, wr);
         }
+        if (m.type == MobType.ENDERMAN && m.carriedBlock != 0) {
+            Item carried = Item.get(m.carriedBlock);
+            if (carried != null) {
+                Matrix4f bm = new Matrix4f(mat).translate(0, 24, 9).scale(8f);
+                items.bindFor(carried, wr);
+                wr.batch.begin(GL_TRIANGLES);
+                items.emit(wr.batch, bm, carried, ItemRenderer.tint(carried));
+                wr.batch.end();
+            }
+        }
     }
+
+    private static final int[] SHEEP_COLORS = {0xFFFFFF, 0x404048, 0xf0d040, 0xd05050, 0x6060e0};
 
     private void renderItem(ItemEntity it, WorldRenderer wr, float pt, double ex, double ey, double ez, float light) {
         Item item = it.stack.item;

@@ -64,6 +64,17 @@ public final class ItemTextureGen {
         tile(34, () -> shape((x, y) -> x >= 3 && x <= 12 && y >= 2 && y <= 13, 0xf0f0e8, 0xb0b0a8, 0xffffff));
         tile(35, this::book);
         tile(36, () -> shape((x, y) -> dist(x, y, 8, 8) < 5.5, 0xf4f8fc, 0xb8c8d8, 0xffffff));
+        tile(37, this::shears);
+        tile(38, () -> bucket(0xf4f4f0));
+        tile(39, () -> {
+            shape((x, y) -> dist(x, y, 7.5, 7.5) < 5.5, 0x1a6a5a, 0x0a3a30, 0x3aa890);
+            for (int y = 5; y <= 10; y++) for (int x = 5; x <= 10; x++) if (dist(x, y, 7.5, 7.5) < 2.2) set(x, y, 0x0a2a24);
+        });
+        tile(85, () -> shape((x, y) -> dist(x, y, 8, 8.5) < 5 && !(x > 9 && y < 6), 0x6ac05a, 0x2a7a2a, 0xb0f0a0));
+        tile(86, () -> shape((x, y) -> sq((x - 8) / 5.0) + sq((y - 9) / 5.5) < 1 || (y < 5 && Math.abs(x - 8) < 2 && y > 1), 0x2a2a3a, 0x0a0a14, 0x5a5a6a));
+        tile(87, this::carrot);
+        tile(88, () -> shape((x, y) -> sq((x - 8) / 5.5) + sq((y - 8.5) / 4.5) < 1, 0xc8a060, 0x7a5a2a, 0xe8c888));
+        tile(89, () -> shape((x, y) -> sq((x - 8) / 5.5) + sq((y - 8.5) / 4.5) < 1, 0xd8a040, 0x7a4a1a, 0xf8e088));
         for (int type = 0; type < 5; type++)
             for (int mat = 0; mat < 5; mat++) {
                 final int t = type, m = mat;
@@ -276,6 +287,18 @@ public final class ItemTextureGen {
         for (int x = 3; x <= 12; x++) set(x, 4, fill == 0 ? 0x3a3a3a : fill);
         for (int x = 4; x <= 11; x++) set(x, 5, fill == 0 ? 0x2a2a2a : fill);
         for (int x = 4; x <= 11; x++) set(x, 2, 0x8a8a8a);
+    }
+
+    private void shears() {
+        shape((x, y) -> (Math.abs((x - 2) - (13 - y)) <= 1 && x >= 5 && x <= 12) || (Math.abs((x - 4) - (15 - y)) <= 1 && x >= 7 && x <= 14 && y >= 2),
+                0xd8d8d8, 0x5a5a5a, 0xffffff);
+        shape((x, y) -> dist(x, y, 4, 12) < 2.6 || dist(x, y, 12, 4) < 2.6, 0xc02020, 0x600a0a, 0xf06060);
+    }
+
+    private void carrot() {
+        shape((x, y) -> Math.abs((x - 8) + (y - 8)) <= 2.2 - (x - y + 8) * 0.05 && x - y > -9 && x - y < 7 && x >= 2 && y <= 13,
+                0xf08a20, 0x9a4a0a, 0xffb860);
+        for (int i = 0; i < 4; i++) { set(11 + i % 2, 2 + i, 0x3aa01a); set(12 + i % 2, 3 + i / 2, 0x2a8012); }
     }
 
     private void flintAndSteel() {
