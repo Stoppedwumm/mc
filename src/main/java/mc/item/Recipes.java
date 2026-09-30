@@ -113,7 +113,14 @@ public final class Recipes {
         Block[] carpets = {Block.WHITE_CARPET, Block.RED_CARPET, Block.BLUE_CARPET, Block.GREEN_CARPET, Block.YELLOW_CARPET, Block.BLACK_CARPET};
         for (int i = 0; i < carpets.length; i++) shaped(Item.of(carpets[i]), 3, new String[]{"##"}, '#', wool[i]);
         shaped(Item.of(Block.TNT), 1, new String[]{"GSG", "SGS", "GSG"}, 'G', Item.GUNPOWDER, 'S', Block.SAND);
-        shaped(Item.of(Block.GLOWSTONE), 1, new String[]{"GG", "GG"}, 'G', Block.GLOWSTONE);
+        shaped(Item.of(Block.GLOWSTONE), 1, new String[]{"GG", "GG"}, 'G', Item.GLOWSTONE_DUST);
+        shaped(Item.of(Block.NETHER_BRICKS), 1, new String[]{"##", "##"}, '#', Item.NETHER_BRICK);
+        shaped(Item.of(Block.QUARTZ_BLOCK), 1, new String[]{"##", "##"}, '#', Item.QUARTZ);
+        shapeless(Item.GOLD_INGOT, 1, Item.GOLD_NUGGET, Item.GOLD_NUGGET, Item.GOLD_NUGGET, Item.GOLD_NUGGET, Item.GOLD_NUGGET,
+                Item.GOLD_NUGGET, Item.GOLD_NUGGET, Item.GOLD_NUGGET, Item.GOLD_NUGGET);
+        shapeless(Item.GOLD_NUGGET, 9, Item.GOLD_INGOT);
+        shapeless(Item.FIRE_CHARGE, 3, Item.GUNPOWDER, Item.COAL, Item.GLOWSTONE_DUST);
+        shapeless(Item.MAGMA_CREAM, 1, Item.SLIMEBALL, Item.GLOWSTONE_DUST);
         shaped(Item.PAPER, 3, new String[]{"###"}, '#', Block.SUGAR_CANE);
         shapeless(Item.SUGAR, 1, Block.SUGAR_CANE);
         shapeless(Item.BOOK, 1, Item.PAPER, Item.PAPER, Item.PAPER, Item.LEATHER);
@@ -147,6 +154,8 @@ public final class Recipes {
         smelt(Item.RAW_CHICKEN, Item.COOKED_CHICKEN);
         smelt(Block.CACTUS, Item.of(Block.GREEN_WOOL));
         smelt(Item.POTATO, Item.BAKED_POTATO);
+        smelt(Block.NETHERRACK, Item.NETHER_BRICK);
+        smelt(Block.NETHER_QUARTZ_ORE, Item.QUARTZ);
     }
 
     /** Finds the crafting result for a square grid (size 2 or 3), or null. */

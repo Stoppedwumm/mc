@@ -126,19 +126,29 @@ public abstract class LivingEntity extends Entity {
         } else {
             air = Math.min(300, air + 5);
         }
-        if (inLava) {
-            fireTicks = 300;
-            damage(DamageSource.LAVA, 4, null);
-        }
-        if (fireTicks > 0) {
-            fireTicks--;
-            if (fireTicks % 20 == 0 && !inLava) damage(DamageSource.FIRE, 1, null);
+        if (fireImmune()) fireTicks = 0;
+        else {
+            if (inLava) {
+                fireTicks = 300;
+                damage(DamageSource.LAVA, 4, null);
+            }
+            if (touching(Block.FIRE.id)) {
+                fireTicks = Math.max(fireTicks, 160);
+                damage(DamageSource.FIRE, 1, null);
+            }
+            if (fireTicks > 0) {
+                fireTicks--;
+                if (fireTicks % 20 == 0 && !inLava) damage(DamageSource.FIRE, 1, null);
+            }
         }
         if (touchingCactus()) damage(DamageSource.CACTUS, 1, null);
         if (y < -64) damage(DamageSource.VOID, 4, null);
     }
 
     protected boolean canDrown() { return true; }
+
+    /** Nether mobs don't burn. */
+    public boolean fireImmune() { return false; }
 
     private boolean touchingCactus() {
         var b = box();

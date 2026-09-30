@@ -23,6 +23,10 @@ public final class Player extends LivingEntity {
     public double spawnX, spawnY = -1, spawnZ;
     public DamageSource deathCause;
     public int xpLevel, xpTotal;
+    /** Ticks spent standing in a portal, and the cooldown after travelling. */
+    public int portalTicks, portalCooldown;
+
+    public boolean inPortal() { return touching(Block.NETHER_PORTAL.id); }
     /** Progress towards the next level, 0-1. */
     public float xpProgress;
 

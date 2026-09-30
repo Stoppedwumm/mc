@@ -331,6 +331,48 @@ public final class MobModel {
                 m.part("armL", -5, 17, 0).box(-12, -0.5f, -0.5f, 12, 1, 1, solid(0x5a3a1a, 0.1));
                 m.part("armR", 5, 17, 0).box(0, -0.5f, -0.5f, 12, 1, 1, solid(0x5a3a1a, 0.1));
             }
+            case ZOMBIE_PIGMAN -> {
+                Painter head = (f, x, y, w, h, r) -> {
+                    if (f == FRONT) {
+                        if (y == 3 && (x == 1 || x == 2 || x == 5 || x == 6)) return x == 2 || x == 5 ? 0xFFd0a020 : 0xFFffffff;
+                        if (y >= 5 && y <= 6 && x >= 2 && x <= 5) return noise(0xe89090, r, 0.05);
+                    }
+                    // Half the face is rotting
+                    return noise(x < w / 2 && f != BACK ? 0x8aa060 : 0xe8a0a0, r, 0.1);
+                };
+                Painter body = (f, x, y, w, h, r) -> noise(y > 9 ? 0x6a4a3a : (x + y) % 5 == 0 ? 0x5a8a4a : 0xd89898, r, 0.12);
+                biped(m, 4, head, body, (f, x, y, w, h, r) -> noise(y < 3 ? 0x6a4a3a : 0xe0a0a0, r, 0.1),
+                        (f, x, y, w, h, r) -> noise(y < 8 ? 0x6a4a3a : 0xd09090, r, 0.1));
+            }
+            case GHAST -> {
+                Painter skin = (f, x, y, w, h, r) -> {
+                    if (f == FRONT) {
+                        if ((y == 6 || y == 7) && (x == 3 || x == 4 || x == 11 || x == 12)) return 0xFF3a3a3a;
+                        if (y == 11 && x >= 5 && x <= 10) return 0xFF6a6a6a;
+                    }
+                    return noise(0xf0f0f0, r, 0.06);
+                };
+                m.part("body", 0, 0, 0).box(-8, 0, -8, 16, 16, 16, skin);
+                m.part("angry", 0, 0, 0).box(-8, 0, 8, 16, 16, 0.2f, (f, x, y, w, h, r) -> {
+                    if (f != FRONT) return 0;
+                    if ((y >= 5 && y <= 8) && (x >= 2 && x <= 5 || x >= 10 && x <= 13)) return (y == 6 || y == 7) && (x == 3 || x == 4 || x == 11 || x == 12) ? 0xFFb01010 : 0xFF202020;
+                    if (y >= 10 && y <= 13 && x >= 4 && x <= 11) return 0xFF301010;
+                    return 0;
+                });
+                for (int i = 0; i < 9; i++) {
+                    float tx = ((i % 3) - 1) * 5 + (i / 3 % 2) * 1.5f - 0.75f, tz = (i / 3 - 1) * 5;
+                    int len = 8 + (i * 7) % 6;
+                    m.part("t" + i, tx, 0, tz).box(-1, -len, -1, 2, len, 2, solid(0xe8e8e8, 0.06));
+                }
+            }
+            case MAGMA_CUBE -> {
+                Painter magma = (f, x, y, w, h, r) -> {
+                    if (f == FRONT && y == 3 && (x == 1 || x == 2 || x == 5 || x == 6)) return 0xFFffc020;
+                    double v = r.nextDouble();
+                    return noise(v < 0.25 ? 0xff7a10 : v < 0.4 ? 0xc03a0a : 0x3a1a14, r, 0.1);
+                };
+                m.part("outer", 0, 0, 0).box(-4, 0, -4, 8, 8, 8, magma);
+            }
             case SLIME -> {
                 Painter core = (f, x, y, w, h, r) -> {
                     if (f == FRONT && y == 1 && (x == 0 || x == 4)) return 0xFF102810;

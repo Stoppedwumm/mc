@@ -19,6 +19,7 @@ import java.util.List;
  * <li>bed: facing (foot to head), bit 2 head half</li>
  * <li>snow layer: layers - 1</li>
  * <li>cake: slices eaten (0-6)</li>
+ * <li>nether portal: 0 = spans the x axis, 1 = spans the z axis</li>
  * <li>torch: 0 standing, 1-4 on a wall in direction (meta - 1)</li>
  * </ul>
  */
@@ -194,6 +195,7 @@ public final class Shapes {
                 }
             }
             case CARPET -> out.add(new int[]{0, 0, 0, 16, 1, 16});
+            case PORTAL -> { if (!col) out.add((meta & 1) == 0 ? new int[]{0, 0, 6, 16, 16, 10} : new int[]{6, 0, 0, 10, 16, 16}); }
             case CAKE -> out.add(new int[]{1 + 2 * Math.min(6, meta & 7), 0, 1, 15, 8, 15});
             case SNOW_LAYER -> {
                 int layers = (meta & 7) + 1;

@@ -117,6 +117,14 @@ public final class TextureGen {
         paint(Tex.EMERALD_BLOCK, () -> metalBlock(0x51e37a, 0x17a64a));
         paint(Tex.SPAWNER, this::spawner);
         paint(Tex.GRAVEL_PATH, this::gravel);
+        paint(Tex.NETHERRACK, this::netherrack);
+        paint(Tex.SOUL_SAND, this::soulSand);
+        paint(Tex.QUARTZ_ORE, this::quartzOre);
+        paint(Tex.PORTAL, this::portal);
+        paint(Tex.FIRE, this::fire);
+        paint(Tex.NETHER_BRICKS, this::netherBricks);
+        paint(Tex.QUARTZ_SIDE, () -> speckle(0xece6de, 0.02, 0xdcd4ca, 0.12));
+        paint(Tex.QUARTZ_TOP, () -> { speckle(0xf0eae2, 0.02, 0xe0d8ce, 0.1); for (int i = 0; i < 16; i++) { set(i, 0, 0xd8d0c4); set(0, i, 0xd8d0c4); } });
         paint(Tex.OAK_DOOR_TOP, () -> woodDoor(true));
         paint(Tex.OAK_DOOR_BOTTOM, () -> woodDoor(false));
         paint(Tex.IRON_DOOR_TOP, () -> ironDoor(true));
@@ -951,6 +959,68 @@ public final class TextureGen {
                 boolean bar = x % 4 == 0 || y % 4 == 0 || x == 15 || y == 15;
                 if (bar) set(x, y, (x + y) % 3 == 0 ? 0x2a3440 : 0x1a2028);
                 else set(x, y, 0, 0);
+            }
+    }
+
+    // ------------------------------------------------------------------ nether
+
+    private void netherrack() {
+        double[] n = valueNoise(4);
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                double v = n[y * 16 + x] + r.nextDouble() * 0.3;
+                int c = v < 0.45 ? 0x6a2a2a : v < 0.8 ? 0x7e3432 : 0x984646;
+                if (r.nextDouble() < 0.06) c = 0x4a1a1a;
+                set(x, y, scale(c, jitter(0.05)));
+            }
+    }
+
+    private void soulSand() {
+        for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) set(x, y, scale(0x5a4232, jitter(0.12)));
+        // Faint screaming faces
+        for (int k = 0; k < 3; k++) {
+            int fx = 1 + r.nextInt(11), fy = 1 + r.nextInt(10);
+            set(fx, fy, 0x3a2820); set(fx + 3, fy, 0x3a2820);
+            set(fx + 1, fy + 3, 0x2e2018); set(fx + 2, fy + 3, 0x2e2018); set(fx + 1, fy + 4, 0x2e2018); set(fx + 2, fy + 4, 0x2e2018);
+        }
+    }
+
+    private void quartzOre() {
+        netherrack();
+        for (int i = 0; i < 6; i++) {
+            int x = 1 + r.nextInt(13), y = 1 + r.nextInt(13);
+            set(x, y, 0xf0ece4); set(x + 1, y, 0xd8d0c8); set(x, y + 1, 0xe4dcd4);
+        }
+    }
+
+    private void portal() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                double sw = Math.sin((x - 7.5) * 0.6 + Math.cos((y - 7.5) * 0.5) * 2) * 0.5 + 0.5;
+                int c = mix(0x3a0a8a, 0xa050f0, sw * 0.7 + r.nextDouble() * 0.3);
+                set(x, y, c, 190);
+            }
+    }
+
+    private void fire() {
+        clearTile();
+        for (int x = 0; x < 16; x++) {
+            int h = 7 + r.nextInt(9);
+            for (int k = 0; k < h; k++) {
+                double t = (double) k / h;
+                int c = t < 0.35 ? 0xfff0a0 : t < 0.7 ? 0xffb030 : 0xe05010;
+                if (r.nextDouble() < 0.15 && k > 3) continue;
+                set(x, 15 - k, c);
+            }
+        }
+    }
+
+    private void netherBricks() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                int row = y / 4, off = row % 2 == 0 ? 0 : 4;
+                boolean mortar = y % 4 == 3 || (x + off) % 8 == 7;
+                set(x, y, mortar ? 0x1a0a0e : scale(0x442228, jitter(0.1)));
             }
     }
 }

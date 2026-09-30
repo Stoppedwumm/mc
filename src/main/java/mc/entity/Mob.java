@@ -68,7 +68,7 @@ public final class Mob extends LivingEntity {
             int r = random.nextInt(100);
             sheepColor = r < 82 ? 0 : r < 87 ? 1 : r < 92 ? 2 : r < 97 ? 3 : 4;
         }
-        if (type == MobType.SLIME) setSlimeSize(1 << random.nextInt(3));
+        if (type.isSlime()) setSlimeSize(1 << random.nextInt(3));
         if (type == MobType.SQUID) stepHeight = 0;
         if (type == MobType.VILLAGER) profession = random.nextInt(PROFESSIONS.length);
         if (type == MobType.IRON_GOLEM) stepHeight = 1;
@@ -88,7 +88,7 @@ public final class Mob extends LivingEntity {
     }
 
     private void updateSize() {
-        if (type == MobType.SLIME) {
+        if (type.isSlime()) {
             width = height = 0.51f * slimeSize;
             return;
         }
@@ -110,14 +110,17 @@ public final class Mob extends LivingEntity {
     }
 
     @Override
-    protected boolean canDrown() { return type != MobType.SKELETON && type != MobType.SQUID; }
+    protected boolean canDrown() { return type != MobType.SKELETON && type != MobType.SQUID && type != MobType.GHAST; }
+
+    @Override
+    public boolean fireImmune() { return type.isNether(); }
 
     @Override
     protected void onLanded(float distance) {
-        if (type != MobType.CHICKEN && type != MobType.SLIME && type != MobType.IRON_GOLEM) super.onLanded(distance);
-        if (type == MobType.SLIME) {
+        if (type != MobType.CHICKEN && !type.isSlime() && type != MobType.IRON_GOLEM && type != MobType.GHAST) super.onLanded(distance);
+        if (type.isSlime()) {
             squish = -0.5f;
-            for (int i = 0; i < slimeSize * 8; i++) world.addParticle("slime", x + (random.nextDouble() - 0.5) * width, y + 0.1, z + (random.nextDouble() - 0.5) * width);
+            for (int i = 0; i < slimeSize * 8; i++) world.addParticle(type == MobType.MAGMA_CUBE ? "flame" : "slime", x + (random.nextDouble() - 0.5) * width, y + 0.1, z + (random.nextDouble() - 0.5) * width);
         }
     }
 
@@ -155,6 +158,11 @@ public final class Mob extends LivingEntity {
                 for (Entity e : world.entities())
                     if (e instanceof Mob m && m.type == MobType.IRON_GOLEM && m.distanceTo(this) < 24) m.angerTicks = 1200;
             }
+        } else if (type == MobType.ZOMBIE_PIGMAN) {
+            if (byPlayer) {
+                for (Entity e : world.entities())
+                    if (e instanceof Mob m && m.type == MobType.ZOMBIE_PIGMAN && m.distanceTo(this) < 32) m.angerTicks = 400 + random.nextInt(400);
+            }
         } else if (type == MobType.ENDERMAN) {
             if (byPlayer) angerTicks = 600;
             if (random.nextInt(3) == 0) teleportRandomly();
@@ -186,14 +194,14 @@ public final class Mob extends LivingEntity {
                 || (lastAttacker instanceof Mob m && m.type == MobType.WOLF && m.tamed);
         if (!isBaby()) dropLoot(fireTicks > 0, byPlayer);
         if (byPlayer && !isBaby() && !type.isGolem() && type != MobType.VILLAGER) {
-            int xp = type == MobType.SLIME ? slimeSize : type.hostile ? 5 + armorPieces() * (1 + random.nextInt(3)) : 1 + random.nextInt(3);
+            int xp = type.isSlime() ? slimeSize : type == MobType.ZOMBIE_PIGMAN ? 5 : type.hostile ? 5 + armorPieces() * (1 + random.nextInt(3)) : 1 + random.nextInt(3);
             XpOrbEntity.spawn(world, x, y + 0.5, z, xp);
         }
-        if (type == MobType.SLIME && slimeSize > 1) {
+        if (type.isSlime() && slimeSize > 1) {
             // Split into 2-4 smaller slimes
             int n = 2 + random.nextInt(3);
             for (int i = 0; i < n; i++) {
-                Mob s = new Mob(MobType.SLIME);
+                Mob s = new Mob(type);
                 s.setSlimeSize(slimeSize / 2);
                 s.setPos(x + (i % 2 - 0.5) * slimeSize / 4.0, y + 0.5, z + (i / 2 - 0.5) * slimeSize / 4.0);
                 s.yaw = random.nextFloat() * 360;
@@ -232,6 +240,13 @@ public final class Mob extends LivingEntity {
             case SLIME -> { if (slimeSize == 1) drop(Item.SLIMEBALL, 0, 2); }
             case IRON_GOLEM -> { drop(Item.IRON_INGOT, 3, 5); drop(Item.of(Block.POPPY), 0, 2); }
             case SNOW_GOLEM -> drop(Item.SNOWBALL, 0, 15);
+            case ZOMBIE_PIGMAN -> {
+                drop(Item.ROTTEN_FLESH, 0, 1);
+                drop(Item.GOLD_NUGGET, 0, 1);
+                if (byPlayer && random.nextInt(40) == 0) drop(Item.GOLD_INGOT, 1, 1);
+            }
+            case GHAST -> { drop(Item.GHAST_TEAR, 0, 1); drop(Item.GUNPOWDER, 0, 2); }
+            case MAGMA_CUBE -> { if (slimeSize > 1) drop(Item.MAGMA_CREAM, 0, 1); }
             default -> { }
         }
         if (type.isUndead() && byPlayer && random.nextInt(40) == 0) drop(Item.IRON_INGOT, 1, 1);
@@ -403,6 +418,10 @@ public final class Mob extends LivingEntity {
             tickSquid();
             return;
         }
+        if (type == MobType.GHAST) {
+            tickGhast();
+            return;
+        }
 
         float forward = 0;
         float speed = type.walkSpeed;
@@ -458,6 +477,7 @@ public final class Mob extends LivingEntity {
                 case SLIME -> {
                     if (slimeSize > 1) meleeIfClose(target, dist, slimeSize == 4 ? 4 : 2);
                 }
+                case MAGMA_CUBE -> meleeIfClose(target, dist, slimeSize * 1.5f + 1);
                 case IRON_GOLEM -> {
                     forward = dist > 2 ? 1 : 0;
                     if (dist < 2.2 + target.width / 2 && attackCooldown == 0) {
@@ -491,7 +511,7 @@ public final class Mob extends LivingEntity {
             speed = f[1];
         }
 
-        if (type == MobType.SLIME) {
+        if (type.isSlime()) {
             // Slimes hop: jump from the ground, drift forward while airborne
             if (onGround) {
                 if (slimeJumpDelay-- <= 0) {
@@ -500,6 +520,7 @@ public final class Mob extends LivingEntity {
                         jump = true;
                         squish = 1;
                         world.playSound("slime_say", x, y, z, 0.3f * slimeSize, pitch());
+                        if (type == MobType.MAGMA_CUBE) motionY += 0.1 + slimeSize * 0.05;
                     }
                 }
                 forward = 0;
@@ -549,6 +570,9 @@ public final class Mob extends LivingEntity {
                 return attackTarget;
             }
             case VILLAGER -> { return null; }
+            case ZOMBIE_PIGMAN -> {
+                return angerTicks > 0 && playerValid && distanceTo(player) < 32 ? player : null;
+            }
             default -> {
                 if (!type.hostile || !playerValid) return null;
                 if (type == MobType.SPIDER && !aggressive && world.isDaytime()) return null;
@@ -666,6 +690,52 @@ public final class Mob extends LivingEntity {
             motionZ *= 0.8;
             motionY *= 0.98;
             squidPitch += (90 - squidPitch) * 0.1f;
+        }
+        bodyYaw = headYaw = yaw;
+    }
+
+    // ------------------------------------------------------------------ ghasts
+
+    private double flyX, flyY, flyZ;
+    /** Ticks the ghast has been charging a fireball (its face turns angry). */
+    public int ghastCharge;
+
+    private void tickGhast() {
+        Player p = world.player();
+        boolean target = p != null && !p.isDead() && !p.creative && distanceTo(p) < 64 && canSee(p);
+        // Drift towards a random point, re-picked when reached or blocked
+        double dx = flyX - x, dy = flyY - y, dz = flyZ - z;
+        double d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (d < 1 || d > 60 || horizontalCollision || verticalCollision || random.nextInt(100) == 0) {
+            flyX = x + (random.nextDouble() * 2 - 1) * 16;
+            flyY = Math.max(40, Math.min(110, y + (random.nextDouble() * 2 - 1) * 16));
+            flyZ = z + (random.nextDouble() * 2 - 1) * 16;
+        } else {
+            motionX += dx / d * 0.02;
+            motionY += dy / d * 0.02;
+            motionZ += dz / d * 0.02;
+        }
+        move(motionX, motionY, motionZ);
+        motionX *= 0.91;
+        motionY *= 0.91;
+        motionZ *= 0.91;
+        if (target) {
+            faceTowards(p.x, p.z, 20);
+            if (++ghastCharge == 10) world.playSound("ghast_charge", x, y + 2, z, 2, 1);
+            if (ghastCharge >= 20) {
+                FireballEntity f = new FireballEntity(this);
+                double ry = Math.toRadians(yaw);
+                f.setPos(x - Math.sin(ry) * 2.2, y + 2, z + Math.cos(ry) * 2.2);
+                f.aim(p.x - f.x, p.y + p.height / 2 - f.y, p.z - f.z);
+                world.addEntity(f);
+                world.playSound("ghast_shoot", x, y + 2, z, 2, 1);
+                ghastCharge = -40;
+            }
+        } else {
+            if (ghastCharge > 0) ghastCharge--;
+            double h = Math.sqrt(motionX * motionX + motionZ * motionZ);
+            if (h > 0.01) yaw += wrap((float) Math.toDegrees(Math.atan2(-motionX, motionZ)) - yaw) * 0.1f;
+            if (random.nextInt(200) == 0) world.playSound("ghast_say", x, y + 2, z, 3, 0.8f + random.nextFloat() * 0.4f);
         }
         bodyYaw = headYaw = yaw;
     }

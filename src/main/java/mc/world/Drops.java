@@ -45,6 +45,9 @@ public final class Drops {
             }
             case 102, 105 -> { }
             case 103 -> add(out, Item.EMERALD, 1);
+            case 106, 110 -> { }
+            case 109 -> add(out, Item.QUARTZ, 1);
+            case 30 -> add(out, Item.GLOWSTONE_DUST, 2 + RANDOM.nextInt(3));
             case 63 -> {
                 if ((meta & 7) >= 7) {
                     add(out, Item.WHEAT, 1);

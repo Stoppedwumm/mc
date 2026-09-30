@@ -72,10 +72,20 @@ public final class World implements Shapes.Getter {
     private int[][] offsets = new int[0][];
     private int offsetsRadius = -1;
 
+    public final Dimension dimension;
+    /** Terrain for the Nether (null in the overworld). */
+    public final mc.world.gen.NetherGenerator nether;
+
     public World(long seed, WorldStorage storage) {
+        this(seed, storage, Dimension.OVERWORLD);
+    }
+
+    public World(long seed, WorldStorage storage, Dimension dimension) {
         this.seed = seed;
         this.storage = storage;
+        this.dimension = dimension;
         this.generator = new TerrainGenerator(seed);
+        this.nether = dimension == Dimension.NETHER ? new mc.world.gen.NetherGenerator(seed) : null;
         this.decorator = new Decorator(this, seed);
         threads = Math.max(1, Math.min(8, Runtime.getRuntime().availableProcessors() - 1));
         ThreadFactory tf = r -> {
@@ -223,7 +233,7 @@ public final class World implements Shapes.Getter {
             if (nid == 0) continue;
             Block b = Block.get(nid);
             if (b.isLiquid()) scheduleTick(nx, ny, nz, Liquids.delay(nid));
-            else if (d[1] >= 0 || d[0] != 0 || d[2] != 0) neighborChanged(nx, ny, nz, b);
+            else neighborChanged(nx, ny, nz, b);
         }
     }
 
@@ -245,6 +255,8 @@ public final class World implements Shapes.Getter {
             int f = meta & 3, dir = (meta & 4) != 0 ? Shapes.opposite(f) : f;
             ok = getBlock(x + Shapes.DX[dir], y, z + Shapes.DZ[dir]) == b.id;
         }
+        else if (b == Block.NETHER_PORTAL) ok = Portal.intact(this, x, y, z);
+        else if (b == Block.FIRE) ok = (below.solid && !below.isLiquid()) || nextToFlammable(x, y, z);
         else if (b.shape == Block.Shape.CARPET) ok = below != Block.AIR && !below.isLiquid();
         else if (b.shape == Block.Shape.SNOW_LAYER) ok = below.opaque;
         else if (b.isCrop()) ok = below == Block.FARMLAND;
@@ -253,7 +265,47 @@ public final class World implements Shapes.Getter {
         else if (b == Block.DEAD_BUSH) ok = below == Block.SAND || below == Block.TERRACOTTA || below == Block.DIRT;
         else if (b.model == Block.Model.CROSS) ok = below == Block.GRASS || below == Block.DIRT || below == Block.COARSE_DIRT || below == Block.SNOWY_GRASS || below == Block.FARMLAND;
         else if (b == Block.SAND || b == Block.GRAVEL) { checkFalling(x, y, z); return; }
-        if (!ok) breakBlock(x, y, z, null, true);
+        if (!ok) {
+            if (b == Block.FIRE || b == Block.NETHER_PORTAL) setBlock(x, y, z, 0);
+            else breakBlock(x, y, z, null, true);
+        }
+    }
+
+    private static final int[][] DIRS6 = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+
+    public boolean nextToFlammablePublic(int x, int y, int z) { return nextToFlammable(x, y, z); }
+
+    private boolean nextToFlammable(int x, int y, int z) {
+        for (int[] d : DIRS6) if (Block.get(getBlock(x + d[0], y + d[1], z + d[2])).flammable) return true;
+        return false;
+    }
+
+    /** Fire burns out unless on netherrack, spreads to flammable neighbours and consumes them. */
+    private void tickFire(int x, int y, int z) {
+        Block below = Block.get(getBlock(x, y - 1, z));
+        if (below == Block.NETHERRACK) return;
+        if (raining && getSkyLight(x, y, z) >= 15 && random.nextInt(2) == 0) { setBlock(x, y, z, 0); return; }
+        int age = getMeta(x, y, z);
+        if (age < 15) setBlock(x, y, z, Block.FIRE.id, age + 1, false);
+        boolean fuel = nextToFlammable(x, y, z);
+        if ((!fuel && age > 3) || (age >= 15 && random.nextInt(4) == 0)) { setBlock(x, y, z, 0); return; }
+        for (int[] d : DIRS6) {
+            int nx = x + d[0], ny = y + d[1], nz = z + d[2];
+            Block n = Block.get(getBlock(nx, ny, nz));
+            if (!n.flammable || random.nextInt(3) != 0) continue;
+            if (n == Block.TNT) {
+                setBlock(nx, ny, nz, 0);
+                TntEntity t = new TntEntity(80);
+                t.setPos(nx + 0.5, ny, nz + 0.5);
+                addEntity(t);
+            } else if (random.nextInt(2) == 0) setBlock(nx, ny, nz, Block.FIRE.id);
+            else setBlock(nx, ny, nz, 0);
+        }
+        // Flames jump to empty spaces next to fuel
+        for (int i = 0; i < 2; i++) {
+            int nx = x + random.nextInt(3) - 1, ny = y + random.nextInt(3) - 1, nz = z + random.nextInt(3) - 1;
+            if (getBlock(nx, ny, nz) == 0 && nextToFlammable(nx, ny, nz) && random.nextInt(4) == 0) setBlock(nx, ny, nz, Block.FIRE.id);
+        }
     }
 
     /** Makes sand and gravel with nothing beneath them fall. */
@@ -392,6 +444,7 @@ public final class World implements Shapes.Getter {
     }
 
     public boolean isDaytime() {
+        if (dimension == Dimension.NETHER) return false;
         long t = time % 24000;
         return t < 12500 || t > 23500;
     }
@@ -437,7 +490,7 @@ public final class World implements Shapes.Getter {
             Entity e = it.next();
             boolean frozen = !isLoaded((int) Math.floor(e.x), (int) Math.floor(e.z));
             if (!e.removed && !frozen) {
-                if (e instanceof Mob m && m.type.hostile && player != null) {
+                if (e instanceof Mob m && (m.type.hostile || (dimension == Dimension.NETHER && m.type == MobType.ZOMBIE_PIGMAN)) && player != null) {
                     double d = m.distanceSq(player.x, player.y, player.z);
                     if (d > 128 * 128 || (d > 40 * 40 && random.nextInt(800) == 0)) m.remove();
                 }
@@ -455,7 +508,7 @@ public final class World implements Shapes.Getter {
         for (int dx = -6; dx <= 6; dx++)
             for (int dz = -6; dz <= 6; dz++) {
                 Chunk c = chunks.get(Chunk.key(pcx + dx, pcz + dz));
-                if (c == null || c.state != Chunk.STATE_DECORATED || c.light == null) continue;
+                if (c == null || c.state != Chunk.STATE_DECORATED) continue;
                 int sections = (c.maxY + 15) / 16;
                 for (int s = 0; s < sections; s++)
                     for (int k = 0; k < 3; k++) {
@@ -501,6 +554,8 @@ public final class World implements Shapes.Getter {
             if (h < 3 && random.nextInt(8) == 0) setBlock(x, y + 1, z, b.id);
         } else if (b == Block.OAK_LEAVES || b == Block.BIRCH_LEAVES || b == Block.SPRUCE_LEAVES) {
             if (getMeta(x, y, z) == 0 && !logNearby(x, y, z)) breakBlock(x, y, z, null, true);
+        } else if (b == Block.FIRE) {
+            tickFire(x, y, z);
         } else if (b == Block.ICE) {
             if (getBlockLight(x, y + 1, z) > 11) setBlock(x, y, z, Block.WATER.id);
         }
@@ -531,6 +586,11 @@ public final class World implements Shapes.Getter {
 
     /** Minecraft-style explosion: rays from the centre destroy blocks; nearby entities take damage. */
     public void explode(double cx, double cy, double cz, float power, Entity source) {
+        explode(cx, cy, cz, power, source, false);
+    }
+
+    /** With fire = true, flames are left on some of the blasted ground (ghast fireballs). */
+    public void explode(double cx, double cy, double cz, float power, Entity source, boolean fire) {
         playSound("explode", cx, cy, cz, 4, 0.8f + random.nextFloat() * 0.3f);
         for (int i = 0; i < 12; i++) addParticle("explosion", cx + random.nextGaussian() * power * 0.4, cy + random.nextGaussian() * power * 0.4, cz + random.nextGaussian() * power * 0.4);
         it.unimi.dsi.fastutil.longs.LongOpenHashSet destroy = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
@@ -574,6 +634,12 @@ public final class World implements Shapes.Getter {
             if (drop) for (ItemStack s : Drops.of(b, meta, new ItemStack(Item.DIAMOND_PICKAXE, 1))) spawnItem(p[0] + 0.5, p[1] + 0.5, p[2] + 0.5, s);
         }
         for (int[] p : list) notifyNeighbors(p[0], p[1], p[2]);
+        if (fire) {
+            for (int[] p : list) {
+                if (random.nextInt(3) == 0 && getBlock(p[0], p[1], p[2]) == 0 && Block.get(getBlock(p[0], p[1] - 1, p[2])).opaque)
+                    setBlock(p[0], p[1], p[2], Block.FIRE.id);
+            }
+        }
         // Damage and push entities
         double radius = power * 2;
         List<Entity> all = new ArrayList<>(entities);
@@ -832,7 +898,8 @@ public final class World implements Shapes.Getter {
             System.arraycopy(data, 1, blocks, 0, Chunk.VOLUME);
             System.arraycopy(data, 1 + Chunk.VOLUME, meta, 0, Chunk.VOLUME);
             Chunk c = new Chunk(cx, cz, blocks, meta);
-            generator.computeBiomeData(c);
+            if (nether != null) nether.computeBiomeData(c);
+            else generator.computeBiomeData(c);
             c.state = data[0];
             c.recomputeMaxY();
             c.entityJson = storage.loadEntities(cx, cz);
@@ -840,7 +907,8 @@ public final class World implements Shapes.Getter {
             return c;
         }
         Chunk c = new Chunk(cx, cz);
-        generator.generate(c);
+        if (nether != null) nether.generate(c);
+        else generator.generate(c);
         return c;
     }
 

@@ -135,7 +135,7 @@ public final class ChunkMesher {
                         case LIQUID -> liquid(block, x, y, z, block == Block.WATER ? translucent : solid);
                         case CROSS -> cross(block, x, y, z, tint, solid);
                         case TORCH -> torch(block, x, y, z, solid);
-                        case SHAPE -> shaped(block, x, y, z, tint, solid);
+                        case SHAPE -> shaped(block, x, y, z, tint, block.layer == Block.Layer.TRANSLUCENT ? translucent : solid);
                         default -> { }
                     }
                 }
@@ -412,8 +412,8 @@ public final class ChunkMesher {
         int tu = (tex & 15) * 256 + 1, tv = (tex >> 4) * 256 + 1;
         int s = vSky[0], bl = vBlk[0];
         int shade = 255;
-        int wave = block == Block.SUGAR_CANE ? 0 : F_PLANT;
-        int fl = 6;
+        int wave = block == Block.SUGAR_CANE || block == Block.FIRE ? 0 : F_PLANT;
+        int fl = 6 | (block.lightEmission > 0 ? F_EMISSIVE : 0);
         // Slight random offset for grass so fields look less regular
         int ox = 0, oz = 0;
         if (block == Block.TALL_GRASS || block == Block.FERN) {
@@ -479,7 +479,8 @@ public final class ChunkMesher {
                 } else {
                     flatLight(x, y, z);
                 }
-                emit(out, f, x, y, z, bx[0], bx[1], bx[2], bx[3], bx[4], bx[5], block.textureForFace(f, meta), tint, boundary, 0, 0, 0);
+                emit(out, f, x, y, z, bx[0], bx[1], bx[2], bx[3], bx[4], bx[5], block.textureForFace(f, meta), tint, boundary, 0, 0,
+                        block.lightEmission > 0 ? F_EMISSIVE : 0);
             }
         }
     }

@@ -138,6 +138,13 @@ public final class Item {
     public static final Item REDSTONE = item(327, "Redstone Dust", 91);
     public static final Item ENCHANTED_BOOK = item(328, "Enchanted Book", 92).stack(1);
     public static final Item EXPERIENCE_BOTTLE = item(329, "Bottle o' Enchanting", 93);
+    public static final Item QUARTZ = item(350, "Nether Quartz", 94);
+    public static final Item NETHER_BRICK = item(351, "Nether Brick", 95);
+    public static final Item GLOWSTONE_DUST = item(352, "Glowstone Dust", 112);
+    public static final Item GOLD_NUGGET = item(353, "Gold Nugget", 113);
+    public static final Item GHAST_TEAR = item(354, "Ghast Tear", 114);
+    public static final Item MAGMA_CREAM = item(355, "Magma Cream", 115);
+    public static final Item FIRE_CHARGE = item(356, "Fire Charge", 116);
 
     // Tools: icon = 40 + type*5 + material
     public static final Item WOODEN_PICKAXE = tool(300, "Wooden Pickaxe", 40, Tool.PICKAXE, 0, 59, 2, 2);
@@ -203,13 +210,13 @@ public final class Item {
         if (b == Block.STONE || b == Block.COBBLESTONE || b == Block.MOSSY_COBBLESTONE || b == Block.SANDSTONE || b == Block.BRICKS
                 || b == Block.STONE_BRICKS || b == Block.FURNACE || b == Block.LIT_FURNACE || b == Block.OBSIDIAN || b == Block.GRANITE
                 || b == Block.DIORITE || b == Block.ANDESITE || b == Block.TERRACOTTA || b == Block.ICE || b.name.endsWith("Ore")
-                || b == Block.SPAWNER || b.name.startsWith("Block of"))
+                || b == Block.SPAWNER || b.name.startsWith("Block of") || b == Block.NETHERRACK || b == Block.NETHER_BRICKS)
             return Tool.PICKAXE;
         if (b.base != null && b.shape != Block.Shape.CARPET) return effectiveTool(b.base);
         if (b == Block.IRON_DOOR || b == Block.IRON_BARS) return Tool.PICKAXE;
         if (b.sound == Block.SoundType.WOOD) return Tool.AXE;
         if (b == Block.DIRT || b == Block.GRASS || b == Block.SAND || b == Block.GRAVEL || b == Block.CLAY || b == Block.SNOW
-                || b == Block.SNOWY_GRASS || b == Block.COARSE_DIRT || b == Block.FARMLAND || b == Block.SNOW_LAYER) return Tool.SHOVEL;
+                || b == Block.SNOWY_GRASS || b == Block.COARSE_DIRT || b == Block.FARMLAND || b == Block.SNOW_LAYER || b == Block.SOUL_SAND) return Tool.SHOVEL;
         return Tool.NONE;
     }
 
@@ -218,6 +225,7 @@ public final class Item {
         if (b == Block.OBSIDIAN) return 3;
         if (b == Block.DIAMOND_ORE || b == Block.GOLD_ORE || b == Block.EMERALD_ORE || b == Block.EMERALD_BLOCK || b == Block.DIAMOND_BLOCK) return 2;
         if (b == Block.IRON_BLOCK) return 1;
+        if (b == Block.NETHERRACK || b == Block.NETHER_QUARTZ_ORE || b == Block.NETHER_BRICKS || b == Block.QUARTZ_BLOCK) return 0;
         if (b == Block.IRON_ORE) return 1;
         if (effectiveTool(b) == Tool.PICKAXE) return 0;
         return -1;

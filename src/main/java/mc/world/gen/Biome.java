@@ -13,7 +13,8 @@ public enum Biome {
     MOUNTAINS("Mountains"),
     SNOWY_PEAKS("Snowy Peaks"),
     RIVER("River"),
-    BADLANDS("Badlands");
+    BADLANDS("Badlands"),
+    NETHER("Nether Wastes");
 
     public final String displayName;
     public static final Biome[] VALUES = values();

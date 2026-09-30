@@ -10,6 +10,7 @@ import mc.world.BlockEntity;
 import mc.world.Chunk;
 import mc.world.Liquids;
 import mc.world.Shapes;
+import mc.world.Portal;
 import mc.world.World;
 
 import java.util.Random;
@@ -323,6 +324,11 @@ final class Interaction {
             int id = w().getBlock(hit.x, hit.y, hit.z);
             if (id == Block.CRAFTING_TABLE.id) { g.screens.openCrafting(); startSwing(); return; }
             if (toggle(hit.x, hit.y, hit.z)) return;
+            if (id == Block.BED.id && w().dimension == mc.world.Dimension.NETHER) {
+                w().breakBlock(hit.x, hit.y, hit.z, null, false);
+                w().explode(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5, 5, null);
+                return;
+            }
             if (id == Block.BED.id) { g.sleep(hit.x, hit.y, hit.z); startSwing(); return; }
             if (id == Block.CAKE.id && (p.food < 20 || p.creative)) {
                 int bites = w().getMeta(hit.x, hit.y, hit.z);
@@ -372,6 +378,10 @@ final class Interaction {
             if (fresh) { useType = 1; useTicks = 0; }
             return;
         }
+        if ((item == Item.FLINT_AND_STEEL || item == Item.FIRE_CHARGE) && hit != null) {
+            if (fresh) ignite(h);
+            return;
+        }
         if (item.isArmor()) {
             if (fresh) {
                 // Swap with whatever is worn in that slot
@@ -415,6 +425,26 @@ final class Interaction {
                 lastUseWasPlace = true;
                 placeDelay = 4;
             }
+        }
+    }
+
+    /** Flint and steel / fire charge: light a portal frame, or set fire to the block face. */
+    private void ignite(ItemStack h) {
+        Player p = p();
+        int x = hit.x + hit.nx, y = hit.y + hit.ny, z = hit.z + hit.nz;
+        int here = w().getBlock(x, y, z);
+        if (here != 0 && !Block.get(here).replaceable) return;
+        boolean lit = Portal.tryLight(w(), x, y, z);
+        if (!lit) {
+            Block below = Block.get(w().getBlock(x, y - 1, z));
+            if (!below.solid && !w().nextToFlammablePublic(x, y, z)) return;
+            w().setBlock(x, y, z, Block.FIRE.id);
+        }
+        g.sound.play("ignite", x + 0.5, y + 0.5, z + 0.5, 1, 0.9f + random.nextFloat() * 0.2f);
+        startSwing();
+        if (!p.creative) {
+            if (h.item == Item.FIRE_CHARGE) consume(h);
+            else if (h.damageTool(1)) breakHeld();
         }
     }
 
@@ -489,6 +519,13 @@ final class Interaction {
         if (!Block.get(w().getBlock(x, y, z)).replaceable) { x += hit.nx; y += hit.ny; z += hit.nz; }
         Block existing = Block.get(w().getBlock(x, y, z));
         if (!existing.replaceable && !existing.isLiquid()) return;
+        if (liquid == Block.WATER && w().dimension == mc.world.Dimension.NETHER) {
+            // Water boils away in the Nether
+            g.sound.play("fizz", x + 0.5, y + 0.5, z + 0.5, 0.5f, 2.6f);
+            for (int i = 0; i < 8; i++) g.particles.spawn("smoke", x + random.nextDouble(), y + random.nextDouble(), z + random.nextDouble());
+            if (!p().creative) p().inventory.setHeld(new ItemStack(Item.BUCKET, 1));
+            return;
+        }
         w().setBlock(x, y, z, liquid.id, 0, true);
         w().scheduleTick(x, y, z, Liquids.delay(liquid.id));
         g.sound.play("bucket", x, y, z, 1, 0.8f);

@@ -163,6 +163,7 @@ public final class EntityRenderer {
             else if (e instanceof ItemEntity it) renderItem(it, wr, pt, ex, ey, ez, l);
             else if (e instanceof XpOrbEntity o) renderOrb(o, wr, pt, ex, ey, ez);
             else if (e instanceof ThrownEntity t) renderSprite(t.item, wr, pt, ex, ey, ez, l, 0.25f);
+            else if (e instanceof FireballEntity) renderSprite(Item.FIRE_CHARGE, wr, pt, ex, ey + 0.3, ez, 3f, 0.6f);
             else if (e instanceof FallingBlockEntity fb) renderBlock(Block.get(fb.blockId), wr, ex, ey + 0.49, ez, 0.98f, l, 0xFFFFFF);
             else if (e instanceof TntEntity tnt) {
                 float s = tnt.fuse < 10 ? 1 + (10 - tnt.fuse) * 0.02f : 1;
@@ -208,6 +209,19 @@ public final class EntityRenderer {
                 model.get("armL").rz = -(float) (Math.cos(time * 0.09) * 0.05 + 0.05);
                 model.get("armR").rz = (float) (Math.cos(time * 0.09) * 0.05 + 0.05);
             }
+            case ZOMBIE_PIGMAN -> {
+                model.get("legL").rx = legA;
+                model.get("legR").rx = legB;
+                boolean angry = m.angerTicks > 0;
+                model.get("armL").rx = angry ? (float) -Math.PI / 2 : legB * 0.8f;
+                model.get("armR").rx = angry ? (float) -Math.PI / 2 : legA * 0.8f;
+            }
+            case GHAST -> {
+                model.get("angry").visible = m.ghastCharge > 0;
+                for (int i = 0; i < 9; i++) model.get("t" + i).rx = (float) Math.sin(time * 0.1 + i) * 0.2f + 0.2f;
+                mat.translate(0, 0.3f, 0);
+            }
+            case MAGMA_CUBE -> light = Math.max(light, 2.2f);
             case ENDERMAN -> {
                 model.get("legL").rx = legA * 0.5f;
                 model.get("legR").rx = legB * 0.5f;
@@ -323,7 +337,8 @@ public final class EntityRenderer {
             if ((int) (f * 10) % 2 == 0) light *= 1 + f * 2;
         }
         if (m.hurtTime > 0 || m.deathTime > 0) tint = 0xFF8080;
-        if (m.type == MobType.SLIME) {
+        if (m.type == MobType.GHAST) scale *= 4;
+        if (m.type.isSlime()) {
             float sq = m.prevSquish + (m.squish - m.prevSquish) * pt;
             float k = m.slimeSize * 1.02f;
             mat.scale(scale * k / (sq + 1), scale * k * (sq + 1), scale * k / (sq + 1));
@@ -356,6 +371,7 @@ public final class EntityRenderer {
             renderArmor(m.armor, model, mat, wr, tint);
             if (m.type == MobType.SKELETON) renderHandItem(Item.BOW, model, mat, wr);
         }
+        if (m.type == MobType.ZOMBIE_PIGMAN) renderHandItem(Item.GOLDEN_SWORD, model, mat, wr);
         if (m.type == MobType.ENDERMAN && m.carriedBlock != 0) {
             Item carried = Item.get(m.carriedBlock);
             if (carried != null) {

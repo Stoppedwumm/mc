@@ -71,6 +71,13 @@ public final class ItemTextureGen {
             for (int y = 5; y <= 10; y++) for (int x = 5; x <= 10; x++) if (dist(x, y, 7.5, 7.5) < 2.2) set(x, y, 0x0a2a24);
         });
         tile(90, () -> shape((x, y) -> Math.abs(x - 7.5) / 4.5 + Math.abs(y - 7.5) / 6.5 < 1, 0x3ad86a, 0x0a7a2a, 0xa8ffc0));
+        tile(94, () -> shape((x, y) -> Math.abs(x - 7.5) / 3.5 + Math.abs(y - 7.5) / 6.5 < 1 && x + y > 5, 0xece6de, 0xa8a098, 0xffffff));
+        tile(95, () -> shape((x, y) -> x >= 2 && x <= 13 && y >= 5 && y <= 11 && x + y > 8, 0x4a2228, 0x2a0c10, 0x6a3a40));
+        tile(112, () -> pile(0xf8d860, 0xb09020, 0xfff0a0));
+        tile(113, () -> shape((x, y) -> dist(x, y, 7.5, 8.5) < 3.5, 0xf8d840, 0xa87a10, 0xfff8a8));
+        tile(114, () -> shape((x, y) -> dist(x, y, 7.5, 9.5) < 4 || (y < 7 && y > 1 && Math.abs(x - 7.5) < (y - 1) * 0.7), 0xc8e8f0, 0x6a9aa8, 0xffffff));
+        tile(115, () -> shape((x, y) -> dist(x, y, 7.5, 8) < 5.5, 0xf08a20, 0x8a3a0a, 0xffd060));
+        tile(116, () -> { shape((x, y) -> dist(x, y, 7.5, 7.5) < 5.5, 0x3a2a20, 0x101010, 0x6a4a3a); for (int i = 0; i < 10; i++) set(4 + r.nextInt(8), 4 + r.nextInt(8), 0xf08a20); });
         tile(91, () -> pile(0xd01010, 0x6a0000, 0xff5a5a));
         tile(92, () -> { book(); for (int y = 2; y < 14; y += 3) set(5 + (y % 5), y, 0xe070ff); });
         tile(93, this::xpBottle);

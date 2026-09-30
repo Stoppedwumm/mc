@@ -41,6 +41,9 @@ public final class WorldRenderer {
     public final Vector3f sunDir = new Vector3f(), lightDir = new Vector3f();
     public float brightness = 0.5f;
     public boolean shadows = true, clouds = true, underwater, inLava;
+    /** Rendering the Nether: no sky, sun or shadows; red fog. */
+    public boolean nether;
+    public static final float[] NETHER_FOG = {0.045f, 0.006f, 0.004f};
     public int width, height;
 
     public WorldRenderer(long seed) {
@@ -148,7 +151,7 @@ public final class WorldRenderer {
     /** Renders terrain depth from the sun (or moon) into the shadow map, stabilised to world-space texels. */
     public void renderShadows(World world) {
         boolean lightUp = lightDir.y > 0.08f;
-        if (!shadows || !lightUp || underwater) {
+        if (!shadows || !lightUp || underwater || nether) {
             shadowMatrix.identity().scale(0);
             return;
         }
@@ -190,6 +193,7 @@ public final class WorldRenderer {
     // ------------------------------------------------------------------ passes
 
     public void renderSky() {
+        if (nether) return;
         glDisable(GL_DEPTH_TEST);
         glDepthMask(false);
         skyShader.bind();
@@ -212,7 +216,8 @@ public final class WorldRenderer {
         chunkShader.set("uTex", 0);
         chunkShader.set("uShadowMap", 1);
         chunkShader.set("uDepthTex", 2);
-        chunkShader.set("uShadows", shadows && lightDir.y > 0.08f && !underwater ? 1 : 0);
+        chunkShader.set("uShadows", shadows && lightDir.y > 0.08f && !underwater && !nether ? 1 : 0);
+        chunkShader.set("uNether", nether ? 1 : 0);
         chunkShader.set("uShadowMatrix", shadowMatrix);
         chunkShader.set("uLightDir", lightDir.x, lightDir.y, lightDir.z);
         chunkShader.set("uTranslucent", translucent ? 1 : 0);
@@ -286,7 +291,8 @@ public final class WorldRenderer {
         basicShader.set("uUseTex", texture ? 1 : 0);
         basicShader.set("uFog", fogMode);
         basicShader.set("uAlphaCut", alphaCut);
-        basicShader.set("uFogColor", 0.5f, 0.6f, 0.8f);
+        if (nether) basicShader.set("uFogColor", NETHER_FOG[0], NETHER_FOG[1], NETHER_FOG[2]);
+        else basicShader.set("uFogColor", 0.5f, 0.6f, 0.8f);
         basicShader.set("uFogStart", fogEnd * 0.7f);
         basicShader.set("uFogEnd", fogEnd);
         basicShader.set("uLinear", 1);

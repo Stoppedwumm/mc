@@ -173,6 +173,10 @@ final class Commands {
                     chat("Successfully filled " + vol + " blocks");
                 }
                 case "seed" -> chat("Seed: [" + world.seed + "]");
+                case "dimension", "dim" -> {
+                    mc.world.Dimension d = mc.world.Dimension.valueOf(a[1].toUpperCase().replace("THE_", ""));
+                    if (d != world.dimension) g.changeDimension(d, true);
+                }
                 case "locate" -> {
                     int[] v = world.decorator.structures.nearestVillage((int) p.x, (int) p.z);
                     if (v == null) chat("Could not find a village nearby");

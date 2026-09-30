@@ -23,6 +23,9 @@ uniform vec2 uScreen;
 uniform float uNear;
 uniform float uFar;
 uniform float uBrightness;
+uniform int uNether;
+
+const vec3 NETHER_FOG = vec3(0.045, 0.006, 0.004);
 
 out vec4 fragColor;
 
@@ -46,6 +49,12 @@ float linearDepth(float d) {
 }
 
 vec3 fog(vec3 col, float dist, vec3 viewDir, out float amount) {
+    if (uNether == 1 && uUnderwater == 0) {
+        float nf = 1.0 - exp(-dist * 0.011);
+        nf = max(nf, smoothstep(uFogEnd * 0.6, uFogEnd, dist));
+        amount = nf;
+        return mix(col, NETHER_FOG, nf);
+    }
     if (uUnderwater == 1) {
         vec3 water = vec3(0.01, 0.05, 0.08) * (length(sunlightColor()) * 0.6 + 0.08);
         amount = 1.0 - exp(-dist * 0.08);
@@ -62,6 +71,13 @@ vec3 fog(vec3 col, float dist, vec3 viewDir, out float amount) {
 }
 
 vec3 lighting(vec3 albedo, vec3 n, float sky, float blk, float ao, bool foliage) {
+    if (uNether == 1) {
+        // No sky: a dim, warm ambient glow plus torch/lava light
+        float bn = blk * blk;
+        vec3 amb = vec3(0.30, 0.19, 0.15) * (0.8 + 0.2 * n.y) * ao;
+        vec3 lava = vec3(1.0, 0.55, 0.28) * (bn * bn * 2.2 + bn * 0.35) * ao;
+        return albedo * (amb + lava + vec3(0.01) * (0.5 + uBrightness));
+    }
     float sh = shadow();
     float ndl = foliage ? 0.65 : max(dot(n, uLightDir), 0.0);
     vec3 lightCol = uSunDir.y > -0.05 ? sunlightColor() : moonlightColor();

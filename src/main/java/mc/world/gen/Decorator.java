@@ -25,6 +25,11 @@ public final class Decorator {
     public void decorate(Chunk chunk) {
         Random rand = new Random(seed * 31 ^ (chunk.cx * 49632L + 1) * 73856093L ^ (chunk.cz * 325176L + 7) * 19349663L);
         int bx = chunk.cx * 16, bz = chunk.cz * 16;
+        if (world.dimension == mc.world.Dimension.NETHER) {
+            decorateNether(chunk, rand, bx, bz);
+            chunk.state = Chunk.STATE_DECORATED;
+            return;
+        }
         Biome biome = Biome.VALUES[chunk.biome[8 * 16 + 8]];
 
         int trees = switch (biome) {
@@ -125,6 +130,44 @@ public final class Decorator {
 
         structures.decorate(chunk, rand);
         chunk.state = Chunk.STATE_DECORATED;
+    }
+
+    private void decorateNether(Chunk chunk, Random rand, int bx, int bz) {
+        // Glowstone clusters hanging from the ceiling
+        for (int i = 0; i < 2 + rand.nextInt(3); i++) {
+            int x = bx + rand.nextInt(16), z = bz + rand.nextInt(16), y = 120;
+            // Find a ceiling: the first air below netherrack
+            while (y > 40 && !(world.getBlock(x, y, z) == 0 && world.getBlock(x, y + 1, z) == Block.NETHERRACK.id)) y--;
+            if (y <= 40) continue;
+            world.setBlockGen(x, y, z, Block.GLOWSTONE.id);
+            for (int k = 0; k < 120; k++) {
+                int px = x + rand.nextInt(8) - rand.nextInt(8), py = y - rand.nextInt(10), pz = z + rand.nextInt(8) - rand.nextInt(8);
+                if (world.getBlock(px, py, pz) != 0) continue;
+                int n = 0;
+                for (int[] d : new int[][]{{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}})
+                    if (world.getBlock(px + d[0], py + d[1], pz + d[2]) == Block.GLOWSTONE.id) n++;
+                if (n == 1) world.setBlockGen(px, py, pz, Block.GLOWSTONE.id);
+            }
+        }
+        // Eternal fires on netherrack
+        for (int i = 0; i < rand.nextInt(rand.nextInt(10) + 1); i++) {
+            int x = bx + rand.nextInt(16), z = bz + rand.nextInt(16), y = 32 + rand.nextInt(90);
+            for (int k = 0; k < 16; k++) {
+                int px = x + rand.nextInt(6) - 3, py = y + rand.nextInt(4) - 2, pz = z + rand.nextInt(6) - 3;
+                if (world.getBlock(px, py, pz) == 0 && world.getBlock(px, py - 1, pz) == Block.NETHERRACK.id) world.setBlockGen(px, py, pz, Block.FIRE.id);
+            }
+        }
+        // Lava springs in the walls
+        for (int i = 0; i < 6; i++) {
+            int x = bx + rand.nextInt(16), z = bz + rand.nextInt(16), y = 40 + rand.nextInt(80);
+            if (world.getBlock(x, y, z) != Block.NETHERRACK.id || world.getBlock(x, y + 1, z) != Block.NETHERRACK.id) continue;
+            int air = 0;
+            for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) if (world.getBlock(x + d[0], y, z + d[1]) == 0) air++;
+            if (air == 1) {
+                world.setBlockGen(x, y, z, Block.LAVA.id);
+                world.scheduleTick(x, y, z, 30);
+            }
+        }
     }
 
     /** Grows a sapling into a tree suited to the biome; returns false if there wasn't room. */

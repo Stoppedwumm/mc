@@ -6,7 +6,7 @@ package mc.world;
 public final class Block {
     public enum Model { NONE, CUBE, CROSS, LIQUID, TORCH, SHAPE }
     /** Non-cube geometry, see {@link Shapes}. */
-    public enum Shape { NONE, SLAB, STAIRS, FENCE, GATE, DOOR, TRAPDOOR, LADDER, PANE, BED, WALL, CARPET, SNOW_LAYER, CAKE }
+    public enum Shape { NONE, SLAB, STAIRS, FENCE, GATE, DOOR, TRAPDOOR, LADDER, PANE, BED, WALL, CARPET, SNOW_LAYER, CAKE, PORTAL }
     public enum Layer { OPAQUE, CUTOUT, TRANSLUCENT }
     public enum Tint { NONE, GRASS, FOLIAGE, BIRCH, SPRUCE }
     public enum SoundType { STONE, WOOD, GRASS, GRAVEL, SAND, GLASS, CLOTH, SNOW, NONE }
@@ -43,6 +43,8 @@ public final class Block {
     public boolean climbable;
     /** Flowing liquid destroys it (torches, carpet, snow layers). */
     public boolean washable;
+    /** Fire spreads to and burns this block. */
+    public boolean flammable;
 
     private Block(int id, String name, int tex) {
         this.id = id;
@@ -92,8 +94,10 @@ public final class Block {
                 BED_ITEM = 105, SMOOTH_STONE = 106, GLASS_PANE_TOP = 107, CARROTS_0 = 108, POTATOES_0 = 112,
                 CAKE_TOP = 116, CAKE_SIDE = 117, CAKE_INNER = 118, CAKE_BOTTOM = 119, CAKE_ITEM = 120,
                 EMERALD_ORE = 121, EMERALD_BLOCK = 122, SPAWNER = 123, GRAVEL_PATH = 124,
+                NETHERRACK = 125, SOUL_SAND = 126, QUARTZ_ORE = 127, PORTAL = 128, FIRE = 129, NETHER_BRICKS = 130,
+                QUARTZ_SIDE = 131, QUARTZ_TOP = 132,
                 BREAK_0 = 240; // 240..249 crack stages
-        public static final int COUNT = 125;
+        public static final int COUNT = 133;
     }
 
     public static final Block AIR = new Block(0, "Air", 0);
@@ -204,6 +208,13 @@ public final class Block {
     public static final Block EMERALD_ORE = new Block(103, "Emerald Ore", Tex.EMERALD_ORE).hardness(3f);
     public static final Block EMERALD_BLOCK = new Block(104, "Block of Emerald", Tex.EMERALD_BLOCK).hardness(5f);
     public static final Block SPAWNER = new Block(105, "Monster Spawner", Tex.SPAWNER).cutout().hardness(5f);
+    public static final Block NETHER_PORTAL = new Block(106, "Nether Portal", Tex.PORTAL).shape(Shape.PORTAL).translucent().light(11).hardness(-1);
+    public static final Block NETHERRACK = new Block(107, "Netherrack", Tex.NETHERRACK).hardness(0.4f);
+    public static final Block SOUL_SAND = new Block(108, "Soul Sand", Tex.SOUL_SAND).sound(SoundType.SAND).hardness(0.5f);
+    public static final Block NETHER_QUARTZ_ORE = new Block(109, "Nether Quartz Ore", Tex.QUARTZ_ORE).hardness(3f);
+    public static final Block FIRE = new Block(110, "Fire", Tex.FIRE).plant().light(15);
+    public static final Block NETHER_BRICKS = new Block(111, "Nether Bricks", Tex.NETHER_BRICKS).hardness(2f);
+    public static final Block QUARTZ_BLOCK = new Block(112, "Block of Quartz", 0).tex(Tex.QUARTZ_TOP, Tex.QUARTZ_TOP, Tex.QUARTZ_SIDE).hardness(0.8f);
 
     static {
         AIR.model = Model.NONE; AIR.opaque = false; AIR.solid = false; AIR.replaceable = true; AIR.inCreativeInventory = false; AIR.sound = SoundType.NONE;
@@ -220,6 +231,14 @@ public final class Block {
         DANDELION.replaceable = false; POPPY.replaceable = false; BLUE_ORCHID.replaceable = false; SUGAR_CANE.replaceable = false;
         DEAD_BUSH.replaceable = true;
         LADDER.climbable = true;
+        NETHER_PORTAL.solid = false; NETHER_PORTAL.inCreativeInventory = false; NETHER_PORTAL.sound = SoundType.GLASS;
+        FIRE.inCreativeInventory = false; FIRE.sound = SoundType.NONE; FIRE.tint = Tint.NONE;
+        for (Block b : BY_ID) {
+            if (b == null) continue;
+            if (b.sound == SoundType.WOOD && b != CRAFTING_TABLE || b.sound == SoundType.CLOTH && b != CACTUS && b != CAKE
+                    || b == OAK_LEAVES || b == BIRCH_LEAVES || b == SPRUCE_LEAVES || b == TALL_GRASS || b == FERN || b == DEAD_BUSH || b == TNT)
+                b.flammable = true;
+        }
         TORCH.washable = true;
         for (Block b : BY_ID) if (b != null && (b.shape == Shape.CARPET || b.shape == Shape.SNOW_LAYER)) b.washable = true;
         OAK_TRAPDOOR.layer = Layer.CUTOUT; LADDER.layer = Layer.CUTOUT; GLASS_PANE.layer = Layer.CUTOUT; IRON_BARS.layer = Layer.CUTOUT; OAK_DOOR.layer = Layer.CUTOUT;

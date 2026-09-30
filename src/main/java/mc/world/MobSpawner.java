@@ -12,6 +12,10 @@ public final class MobSpawner {
     private static final int PASSIVE_CAP = 12, HOSTILE_CAP = 24;
 
     public void tick(World world, Player player, Random random) {
+        if (world.dimension == Dimension.NETHER) {
+            tickNether(world, player, random);
+            return;
+        }
         int passive = 0, hostile = 0;
         for (Entity e : world.entities()) {
             if (e instanceof Mob m) {
@@ -24,6 +28,41 @@ public final class MobSpawner {
         if (world.tickCount % 40 == 0 && passive - squid < PASSIVE_CAP) spawnPassive(world, player, random);
         if (world.tickCount % 40 == 20 && squid < 5) spawnSquid(world, player, random);
         if (hostile < HOSTILE_CAP) for (int i = 0; i < 2; i++) spawnHostile(world, player, random);
+    }
+
+    /** Zombie pigmen in groups on netherrack, rare ghasts in open caverns, magma cubes anywhere. */
+    private void tickNether(World world, Player player, Random random) {
+        int count = 0;
+        for (Entity e : world.entities()) if (e instanceof Mob) count++;
+        if (count >= 30 || world.tickCount % 4 != 0) return;
+        double ang = random.nextDouble() * Math.PI * 2;
+        double dist = 24 + random.nextDouble() * 40;
+        int x = (int) Math.floor(player.x + Math.cos(ang) * dist), z = (int) Math.floor(player.z + Math.sin(ang) * dist);
+        if (!world.isLoaded(x, z)) return;
+        int y = 32 + random.nextInt(90);
+        int r = random.nextInt(100);
+        if (r < 6) {
+            // Ghasts need a big open space
+            for (int dx = -2; dx <= 2; dx++)
+                for (int dy = 0; dy <= 4; dy++)
+                    for (int dz = -2; dz <= 2; dz++) if (world.getBlock(x + dx, y + dy, z + dz) != 0) return;
+            spawn(world, MobType.GHAST, x + 0.5, y, z + 0.5, random);
+            return;
+        }
+        for (int i = 0; i < 16 && y > 32; i++, y--) if (Block.get(world.getBlock(x, y - 1, z)).solid) break;
+        Block floor = Block.get(world.getBlock(x, y - 1, z));
+        if (!floor.solid || floor == Block.BEDROCK || world.getBlock(x, y, z) != 0 || world.getBlock(x, y + 1, z) != 0) return;
+        if (r < 16) {
+            spawn(world, MobType.MAGMA_CUBE, x + 0.5, y, z + 0.5, random);
+            return;
+        }
+        if (floor != Block.NETHERRACK && floor != Block.SOUL_SAND && floor != Block.GRAVEL) return;
+        int group = 2 + random.nextInt(3);
+        for (int i = 0; i < group; i++) {
+            int gx = x + random.nextInt(5) - 2, gz = z + random.nextInt(5) - 2;
+            if (world.getBlock(gx, y, gz) == 0 && world.getBlock(gx, y + 1, gz) == 0 && Block.get(world.getBlock(gx, y - 1, gz)).solid)
+                spawn(world, MobType.ZOMBIE_PIGMAN, gx + 0.5, y, gz + 0.5, random);
+        }
     }
 
     private void spawnSquid(World world, Player player, Random random) {

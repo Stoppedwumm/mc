@@ -67,7 +67,7 @@ public final class Structures {
 
     /** How many chunks around this one must exist before it can be decorated. */
     public int decorationRadius(int cx, int cz) {
-        return isVillageCenter(cx, cz) ? VILLAGE_RADIUS : 1;
+        return world.dimension == Dimension.OVERWORLD && isVillageCenter(cx, cz) ? VILLAGE_RADIUS : 1;
     }
 
     /** Nearest village centre (block coordinates) to a position, searching nearby regions; null if none. */
@@ -87,6 +87,7 @@ public final class Structures {
     }
 
     public void decorate(Chunk chunk, Random rand) {
+        if (world.dimension != Dimension.OVERWORLD) return;
         Biome biome = Biome.VALUES[chunk.biome[8 * 16 + 8]];
         if (biome == Biome.MOUNTAINS || biome == Biome.SNOWY_PEAKS) emeralds(chunk, rand);
         if (rand.nextInt(5) == 0) dungeon(chunk, rand);

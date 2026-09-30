@@ -16,7 +16,10 @@ public enum MobType {
     SLIME("Slime", true, 16, 2.04f, 2.04f, 0.04f, 0.06f),
     VILLAGER("Villager", false, 20, 0.6f, 1.95f, 0.03f, 0.06f),
     IRON_GOLEM("Iron Golem", false, 100, 1.4f, 2.7f, 0.025f, 0.05f),
-    SNOW_GOLEM("Snow Golem", false, 4, 0.7f, 1.9f, 0.03f, 0.04f);
+    SNOW_GOLEM("Snow Golem", false, 4, 0.7f, 1.9f, 0.03f, 0.04f),
+    ZOMBIE_PIGMAN("Zombie Pigman", false, 20, 0.6f, 1.95f, 0.03f, 0.075f),
+    GHAST("Ghast", true, 10, 4f, 4f, 0.02f, 0.02f),
+    MAGMA_CUBE("Magma Cube", true, 16, 2.04f, 2.04f, 0.04f, 0.06f);
 
     public final String displayName;
     public final boolean hostile;
@@ -39,6 +42,11 @@ public enum MobType {
     public boolean isUndead() { return this == ZOMBIE || this == SKELETON; }
 
     public boolean isGolem() { return this == IRON_GOLEM || this == SNOW_GOLEM; }
+
+    /** Slimes and magma cubes hop and split. */
+    public boolean isSlime() { return this == SLIME || this == MAGMA_CUBE; }
+
+    public boolean isNether() { return this == ZOMBIE_PIGMAN || this == GHAST || this == MAGMA_CUBE; }
 
     public static final MobType[] PASSIVE = {PIG, COW, SHEEP, CHICKEN};
     public static final MobType[] HOSTILE = {ZOMBIE, ZOMBIE, SKELETON, SKELETON, CREEPER, SPIDER, ZOMBIE, SKELETON, CREEPER, SPIDER, ENDERMAN};

@@ -49,6 +49,23 @@ public final class Options {
         public int[][] slots;
         public int burnTime, burnTotal, cookTime;
         public String mob;
+
+        public static List<BlockEntityData> loadList(Path file) {
+            try {
+                if (Files.exists(file)) return java.util.Arrays.asList(GSON.fromJson(Files.readString(file), BlockEntityData[].class));
+            } catch (Exception e) {
+                System.err.println("Could not read block entities: " + e);
+            }
+            return null;
+        }
+
+        public static void saveList(Path file, List<BlockEntityData> list) {
+            try {
+                Files.writeString(file, GSON.toJson(list));
+            } catch (IOException e) {
+                System.err.println("Could not save block entities: " + e);
+            }
+        }
     }
 
     /** World metadata (level.json). */
@@ -72,6 +89,8 @@ public final class Options {
         public boolean raining;
         public int weatherTimer;
         public List<BlockEntityData> blockEntities;
+        /** Dimension the player is in (Dimension enum name). */
+        public String dimension = "OVERWORLD";
 
         public static Level load(Path file) {
             try {

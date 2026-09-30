@@ -123,10 +123,9 @@ public final class Game implements World.Listener {
         } else if (seedGiven && level.seed != seedArg) {
             System.out.println("World already exists with seed " + level.seed + "; ignoring --seed");
         }
-        world = new World(level.seed, new WorldStorage(worldDir));
-        world.time = level.time;
-        world.listener = this;
-        world.setPlayer(player);
+        Dimension startDim;
+        try { startDim = Dimension.valueOf(level.dimension == null ? "OVERWORLD" : level.dimension); } catch (IllegalArgumentException e) { startDim = Dimension.OVERWORLD; }
+        world = createWorld(startDim, level.time);
         renderer = new WorldRenderer(level.seed);
         post = new PostProcess(window.width, window.height);
         itemRenderer = new ItemRenderer();
@@ -171,7 +170,6 @@ public final class Game implements World.Listener {
             player.xpProgress = level.xpProgress;
             player.xpTotal = level.xpTotal;
             player.inventory.selected = Math.max(0, Math.min(8, level.selected));
-            if (level.blockEntities != null) loadBlockEntities(level.blockEntities);
         } else {
             int[] spawn = findSpawn(world.generator);
             player.setPos(spawn[0] + 0.5, 120, spawn[1] + 0.5);
@@ -179,6 +177,58 @@ public final class Game implements World.Listener {
         }
         System.out.println("World seed: " + level.seed);
     }
+
+    private Path dimensionDir(Dimension d) {
+        return d.folder.isEmpty() ? worldDir : worldDir.resolve(d.folder);
+    }
+
+    /** Opens a dimension's world with its block entities. */
+    private World createWorld(Dimension d, long time) throws java.io.IOException {
+        Path dir = dimensionDir(d);
+        Files.createDirectories(dir);
+        World w = new World(level.seed, new WorldStorage(dir), d);
+        w.time = time;
+        w.listener = this;
+        w.setPlayer(player);
+        World previous = world;
+        world = w;
+        List<Options.BlockEntityData> bes = Options.BlockEntityData.loadList(dir.resolve("blockentities.json"));
+        if (bes == null && d == Dimension.OVERWORLD) bes = level.blockEntities;
+        if (bes != null) loadBlockEntities(bes);
+        world = previous;
+        return w;
+    }
+
+    /** Portal travel between the overworld and the Nether (coordinates scale by 8). */
+    void changeDimension(Dimension target, boolean viaPortal) {
+        try {
+            if (isContainer(screen)) screens.onClose();
+            double scale = target == Dimension.NETHER ? 0.125 : world.dimension == Dimension.NETHER ? 8 : 1;
+            double tx = player.x * scale, tz = player.z * scale;
+            saveWorld();
+            long time = world.time;
+            world.shutdown();
+            world = createWorld(target, time);
+            level.dimension = target.name();
+            int maxY = target == Dimension.NETHER ? mc.world.gen.NetherGenerator.HEIGHT : Chunk.HEIGHT;
+            if (viaPortal) {
+                world.loadAreaBlocking((int) Math.floor(tx) >> 4, (int) Math.floor(tz) >> 4, 1);
+                double[] p = mc.world.Portal.findOrCreate(world, tx, Math.min(player.y, maxY - 10), tz, maxY);
+                player.setPos(p[0], p[1], p[2]);
+                sound.playUi("portal_travel", 0.6f, 1);
+            }
+            player.motionX = player.motionY = player.motionZ = 0;
+            player.fallDistance = 0;
+            player.portalTicks = 0;
+            player.portalCooldown = 300;
+            setScreen(Screen.LOADING);
+            loadingMessage = target == Dimension.NETHER ? "Entering the Nether" : "Leaving the Nether";
+        } catch (java.io.IOException e) {
+            hud.chat("Could not change dimension: " + e.getMessage());
+        }
+    }
+
+    private String loadingMessage = "Generating terrain...";
 
     private void loadBlockEntities(List<Options.BlockEntityData> list) {
         for (Options.BlockEntityData d : list) {
@@ -258,7 +308,9 @@ public final class Game implements World.Listener {
             if (be instanceof BlockEntity.Furnace f) { d.burnTime = f.burnTime; d.burnTotal = f.burnTotal; d.cookTime = f.cookTime; }
             bes.add(d);
         }
-        level.blockEntities = bes;
+        level.blockEntities = null;
+        level.dimension = world.dimension.name();
+        Options.BlockEntityData.saveList(dimensionDir(world.dimension).resolve("blockentities.json"), bes);
         level.save(worldDir.resolve("level.json"));
     }
 
@@ -284,6 +336,10 @@ public final class Game implements World.Listener {
     }
 
     void respawn() {
+        if (world.dimension != Dimension.OVERWORLD) {
+            player.respawn();
+            changeDimension(Dimension.OVERWORLD, false);
+        }
         if (player.spawnY < 0) {
             player.spawnX = level.x;
             player.spawnY = level.y;
@@ -339,6 +395,20 @@ public final class Game implements World.Listener {
                 for (int i = 0; i < 20; i++) particles.spawn("splash", player.x + random.nextGaussian() * 0.3, player.y + 0.5, player.z + random.nextGaussian() * 0.3);
             }
             if (player.eyeInBlock(Block.WATER.id) && random.nextInt(8) == 0) particles.spawn("bubble", player.x, player.eyeY(), player.z);
+            boolean inPortal = player.inPortal();
+            // After travelling, the portal only works again once the player has stepped out of it
+            if (player.portalCooldown > 0) {
+                if (inPortal) player.portalCooldown = Math.max(player.portalCooldown, 20);
+                player.portalCooldown--;
+                player.portalTicks = 0;
+            } else if (inPortal) {
+                if (player.portalTicks == 0) sound.playUi("portal_trigger", 0.3f, 0.8f + random.nextFloat() * 0.4f);
+                player.portalTicks++;
+                if (player.portalTicks >= 80 || player.creative) {
+                    changeDimension(world.dimension == Dimension.NETHER ? Dimension.OVERWORLD : Dimension.NETHER, true);
+                    return;
+                }
+            } else player.portalTicks = Math.max(0, player.portalTicks - 4);
             if (player.health < prevHealth && !player.isDead()) sound.play("hurt", player.x, player.y + 1, player.z, 1, 0.9f + random.nextFloat() * 0.2f);
             pickupItems();
         } else {
@@ -355,8 +425,41 @@ public final class Game implements World.Listener {
 
         interaction.tick(play);
         world.tick();
+        animateBlocks();
         particles.tick(world);
         if (ticks % 6000 == 0) saveWorld();
+    }
+
+    /** Client-side block effects near the player, like Minecraft's animateTick. */
+    private void animateBlocks() {
+        int px = (int) Math.floor(player.x), py = (int) Math.floor(player.y), pz = (int) Math.floor(player.z);
+        for (int i = 0; i < 300; i++) {
+            int x = px + random.nextInt(25) - 12, y = py + random.nextInt(25) - 12, z = pz + random.nextInt(25) - 12;
+            int id = world.getBlock(x, y, z);
+            if (id == 0) continue;
+            if (id == Block.TORCH.id) {
+                int m = world.getMeta(x, y, z);
+                double fx = x + 0.5, fy = y + 0.7, fz = z + 0.5;
+                if (m >= 1 && m <= 4) { fx += mc.world.Shapes.DX[m - 1] * 0.27; fz += mc.world.Shapes.DZ[m - 1] * 0.27; fy += 0.22; }
+                particles.spawn("flame", fx, fy, fz);
+                if (random.nextInt(2) == 0) particles.spawn("smoke", fx, fy + 0.05, fz);
+            } else if (id == Block.FIRE.id) {
+                if (random.nextInt(2) == 0) particles.spawn("smoke", x + random.nextDouble(), y + 0.5 + random.nextDouble() * 0.5, z + random.nextDouble());
+                if (random.nextInt(3) == 0) particles.spawn("flame", x + random.nextDouble(), y + random.nextDouble() * 0.6, z + random.nextDouble());
+                if (random.nextInt(24) == 0) sound.play("fizz", x + 0.5, y + 0.5, z + 0.5, 0.2f, 0.5f + random.nextFloat() * 0.3f);
+            } else if (id == Block.NETHER_PORTAL.id) {
+                for (int k = 0; k < 2; k++) particles.spawn("portal", x + random.nextDouble(), y + random.nextDouble(), z + random.nextDouble());
+                if (random.nextInt(100) == 0) sound.play("portal_trigger", x + 0.5, y + 0.5, z + 0.5, 0.25f, 0.8f + random.nextFloat() * 0.4f);
+            } else if (id == Block.LAVA.id && world.getBlock(x, y + 1, z) == 0 && random.nextInt(60) == 0) {
+                particles.spawn("flame", x + random.nextDouble(), y + 1, z + random.nextDouble());
+                particles.spawn("smoke", x + random.nextDouble(), y + 1.1, z + random.nextDouble());
+            } else if (id == Block.LIT_FURNACE.id && random.nextInt(3) == 0) {
+                int f = world.getMeta(x, y, z) & 3;
+                double fx = x + 0.5 + mc.world.Shapes.DX[f] * 0.52, fz = z + 0.5 + mc.world.Shapes.DZ[f] * 0.52;
+                particles.spawn("flame", fx, y + 0.3, fz);
+                particles.spawn("smoke", fx, y + 0.4, fz);
+            }
+        }
     }
 
     // ------------------------------------------------------------------ sleeping
@@ -554,6 +657,7 @@ public final class Game implements World.Listener {
         int bx = (int) Math.floor(x), by = (int) Math.floor(y), bz = (int) Math.floor(z);
         float sky = world.getSkyLight(bx, by, bz) / 15f, blk = world.getBlockLight(bx, by, bz) / 15f;
         float b = blk * blk;
+        if (world.dimension == Dimension.NETHER) return 1.8f * b * b + 0.3f * b + 0.28f;
         return renderer.daylight * 1.4f * sky * sky + 1.8f * b * b + 0.3f * b + 0.03f;
     }
 
@@ -585,7 +689,8 @@ public final class Game implements World.Listener {
         renderer.brightness = options.gamma;
         renderer.shadows = options.shadows;
         renderer.clouds = options.clouds;
-        float rain = weather.rain(pt);
+        renderer.nether = world.dimension == Dimension.NETHER;
+        float rain = renderer.nether ? 0 : weather.rain(pt);
         renderer.updateEnvironment(world, pt, underwater, inLava, options.renderDistance, rain);
         renderer.setupCamera(player, pt, fovNow, window.width, window.height, options.renderDistance, options.viewBobbing, perspective, world);
         sound.listener(renderer.camX, renderer.camY, renderer.camZ, player.yaw, player.pitch);
@@ -594,14 +699,15 @@ public final class Game implements World.Listener {
         sound.setRain(rain * skyAtEye);
 
         // Eye adaptation: expose for how much light reaches the camera
-        float env = Math.max(Math.max(renderer.daylight * skyAtEye * skyAtEye, 0.35f * blkAtEye * blkAtEye), 0.015f);
+        float env = Math.max(Math.max(renderer.daylight * skyAtEye * skyAtEye, 0.35f * blkAtEye * blkAtEye), renderer.nether ? 0.05f : 0.015f);
         float targetExposure = Math.max(0.3f, Math.min(2.4f, 0.3f / (float) Math.pow(env, 0.6)));
         post.exposure += (targetExposure - post.exposure) * (float) Math.min(1, dt * 1.5);
 
         renderer.renderShadows(world);
         post.resize(window.width, window.height);
         post.beginScene();
-        glClearColor(0, 0, 0, 1);
+        if (renderer.nether) glClearColor(WorldRenderer.NETHER_FOG[0], WorldRenderer.NETHER_FOG[1], WorldRenderer.NETHER_FOG[2], 1);
+        else glClearColor(0, 0, 0, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
@@ -615,7 +721,7 @@ public final class Game implements World.Listener {
                     ItemStack.isEmpty(heldStack) ? null : heldStack.item);
         }
         renderer.renderParticles(particles, player, pt);
-        weather.render(renderer, world, pt);
+        if (!renderer.nether) weather.render(renderer, world, pt);
         if (!hideGui) renderer.renderSelection(world, interaction.hit, interaction.breakProgress);
         post.copyDepth();
         renderer.renderTranslucent(post.depthCopy.depth);
@@ -641,6 +747,10 @@ public final class Game implements World.Listener {
 
     private void renderGui() {
         gui.begin(window.width, window.height);
+        if (player.portalTicks > 0 && screen != Screen.LOADING) {
+            float a = Math.min(1, player.portalTicks / 80f);
+            gui.fill(0, 0, gui.width, gui.height, (int) (a * a * 200) << 24 | 0x6a20c0);
+        }
         if (sleepTicks > 0) {
             float a = Math.min(1, sleepTicks / 70f);
             gui.fill(0, 0, gui.width, gui.height, (int) (a * 230) << 24 | 0x0a0a14);
@@ -658,7 +768,7 @@ public final class Game implements World.Listener {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         gui.begin(window.width, window.height);
         gui.fill(0, 0, gui.width, gui.height, 0xFF3a2a1d);
-        gui.centered("Generating terrain...", gui.width / 2, gui.height / 2 - 20, 0xFFFFFFFF);
+        gui.centered(loadingMessage, gui.width / 2, gui.height / 2 - 20, 0xFFFFFFFF);
         int total = 0, done = 0;
         int pcx = (int) Math.floor(player.x) >> 4, pcz = (int) Math.floor(player.z) >> 4;
         for (int dx = -3; dx <= 3; dx++)
