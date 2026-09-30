@@ -1,0 +1,63 @@
+package mc.client;
+
+import static org.lwjgl.glfw.GLFW.*;
+
+/** Collects GLFW events into per-frame state. */
+public final class Input {
+    private final boolean[] keys = new boolean[GLFW_KEY_LAST + 1];
+    private final boolean[] pressed = new boolean[GLFW_KEY_LAST + 1];
+    private final boolean[] buttons = new boolean[8];
+    private final boolean[] clicked = new boolean[8];
+    public double mouseX, mouseY, dx, dy, scroll;
+    private double lastX, lastY;
+    private boolean first = true;
+    public boolean resized;
+    public final StringBuilder typed = new StringBuilder();
+
+    public Input(Window w) {
+        glfwSetKeyCallback(w.handle, (win, key, sc, action, mods) -> {
+            if (key < 0 || key > GLFW_KEY_LAST) return;
+            if (action == GLFW_PRESS) { keys[key] = true; pressed[key] = true; }
+            else if (action == GLFW_RELEASE) keys[key] = false;
+        });
+        glfwSetMouseButtonCallback(w.handle, (win, button, action, mods) -> {
+            if (button < 0 || button >= buttons.length) return;
+            if (action == GLFW_PRESS) { buttons[button] = true; clicked[button] = true; }
+            else if (action == GLFW_RELEASE) buttons[button] = false;
+        });
+        glfwSetCursorPosCallback(w.handle, (win, x, y) -> {
+            if (first) { lastX = x; lastY = y; first = false; }
+            dx += x - lastX;
+            dy += y - lastY;
+            lastX = x; lastY = y;
+            mouseX = x; mouseY = y;
+        });
+        glfwSetScrollCallback(w.handle, (win, x, y) -> scroll += y);
+        glfwSetFramebufferSizeCallback(w.handle, (win, x, y) -> resized = true);
+        glfwSetCharCallback(w.handle, (win, cp) -> typed.appendCodePoint(cp));
+    }
+
+    public boolean down(int key) { return keys[key]; }
+
+    public boolean pressed(int key) { return pressed[key]; }
+
+    public boolean button(int b) { return buttons[b]; }
+
+    public boolean clicked(int b) { return clicked[b]; }
+
+    public void consumeClick(int b) { clicked[b] = false; }
+
+    public void releaseAll() {
+        java.util.Arrays.fill(keys, false);
+        java.util.Arrays.fill(buttons, false);
+    }
+
+    /** Call at the end of every frame. */
+    public void endFrame() {
+        java.util.Arrays.fill(pressed, false);
+        java.util.Arrays.fill(clicked, false);
+        dx = dy = 0;
+        scroll = 0;
+        typed.setLength(0);
+    }
+}

@@ -1,0 +1,684 @@
+package mc.render;
+
+import mc.world.Block.Tex;
+
+import java.util.Random;
+
+/**
+ * Procedurally paints 16x16 pixel-art block textures into a 256x256 atlas (16x16 tiles).
+ * Alpha conventions for opaque blocks: 255 = plain pixel, 153 = biome-tinted pixel (grass), 0 = hole.
+ */
+public final class TextureGen {
+    public static final int ATLAS = 256;
+    private final int[] px = new int[ATLAS * ATLAS];
+    private Random r;
+    private int tile;
+
+    public int[] generate() {
+        paint(Tex.STONE, this::stone);
+        paint(Tex.DIRT, this::dirt);
+        paint(Tex.GRASS_TOP, this::grassTop);
+        paint(Tex.GRASS_SIDE, () -> grassSide(false));
+        paint(Tex.COBBLE, () -> cobble(false));
+        paint(Tex.PLANKS, () -> planks(0xa2824e));
+        paint(Tex.BEDROCK, this::bedrock);
+        paint(Tex.WATER, this::water);
+        paint(Tex.SAND, () -> speckle(0xdbcfa3, 0.06, 0xc9bb8c, 0.12));
+        paint(Tex.GRAVEL, this::gravel);
+        paint(Tex.GOLD_ORE, () -> ore(0xfcee4b, 0xc4a022));
+        paint(Tex.IRON_ORE, () -> ore(0xd8af93, 0xaf8e77));
+        paint(Tex.COAL_ORE, () -> ore(0x2d2d2d, 0x151515));
+        paint(Tex.DIAMOND_ORE, () -> ore(0x5decf5, 0x2cb6c3));
+        paint(Tex.LOG_SIDE, () -> bark(0x6b5130, 0x4f3b22));
+        paint(Tex.LOG_TOP, () -> logTop(0xb28f57, 0x8f6f40, 0x6b5130));
+        paint(Tex.SPRUCE_LOG, () -> bark(0x3b2912, 0x2a1d0c));
+        paint(Tex.SPRUCE_LOG_TOP, () -> logTop(0x7a5a33, 0x5e4426, 0x3b2912));
+        paint(Tex.BIRCH_LOG, this::birchBark);
+        paint(Tex.BIRCH_LOG_TOP, () -> logTop(0xc8b77a, 0xa89a62, 0xd8d8d0));
+        paint(Tex.LEAVES, () -> leaves(0.22));
+        paint(Tex.SPRUCE_LEAVES, () -> leaves(0.18));
+        paint(Tex.BIRCH_LEAVES, () -> leaves(0.24));
+        paint(Tex.GLASS, this::glass);
+        paint(Tex.SANDSTONE_SIDE, () -> sandstone(true));
+        paint(Tex.SANDSTONE_TOP, () -> speckle(0xdcd0a4, 0.04, 0xcfc190, 0.1));
+        paint(Tex.SANDSTONE_BOTTOM, () -> sandstone(false));
+        paint(Tex.TALL_GRASS, this::tallGrass);
+        paint(Tex.FERN, this::fern);
+        paint(Tex.DANDELION, () -> flower(0xf6e03b, 0xd0a820, false));
+        paint(Tex.POPPY, () -> flower(0xd3261e, 0x8d1510, false));
+        paint(Tex.BLUE_ORCHID, () -> flower(0x2fa8e0, 0x1c73b8, true));
+        paint(Tex.BRICKS, this::bricks);
+        paint(Tex.SNOW, () -> speckle(0xf0fbfb, 0.02, 0xdae6f0, 0.1));
+        paint(Tex.SNOWY_GRASS_SIDE, () -> grassSide(true));
+        paint(Tex.ICE, this::ice);
+        paint(Tex.CACTUS_SIDE, this::cactusSide);
+        paint(Tex.CACTUS_TOP, this::cactusTop);
+        paint(Tex.GLOWSTONE, this::glowstone);
+        paint(Tex.TORCH, this::torch);
+        paint(Tex.CLAY, () -> speckle(0xa0a6b3, 0.03, 0x9097a4, 0.1));
+        paint(Tex.MOSSY_COBBLE, () -> cobble(true));
+        paint(Tex.OBSIDIAN, this::obsidian);
+        paint(Tex.BOOKSHELF, this::bookshelf);
+        paint(Tex.WOOL, () -> wool(0xeaecec));
+        paint(Tex.RED_WOOL, () -> wool(0xa12722));
+        paint(Tex.BLUE_WOOL, () -> wool(0x35399d));
+        paint(Tex.GREEN_WOOL, () -> wool(0x546d1b));
+        paint(Tex.YELLOW_WOOL, () -> wool(0xf8c627));
+        paint(Tex.BLACK_WOOL, () -> wool(0x16161b));
+        paint(Tex.STONE_BRICKS, this::stoneBricks);
+        paint(Tex.DEAD_BUSH, this::deadBush);
+        paint(Tex.SPRUCE_PLANKS, () -> planks(0x735533));
+        paint(Tex.BIRCH_PLANKS, () -> planks(0xc4b37b));
+        paint(Tex.LAVA, this::lava);
+        paint(Tex.CRAFTING_TOP, this::craftingTop);
+        paint(Tex.CRAFTING_SIDE, this::craftingSide);
+        paint(Tex.FURNACE_SIDE, () -> furnace(false));
+        paint(Tex.FURNACE_FRONT, () -> furnace(true));
+        paint(Tex.FURNACE_TOP, () -> speckle(0x6e6e6e, 0.08, 0x5a5a5a, 0.2));
+        paint(Tex.PUMPKIN_SIDE, () -> ribbed(0xe38a1d, 0xc0700f, false));
+        paint(Tex.PUMPKIN_TOP, this::pumpkinTop);
+        paint(Tex.MELON_SIDE, () -> ribbed(0x8ea22a, 0x4f6a12, true));
+        paint(Tex.MELON_TOP, () -> logTop(0x8ea22a, 0x7a8d20, 0x5d7a17));
+        paint(Tex.TNT_SIDE, this::tntSide);
+        paint(Tex.TNT_TOP, () -> tntEnd(true));
+        paint(Tex.TNT_BOTTOM, () -> tntEnd(false));
+        paint(Tex.SUGAR_CANE, this::sugarCane);
+        paint(Tex.COARSE_DIRT, this::coarseDirt);
+        paint(Tex.GRANITE, () -> speckle(0x9a6b58, 0.06, 0xc08d78, 0.25));
+        paint(Tex.DIORITE, () -> speckle(0xbcbcbc, 0.06, 0x7d7d80, 0.22));
+        paint(Tex.ANDESITE, () -> speckle(0x888889, 0.06, 0x6c6c6e, 0.28));
+        paint(Tex.TERRACOTTA, () -> speckle(0x985e43, 0.03, 0x8a5339, 0.1));
+        paint(Tex.GRASS_SIDE_ITEM, () -> tintedCopy(Tex.GRASS_SIDE, 0x7fb238));
+        paint(Tex.GRASS_TOP_ITEM, () -> tintedCopy(Tex.GRASS_TOP, 0x7fb238));
+        for (int i = 0; i < 10; i++) {
+            final int stage = i;
+            paint(Tex.BREAK_0 + i, () -> crack(stage));
+        }
+        return px;
+    }
+
+    // ------------------------------------------------------------------ helpers
+
+    private void paint(int t, Runnable painter) {
+        tile = t;
+        r = new Random(t * 7919L + 12345);
+        painter.run();
+        fixTransparentColors();
+    }
+
+    private void set(int x, int y, int rgb, int a) {
+        if (x < 0 || y < 0 || x > 15 || y > 15) return;
+        int ax = (tile & 15) * 16 + x, ay = (tile >> 4) * 16 + y;
+        px[ay * ATLAS + ax] = (a << 24) | (rgb & 0xFFFFFF);
+    }
+
+    private void set(int x, int y, int rgb) { set(x, y, rgb, 255); }
+
+    private int get(int x, int y) {
+        int ax = (tile & 15) * 16 + (x & 15), ay = (tile >> 4) * 16 + (y & 15);
+        return px[ay * ATLAS + ax];
+    }
+
+    private static int clamp(int v) { return v < 0 ? 0 : Math.min(255, v); }
+
+    private static int scale(int rgb, double f) {
+        return clamp((int) ((rgb >> 16 & 255) * f)) << 16 | clamp((int) ((rgb >> 8 & 255) * f)) << 8 | clamp((int) ((rgb & 255) * f));
+    }
+
+    private static int mix(int a, int b, double t) {
+        int r = (int) ((a >> 16 & 255) * (1 - t) + (b >> 16 & 255) * t);
+        int g = (int) ((a >> 8 & 255) * (1 - t) + (b >> 8 & 255) * t);
+        int bl = (int) ((a & 255) * (1 - t) + (b & 255) * t);
+        return r << 16 | g << 8 | bl;
+    }
+
+    private static int gray(int v) { v = clamp(v); return v << 16 | v << 8 | v; }
+
+    private double jitter(double amount) { return 1 + (r.nextDouble() * 2 - 1) * amount; }
+
+    /** Smooth tileable value noise at a given cell size. */
+    private double[] valueNoise(int cell) {
+        int n = 16 / cell;
+        double[] grid = new double[n * n];
+        for (int i = 0; i < grid.length; i++) grid[i] = r.nextDouble();
+        double[] out = new double[256];
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                double fx = (double) x / cell, fy = (double) y / cell;
+                int x0 = (int) fx, y0 = (int) fy;
+                double tx = fx - x0, ty = fy - y0;
+                tx = tx * tx * (3 - 2 * tx);
+                ty = ty * ty * (3 - 2 * ty);
+                double a = grid[(y0 % n) * n + x0 % n], b = grid[(y0 % n) * n + (x0 + 1) % n];
+                double c = grid[((y0 + 1) % n) * n + x0 % n], d = grid[((y0 + 1) % n) * n + (x0 + 1) % n];
+                out[y * 16 + x] = (a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty;
+            }
+        return out;
+    }
+
+    /** Gives fully transparent pixels the average colour of the tile so mipmaps don't darken edges. */
+    private void fixTransparentColors() {
+        long sr = 0, sg = 0, sb = 0, n = 0;
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                int c = get(x, y);
+                if ((c >>> 24) > 0) { sr += c >> 16 & 255; sg += c >> 8 & 255; sb += c & 255; n++; }
+            }
+        if (n == 0 || n == 256) return;
+        int avg = (int) (sr / n) << 16 | (int) (sg / n) << 8 | (int) (sb / n);
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++)
+                if ((get(x, y) >>> 24) == 0) set(x, y, avg, 0);
+    }
+
+    private void speckle(int base, double var, int spot, double spotChance) {
+        double[] n = valueNoise(4);
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                int c = r.nextDouble() < spotChance ? spot : base;
+                set(x, y, scale(c, jitter(var) * (0.94 + n[y * 16 + x] * 0.12)));
+            }
+    }
+
+    /** Copies another tile, baking the biome tint into its tintable pixels (for GUI/held items). */
+    private void tintedCopy(int source, int tint) {
+        int saved = tile;
+        int[] copy = new int[256];
+        tile = source;
+        for (int i = 0; i < 256; i++) copy[i] = get(i & 15, i >> 4);
+        tile = saved;
+        for (int i = 0; i < 256; i++) {
+            int c = copy[i];
+            int a = c >>> 24;
+            if (a > 0 && a < 250) {
+                int r = (c >> 16 & 255) * (tint >> 16 & 255) / 255, g = (c >> 8 & 255) * (tint >> 8 & 255) / 255, b = (c & 255) * (tint & 255) / 255;
+                c = r << 16 | g << 8 | b;
+            }
+            set(i & 15, i >> 4, c, 255);
+        }
+    }
+
+    // ------------------------------------------------------------------ blocks
+
+    private void stone() {
+        double[] n = valueNoise(4), n2 = valueNoise(2);
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                double v = 0.86 + n[y * 16 + x] * 0.14 + n2[y * 16 + x] * 0.08 + (r.nextDouble() - 0.5) * 0.08;
+                if (r.nextDouble() < 0.07) v -= 0.12;
+                set(x, y, gray((int) (122 * v)));
+            }
+        // Faint horizontal fractures, like vanilla stone
+        for (int i = 0; i < 3; i++) {
+            int y = r.nextInt(16), x = r.nextInt(16), len = 2 + r.nextInt(4);
+            for (int k = 0; k < len; k++) set((x + k) & 15, y, scale(get((x + k) & 15, y), 0.86));
+        }
+    }
+
+    private void dirt() {
+        double[] n = valueNoise(4);
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                double v = r.nextDouble();
+                int c = v < 0.12 ? 0x6c4b30 : v < 0.22 ? 0x96694a : v < 0.26 ? 0x7f7f7f : 0x866043;
+                set(x, y, scale(c, jitter(0.05) * (0.92 + n[y * 16 + x] * 0.16)));
+            }
+    }
+
+    private void coarseDirt() {
+        dirt();
+        for (int i = 0; i < 26; i++) {
+            int x = r.nextInt(16), y = r.nextInt(16);
+            set(x, y, gray(90 + r.nextInt(50)));
+        }
+    }
+
+    private int grassPixel(double n) {
+        double v = r.nextDouble();
+        int g = (int) (150 + n * 30 + (v < 0.15 ? -28 : v > 0.9 ? 22 : (v - 0.5) * 24));
+        return gray(g);
+    }
+
+    private void grassTop() {
+        double[] n = valueNoise(4);
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++)
+                set(x, y, grassPixel(n[y * 16 + x] - 0.5), 153);
+    }
+
+    private void grassSide(boolean snowy) {
+        dirt();
+        double[] n = valueNoise(4);
+        for (int x = 0; x < 16; x++) {
+            int depth = 3 + (r.nextDouble() < 0.5 ? 1 : 0) + (r.nextDouble() < 0.25 ? 1 : 0);
+            if (r.nextDouble() < 0.12) depth += 2;
+            for (int y = 0; y < depth; y++) {
+                if (snowy) set(x, y, scale(0xf2fbfb, jitter(0.03) * (y == depth - 1 ? 0.9 : 1)));
+                else set(x, y, grassPixel(n[y * 16 + x] - 0.5 - (y == depth - 1 ? 0.3 : 0)), 153);
+            }
+        }
+    }
+
+    private void cobble(boolean mossy) {
+        int cells = 11;
+        int[] cx = new int[cells], cy = new int[cells];
+        double[] shade = new double[cells];
+        for (int i = 0; i < cells; i++) { cx[i] = r.nextInt(16); cy[i] = r.nextInt(16); shade[i] = 0.8 + r.nextDouble() * 0.35; }
+        double[] moss = valueNoise(8);
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                double d1 = 1e9, d2 = 1e9; int best = 0;
+                for (int i = 0; i < cells; i++) {
+                    for (int ox = -16; ox <= 16; ox += 16)
+                        for (int oy = -16; oy <= 16; oy += 16) {
+                            double dx = x - cx[i] - ox, dy = y - cy[i] - oy;
+                            double d = Math.sqrt(dx * dx + dy * dy);
+                            if (d < d1) { d2 = d1; d1 = d; best = i; } else if (d < d2) d2 = d;
+                        }
+                }
+                int c;
+                if (d2 - d1 < 1.1) c = gray((int) (70 * jitter(0.1)));
+                else {
+                    double hl = (d2 - d1) > 3 ? 1.08 : 1.0;
+                    c = gray((int) (118 * shade[best] * hl * jitter(0.06)));
+                }
+                if (mossy && moss[y * 16 + x] > 0.55 && r.nextDouble() < 0.85) c = scale(0x5a7a35, jitter(0.15) * (d2 - d1 < 1.1 ? 0.7 : 1));
+                set(x, y, c);
+            }
+    }
+
+    private void planks(int base) {
+        for (int board = 0; board < 4; board++) {
+            int seam = r.nextInt(16);
+            double bshade = 0.93 + r.nextDouble() * 0.1;
+            for (int yy = 0; yy < 4; yy++) {
+                int y = board * 4 + yy;
+                for (int x = 0; x < 16; x++) {
+                    double grain = Math.sin((x + board * 5) * 0.9 + yy * 2.1) * 0.03;
+                    int c = scale(base, bshade * (1 + grain) * jitter(0.03));
+                    if (yy == 3) c = scale(base, 0.62);
+                    else if (x == seam) c = scale(base, 0.7);
+                    else if (r.nextDouble() < 0.06) c = scale(base, 0.85);
+                    set(x, y, c);
+                }
+            }
+        }
+    }
+
+    private void bedrock() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                double v = r.nextDouble();
+                set(x, y, gray(v < 0.3 ? 40 + r.nextInt(20) : v < 0.7 ? 85 + r.nextInt(30) : 130 + r.nextInt(40)));
+            }
+    }
+
+    private void water() {
+        double[] n = valueNoise(4);
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                double w = Math.sin((x + y * 0.5) * 0.8 + n[y * 16 + x] * 4) * 0.5 + 0.5;
+                int c = mix(0x2f5fc8, 0x4a7ee0, w * 0.6 + n[y * 16 + x] * 0.3);
+                set(x, y, c, 170);
+            }
+    }
+
+    private void gravel() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) set(x, y, gray(120 + r.nextInt(20)));
+        for (int i = 0; i < 40; i++) {
+            int x = r.nextInt(16), y = r.nextInt(16);
+            int c = r.nextDouble() < 0.3 ? scale(0x8a7a6a, jitter(0.1)) : gray(r.nextDouble() < 0.5 ? 80 + r.nextInt(30) : 150 + r.nextInt(40));
+            set(x, y, c); set(x + 1, y, scale(c, 0.9)); if (r.nextBoolean()) set(x, y + 1, scale(c, 0.8));
+        }
+    }
+
+    private void ore(int color, int dark) {
+        stone();
+        int veins = 4 + r.nextInt(2);
+        for (int i = 0; i < veins; i++) {
+            int x = 2 + r.nextInt(12), y = 2 + r.nextInt(12);
+            int size = 2 + r.nextInt(3);
+            for (int k = 0; k < size; k++) {
+                int ox = x + r.nextInt(3) - 1, oy = y + r.nextInt(3) - 1;
+                set(ox, oy, scale(color, jitter(0.08)));
+                set(ox + 1, oy, dark);
+                set(ox, oy + 1, scale(color, 1.15));
+            }
+        }
+    }
+
+    private void bark(int base, int dark) {
+        for (int x = 0; x < 16; x++) {
+            double col = 0.9 + r.nextDouble() * 0.2;
+            boolean groove = r.nextDouble() < 0.3;
+            for (int y = 0; y < 16; y++) {
+                int c = groove && r.nextDouble() < 0.8 ? dark : scale(base, col * jitter(0.06));
+                set(x, y, c);
+            }
+        }
+    }
+
+    private void birchBark() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) set(x, y, scale(0xd8d8d0, jitter(0.04)));
+        for (int i = 0; i < 9; i++) {
+            int x = r.nextInt(16), y = r.nextInt(16), len = 1 + r.nextInt(4);
+            for (int k = 0; k < len; k++) set((x + k) & 15, y, r.nextDouble() < 0.7 ? 0x2c2c28 : 0x5a5a52);
+        }
+    }
+
+    private void logTop(int light, int dark, int barkColor) {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                double dx = x - 7.5, dy = y - 7.5;
+                double d = Math.max(Math.abs(dx), Math.abs(dy)) * 0.6 + Math.sqrt(dx * dx + dy * dy) * 0.4;
+                int ring = (int) d;
+                int c = (ring & 1) == 0 ? light : dark;
+                if (x == 0 || y == 0 || x == 15 || y == 15) c = barkColor;
+                set(x, y, scale(c, jitter(0.04)));
+            }
+    }
+
+    private void leaves(double holes) {
+        double[] n = valueNoise(4);
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                if (r.nextDouble() < holes) { set(x, y, 0, 0); continue; }
+                double v = r.nextDouble();
+                int g = (int) (120 + n[y * 16 + x] * 50 + (v < 0.2 ? -35 : v > 0.85 ? 25 : 0));
+                set(x, y, gray(g));
+            }
+    }
+
+    private void glass() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                boolean border = x == 0 || y == 0 || x == 15 || y == 15;
+                if (border) set(x, y, (x + y) % 5 == 0 ? 0xffffff : 0xc0e0e8);
+                else set(x, y, 0xffffff, 0);
+            }
+        for (int k = 0; k < 4; k++) { set(3 + k, 5 - k, 0xffffff); set(4 + k, 5 - k, 0xe0f0f4); }
+        for (int k = 0; k < 3; k++) set(10 + k, 12 - k, 0xffffff);
+    }
+
+    private void sandstone(boolean side) {
+        speckle(0xd8cb9a, 0.04, 0xcbbd8a, 0.1);
+        if (side) {
+            for (int x = 0; x < 16; x++) {
+                set(x, 0, 0xe5dbb3); set(x, 1, 0xdcd0a4); set(x, 2, 0xc2b27f);
+                set(x, 12, 0xc2b27f); set(x, 13, 0xd5c794);
+                if (r.nextDouble() < 0.3) set(x, 7, 0xc8b985);
+            }
+        } else {
+            for (int i = 0; i < 10; i++) set(r.nextInt(16), r.nextInt(16), 0xb8a878);
+        }
+    }
+
+    private void clearTile() {
+        for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) set(x, y, 0, 0);
+    }
+
+    private void tallGrass() {
+        clearTile();
+        for (int b = 0; b < 11; b++) {
+            double x = 1 + r.nextInt(14);
+            int h = 5 + r.nextInt(10);
+            double lean = (r.nextDouble() - 0.5) * 0.35;
+            for (int k = 0; k < h; k++) {
+                int y = 15 - k;
+                set((int) Math.round(x), y, gray(150 + (int) (k * 4) + r.nextInt(20) - 10));
+                x += lean;
+            }
+        }
+    }
+
+    private void fern() {
+        clearTile();
+        for (int f = 0; f < 3; f++) {
+            double x = 4 + f * 4, lean = (f - 1) * 0.35;
+            for (int k = 0; k < 13; k++) {
+                int y = 15 - k;
+                int ix = (int) Math.round(x);
+                set(ix, y, gray(130 + k * 3));
+                if (k > 2 && k % 2 == 0) { set(ix - 1, y, gray(150)); set(ix + 1, y, gray(150)); if (k < 10) { set(ix - 2, y + 1, gray(140)); set(ix + 2, y + 1, gray(140)); } }
+                x += lean * 0.3;
+            }
+        }
+    }
+
+    private void flower(int petal, int petalDark, boolean orchid) {
+        clearTile();
+        for (int y = 7; y < 16; y++) set(7, y, 0x3f8c1f);
+        set(6, 11, 0x4d9e27); set(5, 10, 0x4d9e27); set(8, 12, 0x4d9e27); set(9, 11, 0x4d9e27);
+        if (orchid) {
+            int[][] p = {{7, 3}, {6, 4}, {8, 4}, {5, 5}, {9, 5}, {7, 5}, {6, 6}, {8, 6}, {7, 4}};
+            for (int[] q : p) set(q[0], q[1], q[1] == 5 ? petalDark : petal);
+            set(7, 5, 0xb8e0f8);
+        } else {
+            for (int y = 3; y <= 7; y++) for (int x = 5; x <= 9; x++) {
+                if ((x == 5 || x == 9) && (y == 3 || y == 7)) continue;
+                set(x, y, (x + y) % 3 == 0 ? petalDark : petal);
+            }
+            set(7, 5, petal == 0xd3261e ? 0x2a1a10 : 0xe8a000);
+        }
+    }
+
+    private void bricks() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                int row = y / 4;
+                int off = (row & 1) * 4;
+                boolean mortar = y % 4 == 3 || (x + off) % 8 == 7;
+                if (mortar) set(x, y, scale(0xb4aaa0, jitter(0.05)));
+                else set(x, y, scale(0x965040, jitter(0.08) * (y % 4 == 0 ? 1.1 : 1)));
+            }
+    }
+
+    private void ice() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) set(x, y, scale(0x8cb4fc, jitter(0.03)), 190);
+        for (int i = 0; i < 4; i++) {
+            int x = r.nextInt(16), y = r.nextInt(16);
+            for (int k = 0; k < 5; k++) set((x + k) & 15, (y + k) & 15, 0xd0e4ff, 210);
+        }
+    }
+
+    private void cactusSide() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                int c = (x % 4 == 1) ? 0x0e5f1c : (x % 4 == 3) ? 0x23892e : 0x167a26;
+                set(x, y, scale(c, jitter(0.05)));
+            }
+        for (int i = 0; i < 10; i++) set(r.nextInt(16), r.nextInt(16), 0xd8d8b0);
+    }
+
+    private void cactusTop() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                double d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5));
+                int c = d > 6.5 ? 0x0e5f1c : ((int) d & 1) == 0 ? 0x2a9235 : 0x1f8a2c;
+                set(x, y, scale(c, jitter(0.04)));
+            }
+    }
+
+    private void glowstone() {
+        double[] n = valueNoise(4);
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                double v = n[y * 16 + x] + (r.nextDouble() - 0.5) * 0.4;
+                int c = v > 0.65 ? 0xfff0c0 : v > 0.45 ? 0xf0c878 : v > 0.3 ? 0xc89a50 : 0x8a6630;
+                set(x, y, c);
+            }
+    }
+
+    private void torch() {
+        clearTile();
+        for (int y = 8; y < 16; y++) { set(7, y, 0x6b4a26); set(8, y, 0x87603a); }
+        set(7, 6, 0xfff8c0); set(8, 6, 0xffe070);
+        set(7, 7, 0xffc030); set(8, 7, 0xf0a020);
+        set(7, 5, 0xfff8e0, 255); set(8, 5, 0xffffff, 255);
+    }
+
+    private void obsidian() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                double v = r.nextDouble();
+                int c = v < 0.1 ? 0x3b2754 : v < 0.2 ? 0x241a36 : 0x0f0b18;
+                set(x, y, scale(c, jitter(0.1)));
+            }
+    }
+
+    private void bookshelf() {
+        planks(0xa2824e);
+        int[] colors = {0x8c2020, 0x2a4a8c, 0x3a7a2a, 0x7a5a2a, 0x6a2a6a, 0x2a6a6a, 0xa08030};
+        for (int shelf = 0; shelf < 2; shelf++) {
+            int top = shelf == 0 ? 1 : 9, bottom = shelf == 0 ? 6 : 14;
+            int x = 1;
+            while (x < 15) {
+                int w = 1 + r.nextInt(2);
+                int c = colors[r.nextInt(colors.length)];
+                int h = r.nextInt(2);
+                for (int xx = x; xx < Math.min(15, x + w); xx++)
+                    for (int y = top + h; y <= bottom; y++) set(xx, y, scale(c, y == top + h ? 1.2 : jitter(0.05)));
+                x += w;
+            }
+            for (int y = top; y <= bottom; y++) { set(0, y, 0x6b5130); set(15, y, 0x6b5130); }
+        }
+    }
+
+    private void wool(int base) {
+        double[] n = valueNoise(2);
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++)
+                set(x, y, scale(base, (0.9 + n[y * 16 + x] * 0.14) * jitter(0.03)));
+    }
+
+    private void stoneBricks() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                int row = y / 8;
+                int off = row * 8;
+                boolean mortar = y % 8 == 7 || (x + off) % 16 == 15;
+                boolean hl = y % 8 == 0 || (x + off) % 16 == 0;
+                int c = mortar ? gray(78) : gray((int) ((hl ? 140 : 122) * jitter(0.06)));
+                set(x, y, c);
+            }
+        for (int i = 0; i < 3; i++) set(r.nextInt(16), r.nextInt(16), gray(96));
+    }
+
+    private void deadBush() {
+        clearTile();
+        int c = 0x6b4a23;
+        for (int y = 9; y < 16; y++) set(7, y, c);
+        int[][] branches = {{7, 9, -1, -1}, {7, 9, 1, -1}, {7, 12, -1, -1}, {7, 11, 1, -1}};
+        for (int[] b : branches) {
+            int x = b[0], y = b[1];
+            for (int k = 0; k < 5; k++) { x += b[2]; y += b[3]; set(x, y, k % 2 == 0 ? c : 0x8a6232); if (r.nextBoolean()) y--; }
+        }
+    }
+
+    private void lava() {
+        double[] n = valueNoise(4), n2 = valueNoise(2);
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                double v = n[y * 16 + x] * 0.7 + n2[y * 16 + x] * 0.3;
+                int c = v > 0.7 ? 0xffe070 : v > 0.55 ? 0xfcac30 : v > 0.35 ? 0xe06a10 : 0xc04808;
+                set(x, y, c);
+            }
+    }
+
+    private void craftingTop() {
+        planks(0xa2824e);
+        for (int i = 0; i < 16; i++) {
+            set(i, 0, 0x4a3520); set(i, 15, 0x4a3520); set(0, i, 0x4a3520); set(15, i, 0x4a3520);
+            if (i > 1 && i < 14) { set(i, 5, 0x6b5130); set(i, 10, 0x6b5130); set(5, i, 0x6b5130); set(10, i, 0x6b5130); }
+        }
+    }
+
+    private void craftingSide() {
+        planks(0xa2824e);
+        for (int i = 0; i < 16; i++) { set(i, 0, 0x4a3520); set(i, 1, 0x6b5130); }
+        // A saw and a hammer
+        for (int x = 2; x < 8; x++) { set(x, 5, 0xb0b0b0); set(x, 6, 0x8a8a8a); }
+        set(8, 5, 0x6b4a26); set(9, 5, 0x6b4a26);
+        for (int y = 4; y < 12; y++) set(12, y, 0x6b4a26);
+        for (int x = 10; x < 15; x++) set(x, 4, 0x7a7a7a);
+    }
+
+    private void furnace(boolean front) {
+        cobble(false);
+        for (int i = 0; i < 16; i++) { set(i, 0, gray(90)); set(i, 15, gray(90)); set(0, i, gray(90)); set(15, i, gray(90)); }
+        if (front) {
+            for (int y = 8; y < 14; y++) for (int x = 3; x < 13; x++) set(x, y, y > 11 ? 0x301808 : 0x141414);
+            for (int x = 3; x < 13; x++) set(x, 7, gray(60));
+            for (int x = 4; x < 12; x += 2) set(x, 13, 0xe06010);
+        }
+    }
+
+    private void ribbed(int base, int dark, boolean melon) {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                boolean rib = melon ? (x % 5 == 0 || x % 5 == 1) : (x % 4 == 0);
+                set(x, y, scale(rib ? dark : base, jitter(0.05)));
+            }
+    }
+
+    private void pumpkinTop() {
+        ribbed(0xe38a1d, 0xc0700f, false);
+        for (int y = 6; y < 10; y++) for (int x = 6; x < 10; x++) set(x, y, 0x5a4a1a);
+    }
+
+    private void tntSide() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                int c = (y >= 5 && y <= 10) ? 0xe8e8e8 : (x % 4 == 0 ? 0xa02010 : 0xdb3a1f);
+                set(x, y, scale(c, jitter(0.03)));
+            }
+        // "TNT" in tiny letters
+        int[][] t = {{0, 0}, {1, 0}, {2, 0}, {1, 1}, {1, 2}, {1, 3}};
+        int[][] n = {{0, 0}, {0, 1}, {0, 2}, {0, 3}, {1, 1}, {2, 2}, {3, 0}, {3, 1}, {3, 2}, {3, 3}};
+        for (int[] p : t) set(2 + p[0], 6 + p[1], 0x202020);
+        for (int[] p : n) set(6 + p[0], 6 + p[1], 0x202020);
+        for (int[] p : t) set(11 + p[0], 6 + p[1], 0x202020);
+    }
+
+    private void tntEnd(boolean top) {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) set(x, y, scale(0xdb3a1f, jitter(0.05)));
+        for (int i = 0; i < 16; i++) { set(i, 0, 0xa02010); set(i, 15, 0xa02010); set(0, i, 0xa02010); set(15, i, 0xa02010); }
+        if (top) { for (int y = 6; y < 10; y++) for (int x = 6; x < 10; x++) set(x, y, 0xd8d8c8); set(7, 7, 0x303030); set(8, 8, 0x303030); }
+    }
+
+    private void sugarCane() {
+        clearTile();
+        int[] xs = {3, 8, 12};
+        for (int s = 0; s < 3; s++) {
+            int x = xs[s];
+            for (int y = 0; y < 16; y++) {
+                boolean joint = (y + s * 3) % 6 == 0;
+                set(x, y, gray(joint ? 205 : 165));
+                set(x + 1, y, gray(joint ? 185 : 140));
+            }
+            set(x - 1, (s * 5 + 3) & 15, gray(150));
+            set(x + 2, (s * 5 + 9) & 15, gray(150));
+        }
+    }
+
+    private void crack(int stage) {
+        for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) set(x, y, 0x808080, 255);
+        Random cr = new Random(4242);
+        int lines = 2 + stage * 2;
+        for (int i = 0; i < lines; i++) {
+            double x = 8 + (cr.nextDouble() - 0.5) * 4, y = 8 + (cr.nextDouble() - 0.5) * 4;
+            double ang = cr.nextDouble() * Math.PI * 2;
+            int len = 3 + stage + cr.nextInt(3);
+            for (int k = 0; k < len; k++) {
+                set((int) x & 15, (int) y & 15, 0x2a2a2a, 255);
+                ang += (cr.nextDouble() - 0.5) * 0.9;
+                x += Math.cos(ang);
+                y += Math.sin(ang);
+            }
+        }
+    }
+}
