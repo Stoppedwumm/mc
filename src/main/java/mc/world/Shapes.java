@@ -252,6 +252,12 @@ public final class Shapes {
                     out.add(new int[]{2, 0, 9, 8, 2, 15});
                 }
             }
+            case RAIL -> {
+                if (!col) {
+                    boolean up = Rails.ascending(Rails.shape(b.id, meta));
+                    out.add(new int[]{0, 0, 0, 16, up ? 8 : 2, 16});
+                }
+            }
             case ANVIL -> {
                 out.add(rotH(new int[]{2, 0, 2, 14, 4, 14}, f));
                 out.add(rotH(new int[]{4, 4, 3, 12, 5, 13}, f));

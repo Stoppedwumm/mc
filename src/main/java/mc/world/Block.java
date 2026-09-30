@@ -6,7 +6,7 @@ package mc.world;
 public final class Block {
     public enum Model { NONE, CUBE, CROSS, LIQUID, TORCH, SHAPE }
     /** Non-cube geometry, see {@link Shapes}. */
-    public enum Shape { NONE, SLAB, STAIRS, FENCE, GATE, DOOR, TRAPDOOR, LADDER, PANE, BED, WALL, CARPET, SNOW_LAYER, CAKE, PORTAL, WIRE, LEVER, BUTTON, PLATE, REPEATER, PISTON, PISTON_HEAD, TABLE, ANVIL, BREWING }
+    public enum Shape { NONE, SLAB, STAIRS, FENCE, GATE, DOOR, TRAPDOOR, LADDER, PANE, BED, WALL, CARPET, SNOW_LAYER, CAKE, PORTAL, WIRE, LEVER, BUTTON, PLATE, REPEATER, PISTON, PISTON_HEAD, TABLE, ANVIL, BREWING, RAIL }
     public enum Layer { OPAQUE, CUTOUT, TRANSLUCENT }
     public enum Tint { NONE, GRASS, FOLIAGE, BIRCH, SPRUCE }
     public enum SoundType { STONE, WOOD, GRASS, GRAVEL, SAND, GLASS, CLOTH, SNOW, NONE }
@@ -101,9 +101,10 @@ public final class Block {
                 REDSTONE_BLOCK = 147, REPEATER_ITEM = 148, REDSTONE_DUST_LINE = 149, ENCH_TOP = 150, ENCH_SIDE = 151,
                 ENCH_BOTTOM = 152, ANVIL_TOP = 153, ANVIL_SIDE = 154, LAPIS_ORE = 155, LAPIS_BLOCK = 156,
                 BREWING_BASE = 157, BREWING_ROD = 158, NETHER_WART_0 = 159, BROWN_MUSHROOM = 162, RED_MUSHROOM = 163,
-                BREWING_ITEM = 164,
+                BREWING_ITEM = 164, RAIL = 165, RAIL_CORNER = 166, POWERED_RAIL = 167, POWERED_RAIL_ON = 168,
+                DETECTOR_RAIL = 169, DETECTOR_RAIL_ON = 170,
                 BREAK_0 = 240; // 240..249 crack stages
-        public static final int COUNT = 165;
+        public static final int COUNT = 171;
     }
 
     public static final Block AIR = new Block(0, "Air", 0);
@@ -248,6 +249,9 @@ public final class Block {
     public static final Block NETHER_WART = new Block(136, "Nether Wart", Tex.NETHER_WART_0).plant();
     public static final Block BROWN_MUSHROOM = new Block(137, "Brown Mushroom", Tex.BROWN_MUSHROOM).plant().light(1);
     public static final Block RED_MUSHROOM = new Block(138, "Red Mushroom", Tex.RED_MUSHROOM).plant();
+    public static final Block RAIL = new Block(139, "Rail", Tex.RAIL).shape(Shape.RAIL).cutout().hardness(0.7f);
+    public static final Block POWERED_RAIL = new Block(140, "Powered Rail", Tex.POWERED_RAIL).shape(Shape.RAIL).cutout().hardness(0.7f);
+    public static final Block DETECTOR_RAIL = new Block(141, "Detector Rail", Tex.DETECTOR_RAIL).shape(Shape.RAIL).cutout().hardness(0.7f);
 
     static {
         AIR.model = Model.NONE; AIR.opaque = false; AIR.solid = false; AIR.replaceable = true; AIR.inCreativeInventory = false; AIR.sound = SoundType.NONE;
@@ -284,6 +288,7 @@ public final class Block {
         }
         TORCH.washable = true;
         for (Block b : BY_ID) if (b != null && (b.shape == Shape.CARPET || b.shape == Shape.SNOW_LAYER)) b.washable = true;
+        for (Block b : new Block[]{RAIL, POWERED_RAIL, DETECTOR_RAIL}) { b.solid = false; b.washable = true; }
         OAK_TRAPDOOR.layer = Layer.CUTOUT; LADDER.layer = Layer.CUTOUT; GLASS_PANE.layer = Layer.CUTOUT; IRON_BARS.layer = Layer.CUTOUT; OAK_DOOR.layer = Layer.CUTOUT;
     }
 
@@ -357,7 +362,7 @@ public final class Block {
     public boolean has3dItem() {
         return model == Model.CUBE || (model == Model.SHAPE && shape != Shape.DOOR && shape != Shape.LADDER
                 && shape != Shape.PANE && shape != Shape.BED && shape != Shape.CAKE && shape != Shape.REPEATER && shape != Shape.LEVER
-                && shape != Shape.WIRE && shape != Shape.BREWING);
+                && shape != Shape.WIRE && shape != Shape.BREWING && shape != Shape.RAIL);
     }
 
     /** Tile used when the block is shown as a flat sprite. */
