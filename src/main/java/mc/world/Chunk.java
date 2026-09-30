@@ -53,7 +53,7 @@ public final class Chunk {
 
     public int get(int x, int y, int z) {
         if (y < 0 || y >= HEIGHT) return 0;
-        return blocks[(y << 8) | (z << 4) | x];
+        return blocks[(y << 8) | (z << 4) | x] & 255;
     }
 
     public void set(int x, int y, int z, int id) {
@@ -86,7 +86,7 @@ public final class Chunk {
     /** y of the highest block that is neither air nor a non-solid plant, or -1. */
     public int topSolid(int x, int z) {
         for (int y = HEIGHT - 1; y >= 0; y--) {
-            int id = blocks[(y << 8) | (z << 4) | x];
+            int id = blocks[(y << 8) | (z << 4) | x] & 255;
             if (id != 0 && Block.get(id).solid) return y;
         }
         return -1;

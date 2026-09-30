@@ -9,6 +9,7 @@ import mc.world.Block;
 import mc.world.BlockEntity;
 import mc.world.Chunk;
 import mc.world.Liquids;
+import mc.world.Shapes;
 import mc.world.World;
 
 import java.util.Random;
@@ -302,6 +303,8 @@ final class Interaction {
         if (hit != null && !p.sneaking && fresh) {
             int id = w().getBlock(hit.x, hit.y, hit.z);
             if (id == Block.CRAFTING_TABLE.id) { g.screens.openCrafting(); startSwing(); return; }
+            if (toggle(hit.x, hit.y, hit.z)) return;
+            if (id == Block.BED.id) { g.sleep(hit.x, hit.y, hit.z); startSwing(); return; }
             if (id == Block.FURNACE.id || id == Block.LIT_FURNACE.id) {
                 g.screens.openFurnace((BlockEntity.Furnace) w().getOrCreateBlockEntity(hit.x, hit.y, hit.z));
                 return;
@@ -429,20 +432,62 @@ final class Interaction {
         startSwing();
     }
 
+    private static double frac(double v) { return v - Math.floor(v); }
+
+    /** Horizontal facing (0 south, 1 west, 2 north, 3 east) pointing from the block towards the player. */
+    private int facingToPlayer() {
+        return (Math.floorMod(Math.round(p().yaw / 90f), 4) + 2) & 3;
+    }
+
+    private boolean fitsEntities(int x, int y, int z) {
+        AABB cell = new AABB(x, y, z, x + 1, y + 1, z + 1);
+        if (cell.intersects(p().box())) return false;
+        for (Entity e : w().entities()) if (e instanceof LivingEntity && cell.intersects(e.box())) return false;
+        return true;
+    }
+
+    private boolean replaceableAt(int x, int y, int z) {
+        return y >= 0 && y < Chunk.HEIGHT && Block.get(w().getBlock(x, y, z)).replaceable;
+    }
+
     private boolean placeBlock(ItemStack h) {
         Player p = p();
         if (hit == null) return false;
         Block b = h.item.block;
         Block target = Block.get(w().getBlock(hit.x, hit.y, hit.z));
+        int targetMeta = w().getMeta(hit.x, hit.y, hit.z);
+        // Slab onto the matching half of the same slab: make a double slab
+        if (b.isSlab() && target == b && ((targetMeta == 0 && hit.ny == 1) || (targetMeta == 1 && hit.ny == -1))) {
+            return finishPlace(h, b, hit.x, hit.y, hit.z, 2);
+        }
+        // More snow on a snow layer
+        if (b.shape == Block.Shape.SNOW_LAYER && target == b && hit.ny == 1) {
+            if (targetMeta >= 6) return finishPlace(h, Block.SNOW, hit.x, hit.y, hit.z, 0);
+            return finishPlace(h, b, hit.x, hit.y, hit.z, targetMeta + 1);
+        }
         int x = hit.x, y = hit.y, z = hit.z;
         if (!target.replaceable) {
             x += hit.nx; y += hit.ny; z += hit.nz;
         }
         if (y < 0 || y >= Chunk.HEIGHT) return false;
         Block existing = Block.get(w().getBlock(x, y, z));
+        if (b.isSlab() && existing == b && (w().getMeta(x, y, z) & 3) != 2) {
+            if (!fitsEntities(x, y, z)) return false;
+            return finishPlace(h, b, x, y, z, 2);
+        }
         if (!existing.replaceable) return false;
         Block below = Block.get(w().getBlock(x, y - 1, z));
-        if (b == Block.TORCH && !below.opaque) return false;
+        boolean upperHalf = hit.ny == -1 || (hit.ny == 0 && frac(hit.py) > 0.5);
+        int meta = 0;
+        if (b == Block.TORCH) {
+            if (hit.ny == 1 || (hit.ny == 0 && hit.nx == 0 && hit.nz == 0)) {
+                if (!below.opaque) return false;
+            } else if (hit.ny == 0) {
+                int wall = Shapes.facingOf(-hit.nx, -hit.nz);
+                if (!Block.get(w().getBlock(x + Shapes.DX[wall], y, z + Shapes.DZ[wall])).opaque) return false;
+                meta = wall + 1;
+            } else return false;
+        }
         if (b.model == Block.Model.CROSS) {
             boolean soil = below == Block.GRASS || below == Block.DIRT || below == Block.COARSE_DIRT || below == Block.SNOWY_GRASS || below == Block.FARMLAND
                     || (b == Block.DEAD_BUSH && (below == Block.SAND || below == Block.TERRACOTTA))
@@ -450,19 +495,85 @@ final class Interaction {
             if (!soil) return false;
         }
         if (b == Block.CACTUS && below != Block.SAND && below != Block.CACTUS) return false;
-        if (b.solid) {
-            AABB cell = new AABB(x, y, z, x + 1, y + 1, z + 1);
-            if (cell.intersects(p.box())) return false;
-            for (Entity e : w().entities()) if (e instanceof LivingEntity && cell.intersects(e.box())) return false;
-        }
-        int meta = 0;
-        if (b.hasFacing()) meta = (Math.floorMod(Math.round(p.yaw / 90f), 4) + 2) & 3;
+        if (b.solid && b.shape != Block.Shape.CARPET && b.shape != Block.Shape.SNOW_LAYER && !fitsEntities(x, y, z)) return false;
+        if (b.hasFacing()) meta = facingToPlayer();
         if (b == Block.OAK_LEAVES || b == Block.BIRCH_LEAVES || b == Block.SPRUCE_LEAVES) meta = 1;
+        switch (b.shape) {
+            case SLAB -> meta = upperHalf ? 1 : 0;
+            case STAIRS -> meta = facingToPlayer() | (upperHalf ? 4 : 0);
+            case GATE -> meta = facingToPlayer();
+            case TRAPDOOR -> {
+                if (hit.ny == 0) meta = Shapes.facingOf(-hit.nx, -hit.nz) | (frac(hit.py) > 0.5 ? 8 : 0);
+                else meta = Shapes.opposite(facingToPlayer()) | (hit.ny == -1 ? 8 : 0);
+            }
+            case LADDER -> {
+                if (hit.ny != 0) return false;
+                meta = Shapes.facingOf(-hit.nx, -hit.nz);
+                if (!Block.get(w().getBlock(x + Shapes.DX[meta], y, z + Shapes.DZ[meta])).opaque) return false;
+            }
+            case CARPET -> { if (below == Block.AIR || below.isLiquid()) return false; }
+            case SNOW_LAYER -> { if (!below.opaque) return false; }
+            case DOOR -> {
+                if (!below.opaque || !replaceableAt(x, y + 1, z) || !fitsEntities(x, y + 1, z)) return false;
+                int f = facingToPlayer();
+                // Pair with a door on the left to form a double door
+                int left = (f + 1) & 3;
+                boolean right = w().getBlock(x + Shapes.DX[left], y, z + Shapes.DZ[left]) == b.id;
+                meta = f | (right ? 16 : 0);
+                w().setBlock(x, y + 1, z, b.id, meta | 8, false);
+                return finishPlace(h, b, x, y, z, meta);
+            }
+            case BED -> {
+                int f = Shapes.opposite(facingToPlayer());
+                int hx = x + Shapes.DX[f], hz = z + Shapes.DZ[f];
+                if (!below.opaque || !replaceableAt(hx, y, hz) || !Block.get(w().getBlock(hx, y - 1, hz)).opaque || !fitsEntities(hx, y, hz)) return false;
+                w().setBlock(hx, y, hz, b.id, f | 4, false);
+                return finishPlace(h, b, x, y, z, f);
+            }
+            default -> { }
+        }
+        return finishPlace(h, b, x, y, z, meta);
+    }
+
+    private boolean finishPlace(ItemStack h, Block b, int x, int y, int z, int meta) {
         w().setBlock(x, y, z, b.id, meta, true);
         g.sound.dig(b, x + 0.5, y + 0.5, z + 0.5);
         startSwing();
         consume(h);
         w().checkFalling(x, y, z);
+        return true;
+    }
+
+    /** Right click on doors, gates and trapdoors. Returns true if something was toggled. */
+    private boolean toggle(int x, int y, int z) {
+        Block b = Block.get(w().getBlock(x, y, z));
+        int meta = w().getMeta(x, y, z);
+        switch (b.shape) {
+            case DOOR -> {
+                if (b == Block.IRON_DOOR) return false;
+                int other = (meta & 8) != 0 ? y - 1 : y + 1;
+                int nm = meta ^ 4;
+                w().setBlock(x, y, z, b.id, nm, false);
+                if (w().getBlock(x, other, z) == b.id) w().setBlock(x, other, z, b.id, w().getMeta(x, other, z) ^ 4, false);
+                g.sound.play((nm & 4) != 0 ? "door_open" : "door_close", x + 0.5, y + 0.5, z + 0.5, 1, 0.9f + random.nextFloat() * 0.1f);
+            }
+            case GATE -> {
+                int nm = meta ^ 4;
+                // Opening swings away from the player
+                if ((nm & 4) != 0) {
+                    int f = facingToPlayer();
+                    if ((f & 1) == (meta & 1)) nm = (nm & ~3) | f;
+                }
+                w().setBlock(x, y, z, b.id, nm, false);
+                g.sound.play((nm & 4) != 0 ? "door_open" : "door_close", x + 0.5, y + 0.5, z + 0.5, 1, 1.1f);
+            }
+            case TRAPDOOR -> {
+                w().setBlock(x, y, z, b.id, meta ^ 4, false);
+                g.sound.play((meta & 4) == 0 ? "door_open" : "door_close", x + 0.5, y + 0.5, z + 0.5, 1, 1.2f);
+            }
+            default -> { return false; }
+        }
+        startSwing();
         return true;
     }
 

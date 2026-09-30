@@ -27,7 +27,7 @@ public final class ItemRenderer {
     }
 
     public static boolean isCube(Item item) {
-        return item.isBlock() && item.block.model == Block.Model.CUBE;
+        return item.isBlock() && item.block.has3dItem();
     }
 
     private boolean opaque(int tile, int x, int y) {
@@ -103,7 +103,7 @@ public final class ItemRenderer {
             return;
         }
         boolean blockAtlas = item.isBlock();
-        int tile = blockAtlas ? item.block.texSide : item.icon;
+        int tile = blockAtlas ? item.block.spriteTex() : item.icon;
         float[] g = extrude(tile, blockAtlas, blockAtlas ? blockPixels : pixels);
         Vector3f v = new Vector3f();
         int tr = tint >> 16 & 255, tg = tint >> 8 & 255, tb = tint & 255;
@@ -116,30 +116,14 @@ public final class ItemRenderer {
     }
 
     private static void emitCube(Batch batch, Matrix4f m, Block block) {
-        // Reuse the GUI/held cube, transformed on the CPU
-        Batch tmp = batch;
-        float[] shades = {1.0f, 0.5f, 0.8f, 0.8f, 0.6f, 0.6f};
-        int tint = WorldRenderer.tintFor(block);
-        Vector3f[] c = new Vector3f[8];
-        for (int i = 0; i < 8; i++) {
-            c[i] = new Vector3f((i & 1) == 0 ? -0.5f : 0.5f, (i & 2) == 0 ? -0.5f : 0.5f, (i & 4) == 0 ? -0.5f : 0.5f);
-            m.transformPosition(c[i]);
-        }
-        // corner index = x | y<<1 | z<<2
-        int[][] faces = {{2, 6, 7, 3}, {0, 1, 5, 4}, {3, 1, 0, 2}, {6, 4, 5, 7}, {2, 0, 4, 6}, {7, 5, 1, 3}};
-        // faces: up, down, north(-z), south(+z), west(-x), east(+x); vertex order = top-left, bottom-left, bottom-right, top-right
-        int[][] fixed = {{2, 6, 7, 3}, {4, 5, 1, 0}, {3, 1, 0, 2}, {6, 4, 5, 7}, {2, 0, 4, 6}, {7, 5, 1, 3}};
-        for (int f = 0; f < 6; f++) {
-            int tex = block.textureForFace(f);
-            if (block == Block.GRASS) tex = f == 0 ? Block.Tex.GRASS_TOP_ITEM : f == 1 ? Block.Tex.DIRT : Block.Tex.GRASS_SIDE_ITEM;
-            int ft = block == Block.GRASS ? 0xFFFFFF : tint;
-            float s = shades[f];
-            int col = 0xFF000000 | (int) ((ft >> 16 & 255) * s) << 16 | (int) ((ft >> 8 & 255) * s) << 8 | (int) ((ft & 255) * s);
-            float u0 = (tex & 15) / 16f, v0 = (tex >> 4) / 16f, u1 = u0 + 1 / 16f, v1 = v0 + 1 / 16f;
-            int[] q = fixed[f];
-            Vector3f a = c[q[0]], b = c[q[1]], cc = c[q[2]], d = c[q[3]];
-            tmp.quad(a.x, a.y, a.z, u0, v0, b.x, b.y, b.z, u0, v1, cc.x, cc.y, cc.z, u1, v1, d.x, d.y, d.z, u1, v0, col);
-        }
+        Vector3f a = new Vector3f(), b = new Vector3f(), c = new Vector3f(), d = new Vector3f();
+        WorldRenderer.cubeInto((x0, y0, z0, u0, v0, x1, y1, z1, u1, v1, x2, y2, z2, u2, v2, x3, y3, z3, u3, v3, argb) -> {
+            m.transformPosition(a.set(x0, y0, z0));
+            m.transformPosition(b.set(x1, y1, z1));
+            m.transformPosition(c.set(x2, y2, z2));
+            m.transformPosition(d.set(x3, y3, z3));
+            batch.quad(a.x, a.y, a.z, u0, v0, b.x, b.y, b.z, u1, v1, c.x, c.y, c.z, u2, v2, d.x, d.y, d.z, u3, v3, argb);
+        }, block, -0.5f, -0.5f, -0.5f, 1, 1);
     }
 
     /** Binds the atlas an item's sprite lives in. */

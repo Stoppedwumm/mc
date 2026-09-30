@@ -71,6 +71,11 @@ final class Commands {
                         case "pause" -> g.setScreen(Game.Screen.PAUSE);
                         case "inventory" -> g.screens.openInventory();
                         case "crafting" -> g.screens.openCrafting();
+                        case "creative" -> {
+                            p.creative = true;
+                            g.screens.openInventory();
+                            if (a.length > 2) g.screens.creativeScroll = Integer.parseInt(a[2]);
+                        }
                         default -> g.closeScreen();
                     }
                 }
@@ -113,7 +118,11 @@ final class Commands {
                     Block b = blockByName(a[4]);
                     if (b == null) { chat("Unknown block: " + a[4]); return; }
                     if (!world.isLoaded(x, z)) { chat("That position is not loaded"); return; }
-                    world.setBlock(x, y, z, b.id, 0, true);
+                    int meta = a.length > 5 ? Integer.parseInt(a[5]) : 0;
+                    // Two-block structures get their other half too
+                    if (b.shape == Block.Shape.DOOR) world.setBlock(x, y + 1, z, b.id, meta | 8, false);
+                    if (b == Block.BED) world.setBlock(x + mc.world.Shapes.DX[meta & 3], y, z + mc.world.Shapes.DZ[meta & 3], b.id, (meta & 3) | 4, false);
+                    world.setBlock(x, y, z, b.id, meta, true);
                     if (b.isLiquid()) world.scheduleTick(x, y, z, 5);
                     chat("Changed the block at " + x + ", " + y + ", " + z);
                 }
@@ -122,12 +131,13 @@ final class Commands {
                     int x1 = (int) Math.floor(coord(a[4], p.x)), y1 = (int) Math.floor(coord(a[5], p.y)), z1 = (int) Math.floor(coord(a[6], p.z));
                     Block b = blockByName(a[7]);
                     if (b == null) { chat("Unknown block: " + a[7]); return; }
+                    int fillMeta = a.length > 8 ? Integer.parseInt(a[8]) : 0;
                     long vol = (long) (Math.abs(x1 - x0) + 1) * (Math.abs(y1 - y0) + 1) * (Math.abs(z1 - z0) + 1);
                     if (vol > 32768) { chat("Too many blocks in the specified area (" + vol + " > 32768)"); return; }
                     if (!world.isLoaded(x0, z0) || !world.isLoaded(x1, z1)) { chat("That position is not loaded"); return; }
                     for (int x = Math.min(x0, x1); x <= Math.max(x0, x1); x++)
                         for (int y = Math.min(y0, y1); y <= Math.max(y0, y1); y++)
-                            for (int z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) world.setBlock(x, y, z, b.id, 0, false);
+                            for (int z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) world.setBlock(x, y, z, b.id, fillMeta, false);
                     chat("Successfully filled " + vol + " blocks");
                 }
                 case "seed" -> chat("Seed: [" + world.seed + "]");
@@ -136,7 +146,7 @@ final class Commands {
                 case "help" -> {
                     chat("/time set <day|night|n>, /gamemode <c|s>, /tp x y z, /give <item> [n], /clear");
                     chat("/summon <mob> [x y z], /kill [@e], /weather <clear|rain>, /heal, /spawnpoint");
-                    chat("/setblock x y z <block>, /fill x1 y1 z1 x2 y2 z2 <block>, /fly, /seed, /rd <n>");
+                    chat("/setblock x y z <block> [meta], /fill x1 y1 z1 x2 y2 z2 <block> [meta], /fly, /seed, /rd <n>");
                 }
                 default -> chat("Unknown command. Type /help for help.");
             }

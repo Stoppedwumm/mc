@@ -2,6 +2,7 @@ package mc.render;
 
 import mc.world.Block;
 import mc.world.Chunk;
+import mc.world.Shapes;
 
 /**
  * Builds the mesh for one chunk from a snapshot of the 3x3 chunks around it. Light (sky + block) is
@@ -27,12 +28,12 @@ public final class ChunkMesher {
         }
     }
 
-    private static final boolean[] OPAQUE = new boolean[128];
-    private static final int[] FILTER = new int[128];
-    private static final int[] EMIT = new int[128];
+    private static final boolean[] OPAQUE = new boolean[256];
+    private static final int[] FILTER = new int[256];
+    private static final int[] EMIT = new int[256];
 
     static {
-        for (int i = 0; i < 128; i++) {
+        for (int i = 0; i < 256; i++) {
             Block b = Block.get(i);
             OPAQUE[i] = b.opaque;
             FILTER[i] = b.opaque ? 15 : b.lightFilter;
@@ -69,8 +70,21 @@ public final class ChunkMesher {
     private int block(int x, int y, int z) {
         if (y < 0) return Block.BEDROCK.id;
         if (y >= h) return 0;
-        return b[idx(x, y, z)];
+        return b[idx(x, y, z)] & 255;
     }
+
+    /** Neighbour access for shape connections (fences, panes, walls). */
+    private final Shapes.Getter getter = new Shapes.Getter() {
+        public int getBlock(int x, int y, int z) {
+            if (x < 0 || z < 0 || x >= W || z >= W) return 0;
+            return block(x, y, z);
+        }
+
+        public int getMeta(int x, int y, int z) {
+            if (x < 0 || z < 0 || x >= W || z >= W) return 0;
+            return metaAt(x, y, z);
+        }
+    };
 
     private int metaAt(int x, int y, int z) {
         if (y < 0 || y >= h) return 0;
@@ -103,7 +117,7 @@ public final class ChunkMesher {
         for (int y = 0; y < Math.min(h, Chunk.HEIGHT); y++) {
             for (int z = 16; z < 32; z++) {
                 for (int x = 16; x < 32; x++) {
-                    int id = b[idx(x, y, z)];
+                    int id = b[idx(x, y, z)] & 255;
                     if (id == 0) continue;
                     Block block = Block.get(id);
                     int col = (z - 16) * 16 + (x - 16);
@@ -121,6 +135,7 @@ public final class ChunkMesher {
                         case LIQUID -> liquid(block, x, y, z, block == Block.WATER ? translucent : solid);
                         case CROSS -> cross(block, x, y, z, tint, solid);
                         case TORCH -> torch(block, x, y, z, solid);
+                        case SHAPE -> shaped(block, x, y, z, tint, solid);
                         default -> { }
                     }
                 }
@@ -158,7 +173,7 @@ public final class ChunkMesher {
                 int top = -1;
                 for (int y = H - 1; y >= 0; y--) {
                     int i = idx(x, y, z);
-                    int id = b[i];
+                    int id = b[i] & 255;
                     if (light > 0) {
                         if (OPAQUE[id]) light = 0;
                         else light = Math.max(0, light - FILTER[id]);
@@ -188,7 +203,7 @@ public final class ChunkMesher {
 
         head = tail = 0;
         for (int i = 0; i < n; i++) {
-            int e = EMIT[b[i]];
+            int e = EMIT[b[i] & 255];
             if (e > 0) { blk[i] = (byte) e; queue[tail++ & mask] = i; }
         }
         propagate(blk, head, tail);
@@ -209,7 +224,7 @@ public final class ChunkMesher {
                 }
                 if (nx < 0 || nx >= W || nz < 0 || nz >= W || ny < 0 || ny >= H) continue;
                 int ni = idx(nx, ny, nz);
-                int id = b[ni];
+                int id = b[ni] & 255;
                 if (OPAQUE[id]) continue;
                 int nl = l - 1 - FILTER[id];
                 if (nl > light[ni]) {
@@ -229,7 +244,7 @@ public final class ChunkMesher {
         if (nid == 0) return true;
         Block n = Block.get(nid);
         if (n.opaque) return false;
-        if (self == n && (self.layer == Block.Layer.TRANSLUCENT || self == Block.GLASS)) return false;
+        if (self == n && (self.layer == Block.Layer.TRANSLUCENT || self == Block.GLASS || self.shape == Block.Shape.PANE)) return false;
         return true;
     }
 
@@ -286,9 +301,14 @@ public final class ChunkMesher {
             }
             u += uOff; w += vOff;
             int shade = (int) (255 * (ao ? AO_CURVE[vAo[v]] : 1f));
+            if (c[1] == 1) { px += shearX; pz += shearZ; }
+            px += offX; py += offY; pz += offZ;
             out.vertex(lx + px, ly + py, lz + pz, tu + inset(u * 16), tv + inset(w * 16), vSky[v], vBlk[v], shade, tint, flags | face);
         }
     }
+
+    /** Vertex offsets applied by emit (wall torches); top vertices are additionally sheared. */
+    private int offX, offY, offZ, shearX, shearZ;
 
     /** Keeps UVs 1/16 texel inside the tile so mipmapped sampling never bleeds into the neighbouring tile. */
     private static int inset(int t) {
@@ -422,10 +442,45 @@ public final class ChunkMesher {
         flatLight(x, y, z);
         for (int v = 0; v < 4; v++) vBlk[v] = 15 * 16;
         int tex = block.texSide;
+        int meta = metaAt(x, y, z);
+        if (meta >= 1 && meta <= 4) {
+            int wall = meta - 1;
+            offX = Shapes.DX[wall] * 6; offZ = Shapes.DZ[wall] * 6; offY = 3;
+            shearX = -Shapes.DX[wall] * 4; shearZ = -Shapes.DZ[wall] * 4;
+        }
         for (int f = 0; f < 6; f++) {
             if (f == 0) emit(out, f, x, y, z, 7, 0, 7, 9, 10, 9, tex, 0xFFFFFF, false, 0, -1, F_EMISSIVE);
             else if (f == 1) emit(out, f, x, y, z, 7, 0, 7, 9, 10, 9, tex, 0xFFFFFF, false, 0, 7, 0);
             else emit(out, f, x, y, z, 7, 0, 7, 9, 10, 9, tex, 0xFFFFFF, false, 0, 0, 0);
+        }
+        offX = offY = offZ = shearX = shearZ = 0;
+    }
+
+    private static boolean onBoundary(int face, int[] bx) {
+        return switch (face) {
+            case 0 -> bx[4] == 16;
+            case 1 -> bx[1] == 0;
+            case 2 -> bx[2] == 0;
+            case 3 -> bx[5] == 16;
+            case 4 -> bx[0] == 0;
+            default -> bx[3] == 16;
+        };
+    }
+
+    /** Slabs, stairs, fences, doors...: every box of the shape, with faces on the cell boundary culled like cubes. */
+    private void shaped(Block block, int x, int y, int z, int tint, VertexBuilder out) {
+        int meta = metaAt(x, y, z);
+        for (int[] bx : Shapes.boxes(block, meta, getter, x, y, z, Shapes.Mode.RENDER)) {
+            for (int f = 0; f < 6; f++) {
+                boolean boundary = onBoundary(f, bx);
+                if (boundary) {
+                    if (!faceVisible(block, f, x, y, z)) continue;
+                    smoothLight(f, x, y, z);
+                } else {
+                    flatLight(x, y, z);
+                }
+                emit(out, f, x, y, z, bx[0], bx[1], bx[2], bx[3], bx[4], bx[5], block.textureForFace(f, meta), tint, boundary, 0, 0, 0);
+            }
         }
     }
 }

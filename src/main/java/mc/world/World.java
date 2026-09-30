@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Owns all loaded chunks. Terrain generation and meshing run on a worker pool; decoration, block edits and
  * GL uploads happen on the main thread.
  */
-public final class World {
+public final class World implements Shapes.Getter {
     public final TerrainGenerator generator;
     public final WorldStorage storage;
     private final Decorator decorator;
@@ -121,7 +121,7 @@ public final class World {
         if (y < 0 || y >= Chunk.HEIGHT) return 0;
         Chunk c = chunks.get(Chunk.key(x >> 4, z >> 4));
         if (c == null) return 0;
-        return c.blocks[Chunk.index(x & 15, y, z & 15)];
+        return c.blocks[Chunk.index(x & 15, y, z & 15)] & 255;
     }
 
     public int getMeta(int x, int y, int z) {
@@ -182,7 +182,7 @@ public final class World {
         int cx = x >> 4, cz = z >> 4;
         Chunk c = chunks.get(Chunk.key(cx, cz));
         if (c == null) return false;
-        int old = c.blocks[Chunk.index(x & 15, y, z & 15)];
+        int old = c.blocks[Chunk.index(x & 15, y, z & 15)] & 255;
         c.set(x & 15, y, z & 15, id, meta);
         c.touched = true;
         if (old != id) {
@@ -228,7 +228,22 @@ public final class World {
     private void neighborChanged(int x, int y, int z, Block b) {
         Block below = Block.get(getBlock(x, y - 1, z));
         boolean ok = true;
-        if (b == Block.TORCH) ok = below.opaque;
+        int meta = getMeta(x, y, z);
+        if (b == Block.TORCH) {
+            if (meta >= 1 && meta <= 4) ok = Block.get(getBlock(x + Shapes.DX[meta - 1], y, z + Shapes.DZ[meta - 1])).opaque;
+            else ok = below.opaque;
+        }
+        else if (b == Block.LADDER) ok = Block.get(getBlock(x + Shapes.DX[meta & 3], y, z + Shapes.DZ[meta & 3])).opaque;
+        else if (b.shape == Block.Shape.DOOR) {
+            if ((meta & 8) != 0) ok = getBlock(x, y - 1, z) == b.id;
+            else ok = getBlock(x, y + 1, z) == b.id && below.opaque;
+        }
+        else if (b == Block.BED) {
+            int f = meta & 3, dir = (meta & 4) != 0 ? Shapes.opposite(f) : f;
+            ok = getBlock(x + Shapes.DX[dir], y, z + Shapes.DZ[dir]) == b.id;
+        }
+        else if (b.shape == Block.Shape.CARPET) ok = below != Block.AIR && !below.isLiquid();
+        else if (b.shape == Block.Shape.SNOW_LAYER) ok = below.opaque;
         else if (b == Block.WHEAT) ok = below == Block.FARMLAND;
         else if (b == Block.SUGAR_CANE) ok = below == Block.SUGAR_CANE || below == Block.GRASS || below == Block.DIRT || below == Block.SAND;
         else if (b == Block.CACTUS) ok = below == Block.CACTUS || below == Block.SAND;
@@ -258,6 +273,14 @@ public final class World {
         Block b = Block.get(id);
         int meta = getMeta(x, y, z);
         if (listener != null) listener.blockBroken(x, y, z, b, meta);
+        // Two-block structures lose their other half without a second drop
+        int ox = x, oy = y, oz = z;
+        if (b.shape == Block.Shape.DOOR) oy += (meta & 8) != 0 ? -1 : 1;
+        else if (b == Block.BED) {
+            int f = meta & 3, dir = (meta & 4) != 0 ? Shapes.opposite(f) : f;
+            ox += Shapes.DX[dir]; oz += Shapes.DZ[dir];
+        }
+        if ((ox != x || oy != y || oz != z) && getBlock(ox, oy, oz) == id) setBlock(ox, oy, oz, 0, 0, false);
         setBlock(x, y, z, 0);
         if (drop) for (ItemStack s : Drops.of(b, meta, tool)) spawnItem(x + 0.5, y + 0.5, z + 0.5, s);
     }
@@ -376,7 +399,7 @@ public final class World {
                 for (int s = 0; s < sections; s++)
                     for (int k = 0; k < 3; k++) {
                         int x = c.cx * 16 + random.nextInt(16), y = s * 16 + random.nextInt(16), z = c.cz * 16 + random.nextInt(16);
-                        int id = c.blocks[Chunk.index(x & 15, y, z & 15)];
+                        int id = c.blocks[Chunk.index(x & 15, y, z & 15)] & 255;
                         if (id != 0) randomTick(x, y, z, Block.get(id));
                     }
             }

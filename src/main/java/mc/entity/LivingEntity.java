@@ -152,7 +152,17 @@ public abstract class LivingEntity extends Entity {
             float slip = onGround ? slipperiness() * 0.91f : 0.91f;
             float accel = onGround ? speed * 0.16277136f / (slip * slip * slip) : speed * 0.2f;
             moveRelative(strafe, forward, accel);
+            boolean ladder = onLadder();
+            if (ladder) {
+                // Climbing: limited sideways speed, slow descent (none while sneaking), push against it to go up
+                motionX = Math.max(-0.15, Math.min(0.15, motionX));
+                motionZ = Math.max(-0.15, Math.min(0.15, motionZ));
+                motionY = Math.max(motionY, -0.15);
+                if (holdsOnLadder() && motionY < 0) motionY = 0;
+                fallDistance = 0;
+            }
             move(motionX, motionY, motionZ);
+            if (ladder && (horizontalCollision || jump)) motionY = 0.2;
             motionY -= gravity();
             motionY *= 0.98;
             motionX *= slip;
@@ -166,6 +176,13 @@ public abstract class LivingEntity extends Entity {
     }
 
     protected double gravity() { return 0.08; }
+
+    public boolean onLadder() {
+        return Block.get(world.getBlock((int) Math.floor(x), (int) Math.floor(y), (int) Math.floor(z))).climbable;
+    }
+
+    /** Sneaking players stop on ladders. */
+    protected boolean holdsOnLadder() { return false; }
 
     protected void jumpFromGround() {
         motionY = 0.42;

@@ -29,7 +29,7 @@ public final class Liquids {
         Block bl = Block.get(b);
         if (b == id) return false;
         if (bl.isLiquid()) return false;
-        return bl.replaceable || bl.model == Block.Model.CROSS || bl == Block.TORCH;
+        return bl.replaceable || bl.model == Block.Model.CROSS || bl.washable;
     }
 
     public static void tick(World w, int x, int y, int z) {

@@ -22,7 +22,7 @@ public final class Drops {
             case 2, 21, 62 -> add(out, Item.of(Block.DIRT), 1);
             case 12 -> add(out, Item.COAL, 1);
             case 25 -> add(out, Item.DIAMOND, 1);
-            case 15, 23 -> { }
+            case 15, 23, 89 -> { }
             case 14 -> {
                 if (RANDOM.nextInt(20) == 0) add(out, Item.of(Block.SAPLING), 1);
                 if (RANDOM.nextInt(200) == 0) add(out, Item.APPLE, 1);
@@ -40,7 +40,12 @@ public final class Drops {
                     add(out, Item.SEEDS, 1 + RANDOM.nextInt(3));
                 } else add(out, Item.SEEDS, 1);
             }
-            default -> add(out, Item.get(b.id), 1);
+            default -> {
+                if (b.isSlab() && (meta & 3) == 2) add(out, Item.get(b.id), 2);
+                else if (b.shape == Block.Shape.SNOW_LAYER) add(out, Item.SNOWBALL, (meta & 7) + 1);
+                else if (b == Block.SNOW) add(out, Item.SNOWBALL, 4);
+                else add(out, Item.get(b.id), 1);
+            }
         }
         return out;
     }

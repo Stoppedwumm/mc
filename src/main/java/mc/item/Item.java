@@ -74,7 +74,11 @@ public final class Item {
         }
         BY_ID[Block.TORCH.id].fuelTicks = 0;
         for (Block b : new Block[]{Block.PLANKS, Block.SPRUCE_PLANKS, Block.BIRCH_PLANKS, Block.OAK_LOG, Block.SPRUCE_LOG,
-                Block.BIRCH_LOG, Block.CRAFTING_TABLE, Block.BOOKSHELF, Block.CHEST}) BY_ID[b.id].fuelTicks = 300;
+                Block.BIRCH_LOG, Block.CRAFTING_TABLE, Block.BOOKSHELF, Block.CHEST, Block.OAK_STAIRS, Block.SPRUCE_STAIRS,
+                Block.BIRCH_STAIRS, Block.OAK_FENCE, Block.OAK_FENCE_GATE, Block.OAK_TRAPDOOR, Block.LADDER}) BY_ID[b.id].fuelTicks = 300;
+        for (Block b : new Block[]{Block.OAK_SLAB, Block.SPRUCE_SLAB, Block.BIRCH_SLAB, Block.OAK_DOOR}) BY_ID[b.id].fuelTicks = 150;
+        for (Block b : Block.BY_ID) if (b != null && b.shape == Block.Shape.DOOR) BY_ID[b.id].maxStack = 16;
+        BY_ID[Block.BED.id].maxStack = 1;
         BY_ID[Block.SAPLING.id].fuelTicks = 100;
     }
 
@@ -115,6 +119,7 @@ public final class Item {
     public static final Item SUGAR = item(289, "Sugar", 33);
     public static final Item PAPER = item(290, "Paper", 34);
     public static final Item BOOK = item(291, "Book", 35);
+    public static final Item SNOWBALL = item(292, "Snowball", 36).stack(16);
 
     // Tools: icon = 40 + type*5 + material
     public static final Item WOODEN_PICKAXE = tool(300, "Wooden Pickaxe", 40, Tool.PICKAXE, 0, 59, 2, 2);
@@ -155,9 +160,11 @@ public final class Item {
                 || b == Block.STONE_BRICKS || b == Block.FURNACE || b == Block.LIT_FURNACE || b == Block.OBSIDIAN || b == Block.GRANITE
                 || b == Block.DIORITE || b == Block.ANDESITE || b == Block.TERRACOTTA || b == Block.ICE || b.name.endsWith("Ore"))
             return Tool.PICKAXE;
+        if (b.base != null && b.shape != Block.Shape.CARPET) return effectiveTool(b.base);
+        if (b == Block.IRON_DOOR || b == Block.IRON_BARS) return Tool.PICKAXE;
         if (b.sound == Block.SoundType.WOOD) return Tool.AXE;
         if (b == Block.DIRT || b == Block.GRASS || b == Block.SAND || b == Block.GRAVEL || b == Block.CLAY || b == Block.SNOW
-                || b == Block.SNOWY_GRASS || b == Block.COARSE_DIRT || b == Block.FARMLAND) return Tool.SHOVEL;
+                || b == Block.SNOWY_GRASS || b == Block.COARSE_DIRT || b == Block.FARMLAND || b == Block.SNOW_LAYER) return Tool.SHOVEL;
         return Tool.NONE;
     }
 

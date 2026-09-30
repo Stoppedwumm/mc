@@ -102,6 +102,20 @@ public final class TextureGen {
         paint(Tex.IRON_BLOCK, () -> metalBlock(0xdcdcdc, 0xa8a8a8));
         paint(Tex.GOLD_BLOCK, () -> metalBlock(0xf8d840, 0xc89a18));
         paint(Tex.DIAMOND_BLOCK, () -> metalBlock(0x68e8e0, 0x2aa8a4));
+        paint(Tex.SMOOTH_STONE, this::smoothStone);
+        paint(Tex.OAK_DOOR_TOP, () -> woodDoor(true));
+        paint(Tex.OAK_DOOR_BOTTOM, () -> woodDoor(false));
+        paint(Tex.IRON_DOOR_TOP, () -> ironDoor(true));
+        paint(Tex.IRON_DOOR_BOTTOM, () -> ironDoor(false));
+        paint(Tex.TRAPDOOR, this::trapdoor);
+        paint(Tex.LADDER, this::ladder);
+        paint(Tex.IRON_BARS, this::ironBars);
+        paint(Tex.BED_HEAD, () -> bedTop(true));
+        paint(Tex.BED_FOOT, () -> bedTop(false));
+        paint(Tex.BED_SIDE, this::bedSide);
+        paint(Tex.OAK_DOOR_ITEM, () -> doorItem(false));
+        paint(Tex.IRON_DOOR_ITEM, () -> doorItem(true));
+        paint(Tex.BED_ITEM, this::bedItem);
         paint(Tex.GRASS_SIDE_ITEM, () -> tintedCopy(Tex.GRASS_SIDE, 0x7fb238));
         paint(Tex.GRASS_TOP_ITEM, () -> tintedCopy(Tex.GRASS_TOP, 0x7fb238));
         for (int i = 0; i < 10; i++) {
@@ -755,5 +769,125 @@ public final class TextureGen {
                 y += Math.sin(ang);
             }
         }
+    }
+
+    // ------------------------------------------------------------------ building blocks
+
+    private void smoothStone() {
+        speckle(0xa0a0a0, 0.03, 0x979797, 0.1);
+        for (int i = 0; i < 16; i++) { set(i, 0, 0xb4b4b4); set(i, 15, 0x7c7c7c); set(0, i, 0xacacac); set(15, i, 0x858585); }
+    }
+
+    private static final int OAK = 0xa2824e;
+
+    private void woodDoor(boolean top) {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                double grain = Math.sin(x * 1.7 + y * 0.15) * 0.04;
+                int c = scale(OAK, (x % 4 == 0 ? 0.8 : 1) * (1 + grain) * jitter(0.03));
+                set(x, y, c);
+            }
+        for (int i = 0; i < 16; i++) {
+            set(i, top ? 0 : 15, scale(OAK, 0.6));
+            set(0, i, scale(OAK, 0.65));
+            set(15, i, scale(OAK, 0.65));
+        }
+        if (top) {
+            // Two small windows
+            for (int y = 3; y < 8; y++)
+                for (int x = 3; x < 13; x++) {
+                    if (x == 7 || x == 8) { set(x, y, scale(OAK, 0.7)); continue; }
+                    set(x, y, 0, 0);
+                }
+            for (int x = 2; x < 14; x++) { set(x, 2, scale(OAK, 0.65)); set(x, 8, scale(OAK, 0.65)); }
+            for (int y = 2; y < 9; y++) { set(2, y, scale(OAK, 0.65)); set(13, y, scale(OAK, 0.65)); }
+        } else {
+            for (int x = 2; x < 14; x++) { set(x, 3, scale(OAK, 0.7)); set(x, 11, scale(OAK, 0.7)); }
+            set(12, 1, 0x3a3a3a); set(12, 2, 0x3a3a3a); set(13, 1, 0x555555);
+        }
+    }
+
+    private void ironDoor(boolean top) {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) set(x, y, scale(0xc8c8c8, jitter(0.03) * (x == 0 || x == 15 ? 0.75 : 1)));
+        for (int i = 0; i < 16; i++) set(i, top ? 0 : 15, 0x8a8a8a);
+        if (top) {
+            for (int y = 3; y < 9; y++) for (int x = 3; x < 13; x++) set(x, y, (x + y) % 3 == 0 ? 0x9a9a9a : 0xb0b0b0);
+        } else {
+            for (int y = 2; y < 14; y += 4) for (int x = 2; x < 14; x++) set(x, y, 0xa0a0a0);
+            set(12, 1, 0x505050); set(12, 2, 0x505050);
+        }
+    }
+
+    private void trapdoor() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                boolean frame = x < 2 || y < 2 || x > 13 || y > 13 || x == 7 || x == 8 || y == 7 || y == 8;
+                if (!frame && ((x + y) % 5 == 0)) { set(x, y, 0, 0); continue; }
+                set(x, y, scale(OAK, (frame ? 0.85 : 1) * jitter(0.04)));
+            }
+    }
+
+    private void ladder() {
+        clearTile();
+        for (int y = 0; y < 16; y++) {
+            for (int x : new int[]{2, 3, 12, 13}) set(x, y, scale(0x7c5c32, (x == 3 || x == 13 ? 0.8 : 1) * jitter(0.05)));
+        }
+        for (int y = 1; y < 16; y += 4)
+            for (int x = 4; x < 12; x++) { set(x, y, scale(0x9a7644, jitter(0.05))); set(x, y + 1, scale(0x6a4e2a, jitter(0.05))); }
+    }
+
+    private void ironBars() {
+        clearTile();
+        for (int y = 0; y < 16; y++)
+            for (int x = 1; x < 16; x += 4) { set(x, y, 0x9a9a9a); set(x + 1, y, 0x6e6e6e); }
+        for (int x = 0; x < 16; x++) { set(x, 0, 0x8a8a8a); set(x, 15, 0x6a6a6a); }
+    }
+
+    private static final int BED_RED = 0xa02525;
+
+    private void bedTop(boolean head) {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) set(x, y, scale(BED_RED, jitter(0.05) * (x == 0 || x == 15 ? 0.8 : 1)));
+        if (head) {
+            // White sheet with a pillow in the middle
+            for (int y = 0; y < 16; y++) for (int x = 1; x < 15; x++) set(x, y, scale(0xe6e6e6, jitter(0.03)));
+            for (int y = 3; y < 13; y++) for (int x = 3; x < 13; x++) set(x, y, scale(0xfafafa, jitter(0.02)));
+            for (int i = 3; i < 13; i++) { set(i, 3, 0xd0d0d0); set(i, 12, 0xc0c0c0); set(3, i, 0xd0d0d0); set(12, i, 0xc0c0c0); }
+        } else {
+            for (int x = 0; x < 16; x++) set(x, 2, scale(BED_RED, 0.8));
+        }
+    }
+
+    private void bedSide() {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                if (y < 3 || y > 9) { set(x, y, 0, 0); continue; }
+                set(x, y, y < 6 ? scale(BED_RED, jitter(0.05)) : scale(OAK, jitter(0.04) * 0.85));
+            }
+        for (int y = 9; y < 16; y++) for (int x = 0; x < 3; x++) { set(x, y, scale(OAK, 0.7)); set(15 - x, y, scale(OAK, 0.7)); }
+        for (int y = 3; y < 7; y++) for (int x = 0; x < 16; x++) if (y == 3) set(x, y, scale(BED_RED, 1.15));
+    }
+
+    private void doorItem(boolean iron) {
+        clearTile();
+        int base = iron ? 0xc8c8c8 : OAK;
+        for (int y = 0; y < 16; y++)
+            for (int x = 4; x < 12; x++) {
+                int c = scale(base, (x == 4 || x == 11 ? 0.7 : 1) * jitter(0.04));
+                if (y == 0 || y == 15) c = scale(base, 0.6);
+                set(x, y, c);
+            }
+        for (int y = 2; y < 6; y++) for (int x = 6; x < 10; x++) set(x, y, iron ? 0x9a9a9a : 0, iron ? 255 : 0);
+        set(10, 9, 0x303030);
+    }
+
+    private void bedItem() {
+        clearTile();
+        for (int x = 0; x < 16; x++) {
+            for (int y = 6; y < 10; y++) set(x, y, x < 4 ? 0xeeeeee : scale(BED_RED, jitter(0.05)));
+            for (int y = 10; y < 12; y++) set(x, y, scale(OAK, 0.85));
+        }
+        for (int y = 12; y < 14; y++) { set(0, y, scale(OAK, 0.7)); set(1, y, scale(OAK, 0.7)); set(14, y, scale(OAK, 0.7)); set(15, y, scale(OAK, 0.7)); }
     }
 }

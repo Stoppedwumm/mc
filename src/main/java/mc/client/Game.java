@@ -293,7 +293,8 @@ public final class Game implements World.Listener {
         f = f + (1 - (Math.cos(f * Math.PI) + 1) / 2 - f) / 3;
         world.dayFactor = (float) Math.max(0, Math.min(1, Math.cos(f * Math.PI * 2) * 2 + 0.5)) * (1 - weather.rain(1) * 0.3f);
 
-        boolean play = screen == Screen.NONE;
+        boolean play = screen == Screen.NONE && sleepTicks == 0;
+        if (sleepTicks > 0) tickSleep();
         float forward = 0, strafe = 0;
         boolean jump = false, sneak = false;
         if (play) {
@@ -337,6 +338,53 @@ public final class Game implements World.Listener {
         world.tick();
         particles.tick(world);
         if (ticks % 6000 == 0) saveWorld();
+    }
+
+    // ------------------------------------------------------------------ sleeping
+
+    /** Ticks spent in bed (0 = awake). After 100 ticks the night is skipped. */
+    int sleepTicks;
+    private double bedX, bedY, bedZ;
+
+    void sleep(int x, int y, int z) {
+        if (sleepTicks > 0) return;
+        long t = world.time % 24000;
+        boolean night = t >= 12542 && t <= 23459;
+        if (!night && !weather.raining) { hud.chat("You can only sleep at night or during thunderstorms"); return; }
+        if (player.distanceSq(x + 0.5, y + 0.5, z + 0.5) > 9) { hud.chat("You may not rest now; the bed is too far away"); return; }
+        for (Entity e : world.entities()) {
+            if (e instanceof Mob m && m.type.hostile && !m.isDead() && Math.abs(m.x - x) < 8 && Math.abs(m.y - y) < 5 && Math.abs(m.z - z) < 8) {
+                hud.chat("You may not rest now; there are monsters nearby");
+                return;
+            }
+        }
+        // Lie on the head half
+        int meta = world.getMeta(x, y, z);
+        if ((meta & 4) == 0) { x += mc.world.Shapes.DX[meta & 3]; z += mc.world.Shapes.DZ[meta & 3]; }
+        bedX = x + 0.5; bedY = y + 0.5625; bedZ = z + 0.5;
+        if (player.spawnX != bedX || player.spawnZ != bedZ) hud.chat("Respawn point set");
+        player.spawnX = bedX; player.spawnY = bedY; player.spawnZ = bedZ;
+        player.setPos(bedX, bedY, bedZ);
+        player.motionX = player.motionY = player.motionZ = 0;
+        sleepTicks = 1;
+        interaction.breakProgress = 0;
+    }
+
+    private void tickSleep() {
+        sleepTicks++;
+        player.setPos(bedX, bedY, bedZ);
+        player.eyeHeight = player.prevEyeHeight = 0.3f;
+        if (input.down(GLFW_KEY_LEFT_SHIFT) && sleepTicks > 5) { wakeUp(); return; }
+        if (sleepTicks >= 100) {
+            world.time += 24000 - world.time % 24000;
+            weather.raining = false;
+            wakeUp();
+        }
+    }
+
+    private void wakeUp() {
+        sleepTicks = 0;
+        player.setPos(bedX, bedY, bedZ);
     }
 
     private void onPlayerDeath() {
@@ -412,16 +460,16 @@ public final class Game implements World.Listener {
     }
 
     /** Scripted commands from --cmd run one per tick; "/wait" pauses until nearby chunks are loaded, "/sleep N" waits N ticks. */
-    private int sleepTicks;
+    private int scriptDelay;
 
     private void runStartupCommands() {
         if (startupCommands.isEmpty()) return;
-        if (sleepTicks > 0) { sleepTicks--; return; }
+        if (scriptDelay > 0) { scriptDelay--; return; }
         String c = startupCommands.get(0);
         if (c.equals("/wait") || c.equals("wait")) {
             if (!areaReady()) return;
         } else if (c.startsWith("/sleep")) {
-            sleepTicks = Integer.parseInt(c.substring(7).trim());
+            scriptDelay = Integer.parseInt(c.substring(7).trim());
         } else {
             commands.run(c);
         }
@@ -551,6 +599,11 @@ public final class Game implements World.Listener {
 
     private void renderGui() {
         gui.begin(window.width, window.height);
+        if (sleepTicks > 0) {
+            float a = Math.min(1, sleepTicks / 70f);
+            gui.fill(0, 0, gui.width, gui.height, (int) (a * 230) << 24 | 0x0a0a14);
+            gui.centered("Sleeping... (Shift to leave bed)", gui.width / 2, gui.height - 70, 0xFFE0E0E0);
+        }
         if (!hideGui) hud.render(gui);
         if (isContainer(screen)) screens.renderContainer(gui, input);
         else if (screen == Screen.PAUSE) screens.renderPause(gui, input);

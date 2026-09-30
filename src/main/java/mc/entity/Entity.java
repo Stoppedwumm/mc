@@ -2,6 +2,7 @@ package mc.entity;
 
 import mc.util.AABB;
 import mc.world.Block;
+import mc.world.Shapes;
 import mc.world.World;
 
 import java.util.ArrayList;
@@ -83,8 +84,12 @@ public abstract class Entity {
                 boolean loaded = world.isLoaded(bx, bz);
                 for (int by = y0; by <= y1; by++) {
                     // Unloaded terrain is treated as solid so nothing falls out of the world
-                    if (!loaded || Block.get(world.getBlock(bx, by, bz)).solid)
-                        list.add(new AABB(bx, by, bz, bx + 1, by + 1, bz + 1));
+                    if (!loaded) { list.add(new AABB(bx, by, bz, bx + 1, by + 1, bz + 1)); continue; }
+                    Block b = Block.get(world.getBlock(bx, by, bz));
+                    if (b.model == Block.Model.SHAPE) {
+                        for (int[] s : Shapes.boxes(b, world.getMeta(bx, by, bz), world, bx, by, bz, Shapes.Mode.COLLISION))
+                            list.add(new AABB(bx + s[0] / 16.0, by + s[1] / 16.0, bz + s[2] / 16.0, bx + s[3] / 16.0, by + s[4] / 16.0, bz + s[5] / 16.0));
+                    } else if (b.solid) list.add(new AABB(bx, by, bz, bx + 1, by + 1, bz + 1));
                 }
             }
         return list;

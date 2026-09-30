@@ -21,7 +21,7 @@ final class Screens {
     private int craftSize = 2;
     private BlockEntity.Furnace furnace;
     private BlockEntity.Chest chest;
-    private int creativeScroll;
+    int creativeScroll;
     private final List<Item> creativeItems = new ArrayList<>();
 
     /** Slot kinds */

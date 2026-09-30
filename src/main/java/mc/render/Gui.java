@@ -97,7 +97,7 @@ public final class Gui {
     public void icon(Block block, float x, float y, float size) {
         glActiveTexture(GL_TEXTURE0);
         wr.atlas.bind();
-        if (block.model == Block.Model.CUBE) {
+        if (block.has3dItem()) {
             Matrix4f m = new Matrix4f(ortho)
                     .translate(x + size / 2, y + size / 2, 100)
                     .scale(size * 0.62f, -size * 0.62f, size * 0.62f)
@@ -111,7 +111,7 @@ public final class Gui {
             batch.end();
             glDisable(GL_DEPTH_TEST);
         } else {
-            int tex = block.texSide;
+            int tex = block.spriteTex();
             if (block == Block.WHEAT) tex = Block.Tex.WHEAT_0 + 7;
             float u0 = (tex & 15) / 16f, v0 = (tex >> 4) / 16f;
             shader(ortho, true, 0.3f);

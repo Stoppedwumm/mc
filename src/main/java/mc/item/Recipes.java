@@ -78,7 +78,31 @@ public final class Recipes {
         shaped(Item.of(Block.BRICKS), 1, new String[]{"##", "##"}, '#', Item.BRICK);
         shaped(Item.of(Block.CLAY), 1, new String[]{"##", "##"}, '#', Item.CLAY_BALL);
         shaped(Item.of(Block.WHITE_WOOL), 1, new String[]{"##", "##"}, '#', Item.STRING);
-        shaped(Item.of(Block.SNOW), 1, new String[]{"##", "##"}, '#', Block.SNOW);
+        shaped(Item.of(Block.SNOW), 1, new String[]{"##", "##"}, '#', Item.SNOWBALL);
+        shaped(Item.of(Block.SNOW_LAYER), 6, new String[]{"###"}, '#', Block.SNOW);
+        Block[][] derived = {
+                {Block.SMOOTH_STONE_SLAB, Block.STONE, null}, {Block.COBBLESTONE_SLAB, Block.COBBLESTONE, Block.COBBLESTONE_STAIRS},
+                {Block.OAK_SLAB, Block.PLANKS, Block.OAK_STAIRS}, {Block.SPRUCE_SLAB, Block.SPRUCE_PLANKS, Block.SPRUCE_STAIRS},
+                {Block.BIRCH_SLAB, Block.BIRCH_PLANKS, Block.BIRCH_STAIRS}, {Block.SANDSTONE_SLAB, Block.SANDSTONE, Block.SANDSTONE_STAIRS},
+                {Block.BRICK_SLAB, Block.BRICKS, Block.BRICK_STAIRS}, {Block.STONE_BRICK_SLAB, Block.STONE_BRICKS, Block.STONE_BRICK_STAIRS}};
+        for (Block[] d : derived) {
+            shaped(Item.of(d[0]), 6, new String[]{"###"}, '#', d[1]);
+            if (d[2] != null) shaped(Item.of(d[2]), 4, new String[]{"#  ", "## ", "###"}, '#', d[1]);
+        }
+        shaped(Item.of(Block.OAK_FENCE), 3, new String[]{"#S#", "#S#"}, '#', PLANKS, 'S', Item.STICK);
+        shaped(Item.of(Block.OAK_FENCE_GATE), 1, new String[]{"S#S", "S#S"}, '#', PLANKS, 'S', Item.STICK);
+        shaped(Item.of(Block.OAK_DOOR), 3, new String[]{"##", "##", "##"}, '#', PLANKS);
+        shaped(Item.of(Block.IRON_DOOR), 3, new String[]{"##", "##", "##"}, '#', Item.IRON_INGOT);
+        shaped(Item.of(Block.OAK_TRAPDOOR), 2, new String[]{"###", "###"}, '#', PLANKS);
+        shaped(Item.of(Block.LADDER), 3, new String[]{"S S", "SSS", "S S"}, 'S', Item.STICK);
+        shaped(Item.of(Block.GLASS_PANE), 16, new String[]{"###", "###"}, '#', Block.GLASS);
+        shaped(Item.of(Block.IRON_BARS), 16, new String[]{"###", "###"}, '#', Item.IRON_INGOT);
+        shaped(Item.of(Block.COBBLESTONE_WALL), 6, new String[]{"###", "###"}, '#', Block.COBBLESTONE);
+        Item[] wool = {Item.of(Block.WHITE_WOOL), Item.of(Block.RED_WOOL), Item.of(Block.BLUE_WOOL), Item.of(Block.GREEN_WOOL),
+                Item.of(Block.YELLOW_WOOL), Item.of(Block.BLACK_WOOL)};
+        shaped(Item.of(Block.BED), 1, new String[]{"WWW", "PPP"}, 'W', wool, 'P', PLANKS);
+        Block[] carpets = {Block.WHITE_CARPET, Block.RED_CARPET, Block.BLUE_CARPET, Block.GREEN_CARPET, Block.YELLOW_CARPET, Block.BLACK_CARPET};
+        for (int i = 0; i < carpets.length; i++) shaped(Item.of(carpets[i]), 3, new String[]{"##"}, '#', wool[i]);
         shaped(Item.of(Block.TNT), 1, new String[]{"GSG", "SGS", "GSG"}, 'G', Item.GUNPOWDER, 'S', Block.SAND);
         shaped(Item.of(Block.GLOWSTONE), 1, new String[]{"GG", "GG"}, 'G', Block.GLOWSTONE);
         shaped(Item.PAPER, 3, new String[]{"###"}, '#', Block.SUGAR_CANE);

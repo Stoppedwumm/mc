@@ -60,6 +60,7 @@ public final class ItemTextureGen {
         tile(33, () -> pile(0xf8f8f8, 0xc8c8c8, 0xffffff));
         tile(34, () -> shape((x, y) -> x >= 3 && x <= 12 && y >= 2 && y <= 13, 0xf0f0e8, 0xb0b0a8, 0xffffff));
         tile(35, this::book);
+        tile(36, () -> shape((x, y) -> dist(x, y, 8, 8) < 5.5, 0xf4f8fc, 0xb8c8d8, 0xffffff));
         for (int type = 0; type < 5; type++)
             for (int mat = 0; mat < 5; mat++) {
                 final int t = type, m = mat;

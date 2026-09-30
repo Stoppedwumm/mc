@@ -7,7 +7,8 @@ import java.nio.ByteBuffer;
 import static org.lwjgl.opengl.GL33C.*;
 
 /** Immediate-mode style vertex batch (position, uv, colour) used for GUI, particles, clouds and outlines. */
-public final class Batch {
+public final class Batch implements QuadSink {
+
     private static final int STRIDE = 24;
     private final int vao, vbo;
     private ByteBuffer buf = MemoryUtil.memAlloc(STRIDE * 65536);

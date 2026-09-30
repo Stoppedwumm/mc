@@ -35,6 +35,9 @@ public final class Player extends LivingEntity {
     protected boolean avoidsEdges() { return sneaking; }
 
     @Override
+    protected boolean holdsOnLadder() { return sneaking; }
+
+    @Override
     protected boolean isInvulnerable() { return creative; }
 
     @Override

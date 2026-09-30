@@ -269,12 +269,12 @@ public final class WorldRenderer {
     public void renderSelection(World world, RayCast.Hit hit, float breakProgress) {
         if (hit == null) return;
         Block b = Block.get(world.getBlock(hit.x, hit.y, hit.z));
-        double[] s = RayCast.shape(b);
+        double[] s = RayCast.bounds(world, b, hit.x, hit.y, hit.z);
         float e = 0.002f;
         float x0 = (float) (hit.x + s[0] - camX) - e, y0 = (float) (hit.y + s[1] - camY) - e, z0 = (float) (hit.z + s[2] - camZ) - e;
         float x1 = (float) (hit.x + s[3] - camX) + e, y1 = (float) (hit.y + s[4] - camY) + e, z1 = (float) (hit.z + s[5] - camZ) + e;
 
-        if (breakProgress > 0 && b.model == Block.Model.CUBE) {
+        if (breakProgress > 0 && (b.model == Block.Model.CUBE || b.model == Block.Model.SHAPE)) {
             int stage = Math.min(9, (int) (breakProgress * 10));
             int tex = Block.Tex.BREAK_0 + stage;
             float u0 = (tex & 15) / 16f, v0 = (tex >> 4) / 16f, u1 = u0 + 1 / 16f, v1 = v0 + 1 / 16f;
@@ -418,29 +418,52 @@ public final class WorldRenderer {
         return 0xFF000000 | Math.min(255, r) << 16 | Math.min(255, g) << 8 | Math.min(255, b);
     }
 
-    /** Adds a textured, shaded cube to the batch (used for held item and GUI icons). */
-    public static void cubeInto(Batch batch, Block block, float x, float y, float z, float s, float brightness) {
-        float[] shades = {1.0f, 0.5f, 0.8f, 0.8f, 0.6f, 0.6f};
+    /** Adds a textured, shaded block model to the batch (used for held items, GUI icons and falling blocks). */
+    public static void cubeInto(QuadSink batch, Block block, float x, float y, float z, float s, float brightness) {
+        java.util.List<int[]> boxes = block.model == Block.Model.SHAPE ? mc.world.Shapes.itemBoxes(block)
+                : java.util.List.of(new int[]{0, 0, 0, 16, 16, 16});
+        for (int[] b : boxes) boxInto(batch, block, b, x, y, z, s, brightness);
+    }
+
+    private static final float[] FACE_SHADES = {1.0f, 0.5f, 0.8f, 0.8f, 0.6f, 0.6f};
+
+    /** One box of a block model; UVs follow the box like Minecraft's block models. */
+    public static void boxInto(QuadSink batch, Block block, int[] b, float x, float y, float z, float s, float brightness) {
         int tint = tintFor(block);
+        float k = s / 16f;
         for (int f = 0; f < 6; f++) {
-            int tex = block.textureForFace(f);
-            // Grass sides aren't fully tinted; approximate with a light tint on sides
+            int tex = block.textureForFace(f, block == Block.BED && f == 0 ? 4 : 0);
             int faceTint = tint;
             if (block == Block.GRASS) {
                 faceTint = 0xFFFFFF;
                 tex = f == 0 ? Block.Tex.GRASS_TOP_ITEM : f == 1 ? Block.Tex.DIRT : Block.Tex.GRASS_SIDE_ITEM;
             }
-            int c = shade(brightness * shades[f], faceTint);
-            float u0 = (tex & 15) / 16f, v0 = (tex >> 4) / 16f, u1 = u0 + 1 / 16f, v1 = v0 + 1 / 16f;
-            float X0 = x, Y0 = y, Z0 = z, X1 = x + s, Y1 = y + s, Z1 = z + s;
-            switch (f) {
-                case 0 -> batch.quad(X0, Y1, Z0, u0, v0, X0, Y1, Z1, u0, v1, X1, Y1, Z1, u1, v1, X1, Y1, Z0, u1, v0, c);
-                case 1 -> batch.quad(X0, Y0, Z0, u0, v0, X1, Y0, Z0, u1, v0, X1, Y0, Z1, u1, v1, X0, Y0, Z1, u0, v1, c);
-                case 2 -> batch.quad(X1, Y1, Z0, u0, v0, X1, Y0, Z0, u0, v1, X0, Y0, Z0, u1, v1, X0, Y1, Z0, u1, v0, c);
-                case 3 -> batch.quad(X0, Y1, Z1, u0, v0, X0, Y0, Z1, u0, v1, X1, Y0, Z1, u1, v1, X1, Y1, Z1, u1, v0, c);
-                case 4 -> batch.quad(X0, Y1, Z0, u0, v0, X0, Y0, Z0, u0, v1, X0, Y0, Z1, u1, v1, X0, Y1, Z1, u1, v0, c);
-                default -> batch.quad(X1, Y1, Z1, u0, v0, X1, Y0, Z1, u0, v1, X1, Y0, Z0, u1, v1, X1, Y1, Z0, u1, v0, c);
+            int c = shade(brightness * FACE_SHADES[f], faceTint);
+            float tu = (tex & 15) / 16f, tv = (tex >> 4) / 16f;
+            int[][] q = switch (f) {
+                case 0 -> new int[][]{{b[0], b[4], b[2]}, {b[0], b[4], b[5]}, {b[3], b[4], b[5]}, {b[3], b[4], b[2]}};
+                case 1 -> new int[][]{{b[0], b[1], b[2]}, {b[3], b[1], b[2]}, {b[3], b[1], b[5]}, {b[0], b[1], b[5]}};
+                case 2 -> new int[][]{{b[3], b[4], b[2]}, {b[3], b[1], b[2]}, {b[0], b[1], b[2]}, {b[0], b[4], b[2]}};
+                case 3 -> new int[][]{{b[0], b[4], b[5]}, {b[0], b[1], b[5]}, {b[3], b[1], b[5]}, {b[3], b[4], b[5]}};
+                case 4 -> new int[][]{{b[0], b[4], b[2]}, {b[0], b[1], b[2]}, {b[0], b[1], b[5]}, {b[0], b[4], b[5]}};
+                default -> new int[][]{{b[3], b[4], b[5]}, {b[3], b[1], b[5]}, {b[3], b[1], b[2]}, {b[3], b[4], b[2]}};
+            };
+            float[] v = new float[20];
+            for (int n = 0; n < 4; n++) {
+                int px = q[n][0], py = q[n][1], pz = q[n][2];
+                int u, w;
+                switch (f) {
+                    case 0, 1 -> { u = px; w = pz; }
+                    case 2 -> { u = 16 - px; w = 16 - py; }
+                    case 3 -> { u = px; w = 16 - py; }
+                    case 4 -> { u = pz; w = 16 - py; }
+                    default -> { u = 16 - pz; w = 16 - py; }
+                }
+                v[n * 5] = x + px * k; v[n * 5 + 1] = y + py * k; v[n * 5 + 2] = z + pz * k;
+                v[n * 5 + 3] = tu + u / 256f; v[n * 5 + 4] = tv + w / 256f;
             }
+            batch.quad(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14],
+                    v[15], v[16], v[17], v[18], v[19], c);
         }
     }
 
