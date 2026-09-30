@@ -274,7 +274,7 @@ final class Screens {
             default -> "";
         };
         gui.text(title, px + (screen == Game.Screen.INVENTORY ? 97 : 8), py + 6, 0xFF404040);
-        if (screen != Game.Screen.CREATIVE) gui.text("Inventory", px + 8, py + 73, 0xFF404040);
+        if (screen != Game.Screen.CREATIVE && screen != Game.Screen.INVENTORY) gui.text("Inventory", px + 8, py + 73, 0xFF404040);
         if (screen == Game.Screen.INVENTORY) {
             // Player preview box
             gui.fill(px + 25, py + 7, 51, 72, 0xFF000000);

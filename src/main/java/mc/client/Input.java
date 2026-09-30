@@ -11,7 +11,7 @@ public final class Input {
     public double mouseX, mouseY, dx, dy, scroll;
     private double lastX, lastY;
     private boolean first = true;
-    public boolean resized;
+    public boolean resized, focusLost, focusGained;
     public final StringBuilder typed = new StringBuilder();
 
     public Input(Window w) {
@@ -35,6 +35,10 @@ public final class Input {
         glfwSetScrollCallback(w.handle, (win, x, y) -> scroll += y);
         glfwSetFramebufferSizeCallback(w.handle, (win, x, y) -> resized = true);
         glfwSetCharCallback(w.handle, (win, cp) -> typed.appendCodePoint(cp));
+        glfwSetWindowFocusCallback(w.handle, (win, focused) -> {
+            if (focused) focusGained = true; else { focusLost = true; releaseAll(); }
+        });
+        if (glfwRawMouseMotionSupported()) glfwSetInputMode(w.handle, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
     }
 
     public boolean down(int key) { return keys[key]; }
@@ -58,6 +62,7 @@ public final class Input {
         java.util.Arrays.fill(clicked, false);
         dx = dy = 0;
         scroll = 0;
+        focusLost = focusGained = false;
         typed.setLength(0);
     }
 }

@@ -71,6 +71,9 @@ public final class Window {
 
     public void swap() {
         glfwSwapBuffers(handle);
+    }
+
+    public void pollEvents() {
         glfwPollEvents();
     }
 

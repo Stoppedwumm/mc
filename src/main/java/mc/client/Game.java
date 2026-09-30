@@ -97,7 +97,9 @@ public final class Game implements World.Listener {
             float pt = (float) (acc / TICK);
             frame(pt, dt);
             window.swap();
+            // Reset per-frame input *before* polling, so the events collected now are seen next frame
             input.endFrame();
+            window.pollEvents();
             frameCounter++;
             fpsTimer += dt;
             if (fpsTimer >= 1) { fps = frameCounter; frameCounter = 0; fpsTimer -= 1; }
@@ -580,9 +582,19 @@ public final class Game implements World.Listener {
 
     // ------------------------------------------------------------------ input
 
+    private boolean cursorCaptured;
+
     private void handleInput() {
+        // Like Minecraft: losing focus while playing opens the pause menu and frees the mouse
+        if (input.focusLost && screen == Screen.NONE) setScreen(Screen.PAUSE);
         boolean captured = screen == Screen.NONE;
-        glfwSetInputMode(window.handle, GLFW_CURSOR, captured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+        if (captured != cursorCaptured || input.focusGained) {
+            // Re-applying after a focus change makes macOS grab the pointer again reliably
+            if (input.focusGained) glfwSetInputMode(window.handle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            glfwSetInputMode(window.handle, GLFW_CURSOR, captured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+            cursorCaptured = captured;
+            input.dx = input.dy = 0;
+        }
         if (input.pressed(GLFW_KEY_F11)) window.toggleFullscreen();
         if (input.pressed(GLFW_KEY_F2)) screenshot(null);
         switch (screen) {
