@@ -663,7 +663,8 @@ final class Screens {
         gui.centered("Game Menu", gui.width / 2, 30, 0xFFFFFFFF);
         gui.centered("Left-click a setting to change it, right-click to go back", gui.width / 2, 44, 0xFF909090);
         float bw = 200, bh = 20, x = gui.width / 2 - bw / 2;
-        float y = gui.height / 4 + 8;
+        // Keep the whole column (176 GUI pixels) on screen at large GUI scales
+        float y = Math.max(56, Math.min(gui.height / 4 + 8, gui.height - 176 - 6));
         boolean click = input.clicked(GLFW_MOUSE_BUTTON_LEFT);
         boolean rclick = input.clicked(GLFW_MOUSE_BUTTON_RIGHT);
         boolean any = click || rclick;

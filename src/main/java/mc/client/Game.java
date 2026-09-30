@@ -35,7 +35,7 @@ public final class Game implements World.Listener {
     Sound sound;
     WorldRenderer renderer;
     PostProcess post;
-    private Gui gui;
+    Gui gui;
     private ItemRenderer itemRenderer;
     final EntityRenderer entityRenderer = new EntityRenderer();
     final Weather weather = new Weather();
@@ -101,6 +101,8 @@ public final class Game implements World.Listener {
             // Reset per-frame input *before* polling, so the events collected now are seen next frame
             input.endFrame();
             window.pollEvents();
+            window.updateSize();
+            input.updateCursor(window);
             frameCounter++;
             fpsTimer += dt;
             if (fpsTimer >= 1) { fps = frameCounter; frameCounter = 0; fpsTimer -= 1; }
@@ -782,6 +784,14 @@ public final class Game implements World.Listener {
         if (isContainer(screen)) screens.renderContainer(gui, input);
         else if (screen == Screen.PAUSE) screens.renderPause(gui, input);
         else if (screen == Screen.DEATH) screens.renderDeath(gui, input);
+        if (showDebug && screen != Screen.NONE) {
+            // Where the game thinks the cursor is (should sit under the system pointer)
+            float mx = (float) (input.mouseX / gui.scale), my = (float) (input.mouseY / gui.scale);
+            gui.fill(mx - 4, my - 0.5f, 9, 1, 0xFFFF3030);
+            gui.fill(mx - 0.5f, my - 4, 1, 9, 0xFFFF3030);
+            gui.text("Cursor " + (int) input.pointX + "," + (int) input.pointY + " pt / window " + input.pointsW + "x" + input.pointsH
+                    + " pt / " + window.width + "x" + window.height + " px", 2, gui.height - 10, 0xFFFFFF60);
+        }
     }
 
     private void renderLoading() {

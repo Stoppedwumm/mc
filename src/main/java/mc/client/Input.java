@@ -11,7 +11,11 @@ public final class Input {
     public double mouseX, mouseY, dx, dy, scroll;
     private double lastX, lastY;
     private boolean first = true;
-    private final int[] winW = new int[1], winH = new int[1], fbW = new int[1], fbH = new int[1];
+    private final int[] winW = new int[1], winH = new int[1];
+    private final double[] curX = new double[1], curY = new double[1];
+    /** Raw cursor position in window points and the window size in points (shown on the debug screen). */
+    public double pointX, pointY;
+    public int pointsW, pointsH;
     public boolean resized, focusLost, focusGained;
     public final StringBuilder typed = new StringBuilder();
 
@@ -31,12 +35,6 @@ public final class Input {
             dx += x - lastX;
             dy += y - lastY;
             lastX = x; lastY = y;
-            // The cursor is reported in window points, but the GUI is laid out in framebuffer pixels; on HiDPI
-            // screens (Retina) these differ, so convert to pixels
-            glfwGetWindowSize(win, winW, winH);
-            glfwGetFramebufferSize(win, fbW, fbH);
-            mouseX = winW[0] > 0 ? x * fbW[0] / winW[0] : x;
-            mouseY = winH[0] > 0 ? y * fbH[0] / winH[0] : y;
         });
         glfwSetScrollCallback(w.handle, (win, x, y) -> scroll += y);
         glfwSetFramebufferSizeCallback(w.handle, (win, x, y) -> resized = true);
@@ -60,6 +58,21 @@ public final class Input {
     public void releaseAll() {
         java.util.Arrays.fill(keys, false);
         java.util.Arrays.fill(buttons, false);
+    }
+
+    /**
+     * Reads the cursor position after polling events. GLFW reports it in window points, but everything is drawn in
+     * framebuffer pixels; on HiDPI screens (macOS Retina) these differ, so map points onto the rendered size.
+     */
+    public void updateCursor(Window w) {
+        glfwGetCursorPos(w.handle, curX, curY);
+        glfwGetWindowSize(w.handle, winW, winH);
+        pointX = curX[0];
+        pointY = curY[0];
+        pointsW = winW[0];
+        pointsH = winH[0];
+        mouseX = pointsW > 0 ? pointX * w.width / pointsW : pointX;
+        mouseY = pointsH > 0 ? pointY * w.height / pointsH : pointY;
     }
 
     /** Call at the end of every frame. */

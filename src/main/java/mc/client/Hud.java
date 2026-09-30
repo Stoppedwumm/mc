@@ -176,7 +176,9 @@ final class Hud {
                 "Java: " + System.getProperty("java.version"),
                 "Mem: " + (used * 100 / max) + "% " + used + "/" + max + "MB",
                 "",
-                "Display: " + g.window.width + "x" + g.window.height,
+                "Display: " + g.window.width + "x" + g.window.height + " px, window " + g.input.pointsW + "x" + g.input.pointsH + " pt",
+                "Cursor: " + (int) g.input.pointX + "," + (int) g.input.pointY + " pt -> " + (int) g.input.mouseX + "," + (int) g.input.mouseY
+                        + " px (GUI scale " + g.gui.scale + ")",
                 glGetString(GL_RENDERER),
                 glGetString(GL_VERSION),
         };
