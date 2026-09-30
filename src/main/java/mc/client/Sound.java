@@ -27,6 +27,8 @@ public final class Sound {
     private final Map<Block.SoundType, int[]> dig = new EnumMap<>(Block.SoundType.class);
     private final Map<Block.SoundType, int[]> step = new EnumMap<>(Block.SoundType.class);
     private int splash, click;
+    private final java.util.Map<String, int[]> named = new java.util.HashMap<>();
+    private int rainSource, rainBuffer;
     private final Random random = new Random();
     public float volume = 1f;
 
@@ -52,6 +54,14 @@ public final class Sound {
             }
             splash = buffer(splashSamples());
             click = buffer(clickSamples());
+            buildNamed();
+            rainBuffer = buffer(rainSamples());
+            rainSource = alGenSources();
+            alSourcei(rainSource, AL_BUFFER, rainBuffer);
+            alSourcei(rainSource, AL_LOOPING, AL_TRUE);
+            alSourcei(rainSource, AL_SOURCE_RELATIVE, AL_TRUE);
+            alSourcef(rainSource, AL_GAIN, 0);
+            alSourcePlay(rainSource);
             ok = true;
         } catch (Throwable e) {
             System.err.println("Sound disabled: " + e.getMessage());
@@ -102,6 +112,125 @@ public final class Sound {
             out[i] = (short) (Math.max(-1, Math.min(1, v * env * amp)) * 32000);
         }
         return out;
+    }
+
+    /**
+     * Generic voice synthesiser: a tone (with optional vibrato, tremolo and pitch slide) mixed with filtered
+     * noise and rhythmic clicks, under an attack/decay envelope.
+     */
+    private short[] voice(double freq, double seconds, double noiseMix, double vibrato, double tremolo, double slide,
+                          double clicks, double cutoff, long seed) {
+        Random r = new Random(seed);
+        int n = (int) (RATE * seconds);
+        short[] out = new short[n];
+        double phase = 0, lp = 0, lp2 = 0;
+        for (int i = 0; i < n; i++) {
+            double t = (double) i / RATE, p = t / seconds;
+            double f = freq * (1 + slide * p) * (1 + vibrato * Math.sin(t * 2 * Math.PI * 6));
+            phase += 2 * Math.PI * f / RATE;
+            // Slightly buzzy tone: fundamental plus harmonics
+            double tone = Math.sin(phase) * 0.6 + Math.sin(phase * 2) * 0.25 + Math.sin(phase * 3) * 0.12 + Math.signum(Math.sin(phase)) * 0.08;
+            double noise = r.nextDouble() * 2 - 1;
+            lp += (noise - lp) * cutoff;
+            lp2 += (lp - lp2) * cutoff;
+            double v = tone * (1 - noiseMix) + lp2 * 3 * noiseMix;
+            if (tremolo > 0) v *= 0.6 + 0.4 * Math.sin(t * 2 * Math.PI * tremolo);
+            if (clicks > 0) v *= (Math.sin(t * 2 * Math.PI * clicks) > 0.3 ? 1 : 0.15);
+            double env = Math.min(1, p * 12) * Math.pow(1 - p, 1.5);
+            out[i] = (short) (Math.max(-1, Math.min(1, v * env * 0.8)) * 30000);
+        }
+        return out;
+    }
+
+    private void named(String name, short[]... variants) {
+        int[] ids = new int[variants.length];
+        for (int i = 0; i < variants.length; i++) ids[i] = buffer(variants[i]);
+        named.put(name, ids);
+    }
+
+    private void buildNamed() {
+        named("pig_say", voice(160, 0.35, 0.35, 0.05, 0, -0.3, 0, 0.2, 1), voice(180, 0.3, 0.35, 0.05, 0, -0.2, 0, 0.2, 2));
+        named("pig_hurt", voice(260, 0.25, 0.3, 0.1, 0, -0.4, 0, 0.3, 3));
+        named("pig_death", voice(220, 0.6, 0.3, 0.1, 0, -0.6, 0, 0.3, 4));
+        named("cow_say", voice(105, 1.1, 0.15, 0.03, 0, -0.15, 0, 0.1, 5), voice(95, 0.9, 0.15, 0.03, 0, 0.1, 0, 0.1, 6));
+        named("cow_hurt", voice(150, 0.4, 0.2, 0.05, 0, -0.3, 0, 0.2, 7));
+        named("cow_death", voice(120, 0.9, 0.2, 0.05, 0, -0.5, 0, 0.2, 8));
+        named("sheep_say", voice(320, 0.7, 0.2, 0.02, 14, -0.1, 0, 0.3, 9), voice(290, 0.6, 0.2, 0.02, 12, 0, 0, 0.3, 10));
+        named("sheep_hurt", voice(400, 0.3, 0.2, 0.02, 16, -0.2, 0, 0.3, 11));
+        named("sheep_death", voice(350, 0.7, 0.2, 0.02, 12, -0.5, 0, 0.3, 12));
+        named("chicken_say", voice(900, 0.25, 0.3, 0.1, 0, 0.3, 18, 0.5, 13), voice(1000, 0.2, 0.3, 0.1, 0, 0.2, 22, 0.5, 14));
+        named("chicken_hurt", voice(1200, 0.2, 0.3, 0.1, 0, -0.3, 0, 0.5, 15));
+        named("chicken_death", voice(1000, 0.4, 0.3, 0.1, 0, -0.5, 0, 0.5, 16));
+        named("zombie_say", voice(85, 1.2, 0.5, 0.08, 3, -0.2, 0, 0.08, 17), voice(75, 1.0, 0.5, 0.1, 2, 0.1, 0, 0.08, 18));
+        named("zombie_hurt", voice(120, 0.4, 0.5, 0.1, 0, -0.3, 0, 0.1, 19));
+        named("zombie_death", voice(90, 1.2, 0.5, 0.1, 0, -0.6, 0, 0.1, 20));
+        named("skeleton_say", voice(600, 0.4, 0.8, 0, 0, 0, 25, 0.6, 21));
+        named("skeleton_hurt", voice(700, 0.3, 0.8, 0, 0, 0, 30, 0.6, 22));
+        named("skeleton_death", voice(500, 0.7, 0.8, 0, 0, -0.3, 20, 0.6, 23));
+        named("spider_say", voice(200, 0.6, 0.9, 0, 0, 0, 0, 0.7, 24));
+        named("spider_hurt", voice(300, 0.3, 0.9, 0, 0, 0, 0, 0.7, 25));
+        named("spider_death", voice(200, 0.8, 0.9, 0, 0, -0.3, 0, 0.6, 26));
+        named("creeper_hurt", voice(300, 0.25, 0.7, 0, 0, 0, 0, 0.4, 27));
+        named("creeper_death", voice(250, 0.4, 0.7, 0, 0, -0.2, 0, 0.4, 28));
+        named("creeper_say", voice(250, 0.2, 0.9, 0, 0, 0, 0, 0.5, 29));
+        named("fuse", voice(3000, 1.4, 1.0, 0, 0, 0, 0, 0.9, 30));
+        named("fizz", voice(3000, 0.5, 1.0, 0, 0, 0, 0, 0.9, 31));
+        named("explode", explosionSamples(40), explosionSamples(41));
+        named("hurt", voice(280, 0.25, 0.25, 0.05, 0, -0.35, 0, 0.3, 32));
+        named("hit", voice(150, 0.12, 0.8, 0, 0, 0, 0, 0.3, 33));
+        named("pop", voice(700, 0.08, 0.1, 0, 0, 0.8, 0, 0.3, 34));
+        named("eat", voice(400, 0.15, 0.9, 0, 0, 0, 30, 0.35, 35), voice(450, 0.15, 0.9, 0, 0, 0, 25, 0.35, 36));
+        named("burp", voice(90, 0.4, 0.3, 0.1, 0, -0.2, 0, 0.15, 37));
+        named("bow", voice(900, 0.25, 0.8, 0, 0, -0.6, 0, 0.5, 38));
+        named("arrow_hit", voice(250, 0.12, 0.7, 0, 0, 0, 0, 0.4, 39));
+        named("thunder", explosionSamples(50));
+        named("bucket", voice(200, 0.35, 0.8, 0, 8, 0.3, 0, 0.3, 42));
+    }
+
+    private short[] explosionSamples(long seed) {
+        Random r = new Random(seed);
+        int n = (int) (RATE * 2.2);
+        short[] out = new short[n];
+        double lp = 0, lp2 = 0;
+        for (int i = 0; i < n; i++) {
+            double t = (double) i / RATE;
+            double cutoff = 0.25 * Math.exp(-t * 1.5) + 0.02;
+            lp += ((r.nextDouble() * 2 - 1) - lp) * cutoff;
+            lp2 += (lp - lp2) * cutoff;
+            double env = Math.min(1, t * 200) * Math.exp(-t * 2.2);
+            out[i] = (short) (Math.max(-1, Math.min(1, lp2 * 6 * env)) * 30000);
+        }
+        return out;
+    }
+
+    private short[] rainSamples() {
+        Random r = new Random(99);
+        int n = RATE * 3;
+        short[] out = new short[n];
+        double lp = 0;
+        for (int i = 0; i < n; i++) {
+            lp += ((r.nextDouble() * 2 - 1) - lp) * 0.45;
+            double drop = r.nextDouble() < 0.003 ? (r.nextDouble() - 0.5) * 2 : 0;
+            out[i] = (short) (Math.max(-1, Math.min(1, lp * 0.35 + drop * 0.3)) * 20000);
+        }
+        return out;
+    }
+
+    /** Plays a named sound at a world position (see buildNamed). */
+    public void play(String name, double x, double y, double z, float volume, float pitch) {
+        int[] set = named.get(name);
+        if (set == null) return;
+        play(set[random.nextInt(set.length)], Math.min(1, volume), pitch, x, y, z, false);
+    }
+
+    public void playUi(String name, float volume, float pitch) {
+        int[] set = named.get(name);
+        if (set == null) return;
+        play(set[random.nextInt(set.length)], volume, pitch, 0, 0, 0, true);
+    }
+
+    public void setRain(float level) {
+        if (ok) alSourcef(rainSource, AL_GAIN, level * 0.35f * volume);
     }
 
     private short[] splashSamples() {

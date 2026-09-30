@@ -12,7 +12,7 @@ import java.util.zip.InflaterInputStream;
 
 /** Stores each chunk as a small deflate-compressed file. Writes happen on a background IO thread. */
 public final class WorldStorage {
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
     private final Path chunkDir;
     private final ExecutorService io = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "Chunk IO");
@@ -32,9 +32,10 @@ public final class WorldStorage {
     }
 
     public void save(Chunk chunk) {
-        byte[] data = new byte[Chunk.VOLUME + 1];
+        byte[] data = new byte[Chunk.VOLUME * 2 + 1];
         data[0] = (byte) chunk.state;
         System.arraycopy(chunk.blocks, 0, data, 1, Chunk.VOLUME);
+        System.arraycopy(chunk.meta, 0, data, 1 + Chunk.VOLUME, Chunk.VOLUME);
         long key = chunk.key();
         int cx = chunk.cx, cz = chunk.cz;
         pending.put(key, data);
@@ -57,16 +58,18 @@ public final class WorldStorage {
         });
     }
 
-    /** Returns [state byte + blocks] or null. Safe to call from worker threads. */
+    /** Returns [state byte + blocks + meta] or null. Safe to call from worker threads. */
     public byte[] load(int cx, int cz) {
         byte[] p = pending.get(Chunk.key(cx, cz));
         if (p != null) return p.clone();
         Path f = file(cx, cz);
         if (!Files.exists(f)) return null;
         try (DataInputStream in = new DataInputStream(new BufferedInputStream(new InflaterInputStream(Files.newInputStream(f))))) {
-            if (in.readInt() != VERSION) return null;
-            byte[] data = new byte[Chunk.VOLUME + 1];
-            in.readFully(data);
+            int version = in.readInt();
+            byte[] data = new byte[Chunk.VOLUME * 2 + 1];
+            if (version == 1) in.readFully(data, 0, Chunk.VOLUME + 1);
+            else if (version == VERSION) in.readFully(data);
+            else return null;
             return data;
         } catch (IOException e) {
             System.err.println("Corrupt chunk " + cx + "," + cz + ": " + e);

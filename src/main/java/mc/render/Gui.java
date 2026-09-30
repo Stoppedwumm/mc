@@ -40,6 +40,7 @@ public final class Gui {
         s.set("uUseTex", tex ? 1 : 0);
         s.set("uFog", 0);
         s.set("uAlphaCut", cut);
+        s.set("uLinear", 0);
     }
 
     public void fill(float x, float y, float w, float h, int argb) {
@@ -111,6 +112,7 @@ public final class Gui {
             glDisable(GL_DEPTH_TEST);
         } else {
             int tex = block.texSide;
+            if (block == Block.WHEAT) tex = Block.Tex.WHEAT_0 + 7;
             float u0 = (tex & 15) / 16f, v0 = (tex >> 4) / 16f;
             shader(ortho, true, 0.3f);
             batch.begin(GL_TRIANGLES);
@@ -118,6 +120,74 @@ public final class Gui {
             batch.rect(x, y, size, size, u0, v0, u0 + 1 / 16f, v0 + 1 / 16f, 0xFF000000 | t);
             batch.end();
         }
+    }
+
+    public ItemRenderer items;
+
+    /** Draws a HUD icon from the item atlas (hearts, food...) at size w x h. */
+    public void hudIcon(int tile, float x, float y, float w, float h) {
+        glActiveTexture(GL_TEXTURE0);
+        items.itemAtlas.bind();
+        shader(ortho, true, 0.1f);
+        float u0 = (tile & 15) / 16f, v0 = (tile >> 4) / 16f;
+        batch.begin(GL_TRIANGLES);
+        batch.rect(x, y, w, h, u0, v0, u0 + 1 / 16f, v0 + 1 / 16f, 0xFFFFFFFF);
+        batch.end();
+    }
+
+    /** Draws an item stack icon with its count and durability bar. */
+    public void stack(mc.item.ItemStack s, float x, float y) {
+        if (mc.item.ItemStack.isEmpty(s)) return;
+        mc.item.Item it = s.item;
+        if (ItemRenderer.isCube(it)) {
+            icon(it.block, x, y, 16);
+        } else if (it.isBlock()) {
+            icon(it.block, x, y, 16);
+        } else {
+            glActiveTexture(GL_TEXTURE0);
+            items.itemAtlas.bind();
+            shader(ortho, true, 0.1f);
+            float u0 = (it.icon & 15) / 16f, v0 = (it.icon >> 4) / 16f;
+            batch.begin(GL_TRIANGLES);
+            batch.rect(x, y, 16, 16, u0, v0, u0 + 1 / 16f, v0 + 1 / 16f, 0xFFFFFFFF);
+            batch.end();
+        }
+        if (it.maxDamage > 0 && s.damage > 0) {
+            float f = 1 - (float) s.damage / it.maxDamage;
+            int r = (int) ((1 - f) * 255), g = (int) (f * 255);
+            fill(x + 2, y + 13, 13, 2, 0xFF000000);
+            fill(x + 2, y + 13, 13 * f, 1, 0xFF000000 | r << 16 | g << 8);
+        }
+        if (s.count > 1) {
+            String n = String.valueOf(s.count);
+            text(n, x + 17 - textWidth(n), y + 9, 0xFFFFFFFF);
+        }
+    }
+
+    /** Minecraft-style tooltip box. */
+    public void tooltip(String textLine, float x, float y) {
+        float tw = textWidth(textLine);
+        fill(x + 8, y - 12, tw + 6, 12, 0xF0100010);
+        frame(x + 8, y - 12, tw + 6, 12, 1, 0xFF3a0080);
+        text(textLine, x + 11, y - 10, 0xFFFFFFFF);
+    }
+
+    /** Raised light-grey panel like Minecraft's container backgrounds. */
+    public void panel(float x, float y, float w, float h) {
+        fill(x, y, w, h, 0xFFC6C6C6);
+        fill(x, y, w, 1, 0xFFFFFFFF);
+        fill(x, y, 1, h, 0xFFFFFFFF);
+        fill(x, y + h - 1, w, 1, 0xFF555555);
+        fill(x + w - 1, y, 1, h, 0xFF555555);
+        frame(x - 1, y - 1, w + 2, h + 2, 1, 0xFF000000);
+    }
+
+    public void slot(float x, float y) {
+        fill(x, y, 18, 18, 0xFF8B8B8B);
+        fill(x, y, 17, 1, 0xFF373737);
+        fill(x, y, 1, 17, 0xFF373737);
+        fill(x + 1, y + 17, 17, 1, 0xFFFFFFFF);
+        fill(x + 17, y + 1, 1, 17, 0xFFFFFFFF);
     }
 
     public boolean button(String label, float x, float y, float w, float h, double mx, double my) {

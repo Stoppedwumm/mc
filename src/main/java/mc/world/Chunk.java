@@ -11,6 +11,8 @@ public final class Chunk {
 
     public final int cx, cz;
     public final byte[] blocks;
+    /** Per-block metadata: liquid level, crop age, facing... */
+    public final byte[] meta;
     /** Per-column biome tint colours (0xRRGGBB). */
     public final int[] grassColor = new int[SIZE * SIZE];
     public final int[] foliageColor = new int[SIZE * SIZE];
@@ -24,6 +26,9 @@ public final class Chunk {
     public boolean meshInFlight;
     public boolean urgentMesh;
     public ChunkMesh mesh;
+    /** Light computed by the last mesh build: (sky << 4 | block), lightHeight layers; above that is open sky. */
+    public byte[] light;
+    public int lightHeight;
     /** Highest non-air y + 1 in this chunk. */
     public int maxY;
 
@@ -32,9 +37,14 @@ public final class Chunk {
     }
 
     public Chunk(int cx, int cz, byte[] blocks) {
+        this(cx, cz, blocks, new byte[VOLUME]);
+    }
+
+    public Chunk(int cx, int cz, byte[] blocks, byte[] meta) {
         this.cx = cx;
         this.cz = cz;
         this.blocks = blocks;
+        this.meta = meta;
     }
 
     public static int index(int x, int y, int z) {
@@ -47,9 +57,20 @@ public final class Chunk {
     }
 
     public void set(int x, int y, int z, int id) {
+        set(x, y, z, id, 0);
+    }
+
+    public void set(int x, int y, int z, int id, int m) {
         if (y < 0 || y >= HEIGHT) return;
-        blocks[(y << 8) | (z << 4) | x] = (byte) id;
+        int i = (y << 8) | (z << 4) | x;
+        blocks[i] = (byte) id;
+        meta[i] = (byte) m;
         if (id != 0 && y + 1 > maxY) maxY = y + 1;
+    }
+
+    public int getMeta(int x, int y, int z) {
+        if (y < 0 || y >= HEIGHT) return 0;
+        return meta[(y << 8) | (z << 4) | x];
     }
 
     public void recomputeMaxY() {

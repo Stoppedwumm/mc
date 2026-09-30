@@ -123,6 +123,21 @@ public final class Decorator {
         chunk.state = Chunk.STATE_DECORATED;
     }
 
+    /** Grows a sapling into a tree suited to the biome; returns false if there wasn't room. */
+    public boolean growTree(Random rand, int x, int y, int z, Biome biome) {
+        int h = 7;
+        for (int k = 0; k < h; k++) {
+            int id = world.getBlock(x, y + k, z);
+            if (id != 0 && Block.get(id).model != Block.Model.CROSS && Block.get(id).layer != Block.Layer.CUTOUT) return false;
+        }
+        switch (biome) {
+            case TAIGA, SNOWY_TAIGA, MOUNTAINS -> spruce(rand, x, y, z);
+            case BIRCH_FOREST -> birch(rand, x, y, z);
+            default -> { if (rand.nextInt(10) == 0) bigOak(rand, x, y, z); else oak(rand, x, y, z); }
+        }
+        return world.getBlock(x, y, z) != 0;
+    }
+
     private static boolean insideDecorationArea(Chunk c, int x, int z) {
         return x >= c.cx * 16 - 8 && x < c.cx * 16 + 24 && z >= c.cz * 16 - 8 && z < c.cz * 16 + 24;
     }

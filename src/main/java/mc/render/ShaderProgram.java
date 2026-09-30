@@ -16,8 +16,13 @@ public final class ShaderProgram {
     private final Map<String, Integer> uniforms = new HashMap<>();
 
     public ShaderProgram(String name) {
-        int vs = compile(GL_VERTEX_SHADER, load("/shaders/" + name + ".vsh"), name + ".vsh");
-        int fs = compile(GL_FRAGMENT_SHADER, load("/shaders/" + name + ".fsh"), name + ".fsh");
+        this(name, name);
+    }
+
+    public ShaderProgram(String vertex, String fragment) {
+        String name = fragment;
+        int vs = compile(GL_VERTEX_SHADER, load("/shaders/" + vertex + ".vsh"), vertex + ".vsh");
+        int fs = compile(GL_FRAGMENT_SHADER, load("/shaders/" + fragment + ".fsh"), fragment + ".fsh");
         id = glCreateProgram();
         glAttachShader(id, vs);
         glAttachShader(id, fs);
@@ -31,7 +36,15 @@ public final class ShaderProgram {
     private static String load(String path) {
         try (InputStream in = ShaderProgram.class.getResourceAsStream(path)) {
             if (in == null) throw new IllegalStateException("Missing shader " + path);
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            String src = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            // Minimal #include "file" support for shared GLSL code
+            StringBuilder out = new StringBuilder();
+            for (String line : src.split("\n", -1)) {
+                String t = line.trim();
+                if (t.startsWith("#include")) out.append(load("/shaders/" + t.substring(t.indexOf('"') + 1, t.lastIndexOf('"')))).append('\n');
+                else out.append(line).append('\n');
+            }
+            return out.toString();
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }

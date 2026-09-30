@@ -11,111 +11,82 @@ import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 import static org.lwjgl.opengl.GL33C.*;
 
+/**
+ * Renders the world into the HDR scene buffer: sun shadow map, physically inspired sky, lit terrain,
+ * reflective water with depth absorption, particles, selection and the held item.
+ */
 public final class WorldRenderer {
-    public final ShaderProgram chunkShader, skyShader, basicShader;
+    public static final int SHADOW_SIZE = 2048;
+    private static final float SHADOW_EXTENT = 80;
+
+    public final ShaderProgram chunkShader, skyShader, basicShader, shadowShader;
     public final Texture atlas, white;
-    private final Texture clouds;
-    private final boolean[] cloudMap = new boolean[128 * 128];
     public final Batch batch = new Batch();
     private final int emptyVao;
     private final FrustumIntersection frustum = new FrustumIntersection();
+    private final FrustumIntersection shadowFrustum = new FrustumIntersection();
     private final List<Chunk> visible = new ArrayList<>();
+    private final Framebuffer shadowFb;
 
     public final Matrix4f projection = new Matrix4f(), view = new Matrix4f(), projView = new Matrix4f();
+    private final Matrix4f shadowMatrix = new Matrix4f();
     public double camX, camY, camZ;
+    public float near = 0.05f, far = 512;
     public int renderedChunks;
-    public float fogStart, fogEnd;
-    public final Vector3f fogColor = new Vector3f();
-    public float daylight, sunset, night, celestialAngle;
-    public final Vector3f zenith = new Vector3f(), horizon = new Vector3f(), sunDir = new Vector3f();
-    public float gamma = 0.5f;
-    public boolean clouds3d = true;
+    public float fogEnd;
+    public float daylight, celestialAngle, time, rain;
+    public final Vector3f sunDir = new Vector3f(), lightDir = new Vector3f();
+    public float brightness = 0.5f;
+    public boolean shadows = true, clouds = true, underwater, inLava;
+    public int width, height;
 
     public WorldRenderer(long seed) {
         chunkShader = new ShaderProgram("chunk");
         skyShader = new ShaderProgram("sky");
         basicShader = new ShaderProgram("basic");
+        shadowShader = new ShaderProgram("shadow");
         atlas = new Texture(new TextureGen().generate(), TextureGen.ATLAS, TextureGen.ATLAS, true, false);
         white = new Texture(new int[]{0xFFFFFFFF}, 1, 1, false, true);
         emptyVao = glGenVertexArrays();
-
-        // Cloud map from thresholded smooth noise
-        Random r = new Random(seed ^ 0x5DEECE66DL);
-        double[] grid = new double[16 * 16];
-        for (int i = 0; i < grid.length; i++) grid[i] = r.nextDouble();
-        int[] px = new int[128 * 128];
-        for (int y = 0; y < 128; y++)
-            for (int x = 0; x < 128; x++) {
-                double v = 0, amp = 1, norm = 0;
-                for (int o = 0; o < 3; o++) {
-                    int cell = 16 >> o;
-                    double fx = (double) x / cell, fy = (double) y / cell;
-                    int n = 128 / cell;
-                    int x0 = (int) fx, y0 = (int) fy;
-                    double tx = fx - x0, ty = fy - y0;
-                    double a = grid[((y0 % n) * 16 + x0 % n) % 256], b = grid[((y0 % n) * 16 + (x0 + 1) % n) % 256];
-                    double c = grid[(((y0 + 1) % n) * 16 + x0 % n) % 256], d = grid[(((y0 + 1) % n) * 16 + (x0 + 1) % n) % 256];
-                    v += ((a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty) * amp;
-                    norm += amp;
-                    amp *= 0.5;
-                }
-                v /= norm;
-                boolean on = v + (r.nextDouble() - 0.5) * 0.06 > 0.56;
-                cloudMap[y * 128 + x] = on;
-                px[y * 128 + x] = on ? 0xFFFFFFFF : 0;
-            }
-        clouds = new Texture(px, 128, 128, false, true);
+        shadowFb = new Framebuffer(SHADOW_SIZE, SHADOW_SIZE, 0, true, true);
     }
 
     // ------------------------------------------------------------------ environment
 
-    public void updateEnvironment(World world, float pt, boolean underwater, boolean inLava, int renderDistance) {
+    public void updateEnvironment(World world, float pt, boolean underwater, boolean inLava, int renderDistance, float rain) {
         double t = (world.time % 24000) + pt;
+        time = (float) ((world.time + pt) / 20.0 % 3600.0);
+        this.rain = rain;
+        this.underwater = underwater;
+        this.inLava = inLava;
         double f = t / 24000.0 - 0.25;
         f = f - Math.floor(f);
-        double base = f;
         f = f + (1 - (Math.cos(f * Math.PI) + 1) / 2 - f) / 3;
         celestialAngle = (float) f;
         double a = f * Math.PI * 2;
         sunDir.set((float) -Math.sin(a), (float) Math.cos(a), 0.12f).normalize();
         float d = (float) Math.max(0, Math.min(1, Math.cos(a) * 2 + 0.5));
-        daylight = 0.16f + 0.84f * d;
-        night = 1 - (float) Math.max(0, Math.min(1, Math.cos(a) * 3 + 0.4));
-        double c = Math.cos(a);
-        sunset = c > -0.45 && c < 0.45 ? (float) Math.pow(Math.sin((c / 0.45 * 0.5 + 0.5) * Math.PI), 2) : 0;
-
-        zenith.set(0.47f, 0.65f, 1.0f).mul(d).add(0.005f, 0.006f, 0.02f);
-        horizon.set(0.72f, 0.83f, 1.0f).mul(d).add(0.02f, 0.025f, 0.05f);
-        Vector3f sunsetColor = new Vector3f(1.0f, 0.45f, 0.18f);
-        horizon.lerp(sunsetColor, sunset * 0.25f);
-
+        daylight = (0.16f + 0.84f * d) * (1 - rain * 0.35f);
+        if (sunDir.y > -0.05f) lightDir.set(sunDir); else lightDir.set(sunDir).negate();
         fogEnd = renderDistance * 16f;
-        fogStart = fogEnd * 0.72f;
-        fogColor.set(horizon);
-        if (underwater) {
-            fogColor.set(0.04f, 0.12f, 0.45f).mul(Math.max(0.15f, d));
-            fogStart = 0;
-            fogEnd = 28;
-        } else if (inLava) {
-            fogColor.set(0.6f, 0.1f, 0f);
-            fogStart = 0;
-            fogEnd = 2;
-        }
     }
 
     public void setupCamera(Player p, float pt, float fov, int width, int height, int renderDistance, boolean bobbing) {
+        this.width = width;
+        this.height = height;
         camX = p.interpX(pt);
         camY = p.interpY(pt) + p.prevEyeHeight + (p.eyeHeight - p.prevEyeHeight) * pt;
         camZ = p.interpZ(pt);
-        float far = Math.max(256f, renderDistance * 16f * 2f);
-        projection.setPerspective((float) Math.toRadians(fov), (float) width / height, 0.05f, far);
+        far = Math.max(256f, renderDistance * 16f * 2f);
+        projection.setPerspective((float) Math.toRadians(fov), (float) width / height, near, far);
         view.identity();
         float tilt = p.prevTilt + (p.tilt - p.prevTilt) * pt;
         view.rotateX((float) Math.toRadians(tilt));
+        float hurt = p.hurtTime > 0 ? (p.hurtTime - pt) / 10f : 0;
+        if (hurt > 0) view.rotateZ((float) Math.toRadians(Math.sin(hurt * hurt * hurt * hurt * Math.PI) * 14));
         if (bobbing) {
             float wd = p.walkDist - p.prevWalkDist;
             float walk = -(p.walkDist + wd * pt);
@@ -130,40 +101,106 @@ public final class WorldRenderer {
         frustum.set(projView);
     }
 
+    private void setCommon(ShaderProgram s) {
+        s.set("uSunDir", sunDir.x, sunDir.y, sunDir.z);
+        s.set("uTime", time);
+        s.set("uRain", rain);
+    }
+
+    private void setChunkOffsets(ShaderProgram s, Chunk c) {
+        s.set("uOffset", (float) (c.cx * 16 - Math.floor(camX)), (float) -Math.floor(camY), (float) (c.cz * 16 - Math.floor(camZ)));
+    }
+
+    private void setCamera(ShaderProgram s) {
+        s.set("uCamFrac", (float) (camX - Math.floor(camX)), (float) (camY - Math.floor(camY)), (float) (camZ - Math.floor(camZ)));
+        s.set("uCamInt", (float) Math.floor(camX), (float) Math.floor(camY), (float) Math.floor(camZ));
+    }
+
+    // ------------------------------------------------------------------ shadows
+
+    /** Renders terrain depth from the sun (or moon) into the shadow map, stabilised to world-space texels. */
+    public void renderShadows(World world) {
+        boolean lightUp = lightDir.y > 0.08f;
+        if (!shadows || !lightUp || underwater) {
+            shadowMatrix.identity().scale(0);
+            return;
+        }
+        Matrix4f lightView = new Matrix4f().lookAt(lightDir.x * 256, lightDir.y * 256, lightDir.z * 256, 0, 0, 0, 0, 0, 1);
+        // Snap to texel grid so shadows don't shimmer when moving
+        float texel = SHADOW_EXTENT * 2 / SHADOW_SIZE;
+        Vector3f camLs = lightView.transformDirection(new Vector3f((float) (camX % 4096), (float) camY, (float) (camZ % 4096)));
+        float offX = camLs.x - (float) Math.floor(camLs.x / texel) * texel;
+        float offY = camLs.y - (float) Math.floor(camLs.y / texel) * texel;
+        shadowMatrix.setOrtho(-SHADOW_EXTENT, SHADOW_EXTENT, -SHADOW_EXTENT, SHADOW_EXTENT, 0, 512)
+                .translate(offX, offY, 0).mul(lightView);
+        shadowFrustum.set(shadowMatrix);
+
+        shadowFb.bind();
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(1.1f, 2f);
+        shadowShader.bind();
+        shadowShader.set("uShadowMatrix", shadowMatrix);
+        shadowShader.set("uTex", 0);
+        setCommon(shadowShader);
+        setCamera(shadowShader);
+        glActiveTexture(GL_TEXTURE0);
+        atlas.bind();
+        for (Chunk c : world.chunks()) {
+            if (c.mesh == null || !c.mesh.hasSolid()) continue;
+            float ox = (float) (c.cx * 16 - camX), oz = (float) (c.cz * 16 - camZ);
+            if (!shadowFrustum.testAab(ox, (float) -camY, oz, ox + 16, (float) (c.maxY + 1 - camY), oz + 16)) continue;
+            setChunkOffsets(shadowShader, c);
+            c.mesh.drawSolid();
+        }
+        glBindVertexArray(0);
+        glDisable(GL_POLYGON_OFFSET_FILL);
+        glEnable(GL_CULL_FACE);
+    }
+
     // ------------------------------------------------------------------ passes
 
     public void renderSky() {
         glDisable(GL_DEPTH_TEST);
         glDepthMask(false);
         skyShader.bind();
+        setCommon(skyShader);
         skyShader.set("uInvProjView", new Matrix4f(projView).invert());
-        skyShader.set("uSunDir", sunDir.x, sunDir.y, sunDir.z);
-        skyShader.set("uZenith", zenith.x, zenith.y, zenith.z);
-        skyShader.set("uHorizon", fogColor.x, fogColor.y, fogColor.z);
-        skyShader.set("uSunsetColor", 1.0f, 0.42f, 0.16f);
-        skyShader.set("uSunset", sunset);
-        skyShader.set("uNight", night);
         skyShader.set("uStarAngle", celestialAngle * (float) Math.PI * 2);
-        skyShader.set("uMoonPhase", 0.3f);
+        skyShader.set("uCamPos", (float) (camX % 100000), (float) camY, (float) (camZ % 100000));
+        skyShader.set("uClouds", clouds ? 1 : 0);
         glBindVertexArray(emptyVao);
         glDrawArrays(GL_TRIANGLES, 0, 3);
         glDepthMask(true);
         glEnable(GL_DEPTH_TEST);
     }
 
-    private void setupChunkShader(boolean translucent) {
+    private void setupChunkShader(boolean translucent, int depthTex) {
         chunkShader.bind();
+        setCommon(chunkShader);
+        setCamera(chunkShader);
         chunkShader.set("uProjView", projView);
         chunkShader.set("uTex", 0);
-        chunkShader.set("uDaylight", daylight);
-        float n = 1 - (daylight - 0.16f) / 0.84f;
-        chunkShader.set("uSkyTint", 1 - 0.25f * n, 1 - 0.18f * n, 1);
-        chunkShader.set("uFogColor", fogColor.x, fogColor.y, fogColor.z);
-        chunkShader.set("uFogStart", fogStart);
-        chunkShader.set("uFogEnd", fogEnd);
+        chunkShader.set("uShadowMap", 1);
+        chunkShader.set("uDepthTex", 2);
+        chunkShader.set("uShadows", shadows && lightDir.y > 0.08f && !underwater ? 1 : 0);
+        chunkShader.set("uShadowMatrix", shadowMatrix);
+        chunkShader.set("uLightDir", lightDir.x, lightDir.y, lightDir.z);
         chunkShader.set("uTranslucent", translucent ? 1 : 0);
-        chunkShader.set("uGamma", gamma);
-        chunkShader.set("uCamFrac", (float) (camX - Math.floor(camX)), (float) (camY - Math.floor(camY)), (float) (camZ - Math.floor(camZ)));
+        chunkShader.set("uFogEnd", inLava ? 3f : fogEnd);
+        chunkShader.set("uUnderwater", underwater ? 1 : 0);
+        chunkShader.set("uScreen", (float) width, (float) height);
+        chunkShader.set("uNear", near);
+        chunkShader.set("uFar", far);
+        chunkShader.set("uBrightness", brightness);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, shadowFb.depth);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, depthTex);
+        glActiveTexture(GL_TEXTURE0);
+        atlas.bind();
     }
 
     public void renderOpaque(World world) {
@@ -177,33 +214,36 @@ public final class WorldRenderer {
         visible.sort((a, b) -> Double.compare(dist2(a), dist2(b)));
         renderedChunks = visible.size();
 
+        glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
-        glActiveTexture(GL_TEXTURE0);
-        atlas.bind();
-        setupChunkShader(false);
+        setupChunkShader(false, 0);
         for (Chunk c : visible) {
             if (!c.mesh.hasSolid()) continue;
-            chunkShader.set("uOffset", (float) (c.cx * 16 - Math.floor(camX)), (float) -Math.floor(camY), (float) (c.cz * 16 - Math.floor(camZ)));
+            setChunkOffsets(chunkShader, c);
             c.mesh.drawSolid();
         }
         glBindVertexArray(0);
     }
 
-    public void renderTranslucent() {
+    public void renderTranslucent(int depthTex) {
         glEnable(GL_BLEND);
-        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+        glBlendFunc(GL_ONE, GL_SRC_ALPHA);
         glDisable(GL_CULL_FACE);
-        atlas.bind();
-        setupChunkShader(true);
+        glDepthMask(false);
+        setupChunkShader(true, depthTex);
         for (int i = visible.size() - 1; i >= 0; i--) {
             Chunk c = visible.get(i);
             if (!c.mesh.hasTranslucent()) continue;
-            chunkShader.set("uOffset", (float) (c.cx * 16 - Math.floor(camX)), (float) -Math.floor(camY), (float) (c.cz * 16 - Math.floor(camZ)));
+            setChunkOffsets(chunkShader, c);
             c.mesh.drawTranslucent();
         }
         glBindVertexArray(0);
+        glDepthMask(true);
         glEnable(GL_CULL_FACE);
         glDisable(GL_BLEND);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glActiveTexture(GL_TEXTURE0);
     }
 
     private double dist2(Chunk c) {
@@ -211,65 +251,19 @@ public final class WorldRenderer {
         return dx * dx + dz * dz;
     }
 
-    private void setupBasic(Matrix4f mvp, boolean texture, int fogMode, float alphaCut) {
+    /** Sets up the simple textured/coloured shader for drawing into the HDR scene. */
+    public void setupBasic(Matrix4f mvp, boolean texture, int fogMode, float alphaCut) {
         basicShader.bind();
         basicShader.set("uMVP", mvp);
         basicShader.set("uTex", 0);
         basicShader.set("uUseTex", texture ? 1 : 0);
         basicShader.set("uFog", fogMode);
         basicShader.set("uAlphaCut", alphaCut);
-        basicShader.set("uFogColor", fogColor.x, fogColor.y, fogColor.z);
-        basicShader.set("uFogStart", fogStart);
+        basicShader.set("uFogColor", 0.5f, 0.6f, 0.8f);
+        basicShader.set("uFogStart", fogEnd * 0.7f);
         basicShader.set("uFogEnd", fogEnd);
-    }
-
-    /** Minecraft "fancy" style clouds: extruded 12x4x12 boxes at y = 192. */
-    public void renderClouds(World world, float pt, int renderDistance) {
-        float cloudY = 192;
-        double drift = (world.time + pt) * 0.03;
-        double cx = camX + drift, cz = camZ + 3.96;
-        float cell = 12, thickness = 4;
-        int range = (int) Math.min(64, Math.max(10, renderDistance * 16 * 1.2 / cell));
-        int bx = (int) Math.floor(cx / cell), bz = (int) Math.floor(cz / cell);
-        float ry = (float) (cloudY - camY);
-        float bright = Math.max(0.2f, daylight);
-        int top = argb(0.8f, bright, bright, bright), bottom = argb(0.8f, bright * 0.7f, bright * 0.7f, bright * 0.75f);
-        int sideX = argb(0.8f, bright * 0.9f, bright * 0.9f, bright * 0.9f), sideZ = argb(0.8f, bright * 0.8f, bright * 0.8f, bright * 0.82f);
-
-        setupBasic(projView, false, 2, 0.01f);
-        glActiveTexture(GL_TEXTURE0);
-        white.bind();
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glEnable(GL_CULL_FACE);
-        basicShader.set("uFogStart", range * cell * 0.5f);
-        basicShader.set("uFogEnd", range * cell);
-        batch.begin(GL_TRIANGLES);
-        boolean below = camY < cloudY, above = camY > cloudY + thickness;
-        for (int gx = bx - range; gx <= bx + range; gx++) {
-            for (int gz = bz - range; gz <= bz + range; gz++) {
-                if (!cloud(gx, gz)) continue;
-                float x0 = (float) (gx * cell - cx), z0 = (float) (gz * cell - cz);
-                if (x0 * x0 + z0 * z0 > (range * cell) * (range * cell)) continue;
-                float x1 = x0 + cell, z1 = z0 + cell, y0 = ry, y1 = ry + thickness;
-                if (!below) batch.quad(x0, y1, z0, 0, 0, x0, y1, z1, 0, 0, x1, y1, z1, 0, 0, x1, y1, z0, 0, 0, top);
-                if (!above) batch.quad(x0, y0, z0, 0, 0, x1, y0, z0, 0, 0, x1, y0, z1, 0, 0, x0, y0, z1, 0, 0, bottom);
-                if (!cloud(gx - 1, gz)) batch.quad(x0, y1, z0, 0, 0, x0, y0, z0, 0, 0, x0, y0, z1, 0, 0, x0, y1, z1, 0, 0, sideX);
-                if (!cloud(gx + 1, gz)) batch.quad(x1, y1, z1, 0, 0, x1, y0, z1, 0, 0, x1, y0, z0, 0, 0, x1, y1, z0, 0, 0, sideX);
-                if (!cloud(gx, gz - 1)) batch.quad(x1, y1, z0, 0, 0, x1, y0, z0, 0, 0, x0, y0, z0, 0, 0, x0, y1, z0, 0, 0, sideZ);
-                if (!cloud(gx, gz + 1)) batch.quad(x0, y1, z1, 0, 0, x0, y0, z1, 0, 0, x1, y0, z1, 0, 0, x1, y1, z1, 0, 0, sideZ);
-            }
-        }
-        batch.end();
-        glDisable(GL_BLEND);
-    }
-
-    private boolean cloud(int gx, int gz) {
-        return cloudMap[Math.floorMod(gz, 128) * 128 + Math.floorMod(gx, 128)];
-    }
-
-    private static int argb(float a, float r, float g, float b) {
-        return ((int) (a * 255) << 24) | ((int) (Math.min(1, r) * 255) << 16) | ((int) (Math.min(1, g) * 255) << 8) | (int) (Math.min(1, b) * 255);
+        basicShader.set("uLinear", 1);
+        basicShader.set("uLight", 1f);
     }
 
     public void renderSelection(World world, RayCast.Hit hit, float breakProgress) {
@@ -322,42 +316,91 @@ public final class WorldRenderer {
 
     public void renderParticles(Particles particles, Player p, float pt) {
         if (particles.isEmpty()) return;
-        setupBasic(projView, true, 1, 0.1f);
+        setupBasic(projView, true, 0, 0.1f);
+        basicShader.set("uLight", 1.6f);
         atlas.bind();
         glDisable(GL_CULL_FACE);
         batch.begin(GL_TRIANGLES);
-        particles.render(batch, camX, camY, camZ, p.yaw, p.pitch, pt);
+        particles.render(batch, camX, camY, camZ, p.yaw, p.pitch, pt, false);
         batch.end();
+        white.bind();
+        basicShader.set("uAlphaCut", 0.01f);
+        basicShader.set("uLight", Math.max(0.3f, daylight) * 1.5f);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(false);
+        batch.begin(GL_TRIANGLES);
+        particles.render(batch, camX, camY, camZ, p.yaw, p.pitch, pt, true);
+        batch.end();
+        glDepthMask(true);
+        glDisable(GL_BLEND);
         glEnable(GL_CULL_FACE);
     }
 
-    /** Draws the held block in the lower right like the first-person hand. */
-    public void renderHeldItem(Block block, float swing, float equip, float brightness, float aspect, float fov) {
-        if (block == null || block == Block.AIR) return;
+    /**
+     * First-person hand: the held item (block cube or extruded sprite) or the bare arm, with swing, equip,
+     * eating and bow-drawing animations.
+     */
+    public void renderHeldItem(mc.item.Item item, ItemRenderer ir, float swing, float equip, float light, float aspect,
+                               int useType, float useProgress, float time) {
         glClear(GL_DEPTH_BUFFER_BIT);
         Matrix4f proj = new Matrix4f().setPerspective((float) Math.toRadians(70), aspect, 0.01f, 10f);
         float sw = (float) Math.sin(swing * Math.PI);
         float swSqrt = (float) Math.sin(Math.sqrt(swing) * Math.PI);
-        Matrix4f m = new Matrix4f(proj)
-                .translate(0.62f - swSqrt * 0.4f, -0.6f - equip * 0.6f + (float) Math.sin(Math.sqrt(swing) * Math.PI * 2) * 0.2f, -0.9f - sw * 0.2f)
-                .rotateY((float) Math.toRadians(45 - swSqrt * 20))
-                .rotateX((float) Math.toRadians(-sw * 80 * 0.5f))
-                .scale(0.36f);
-        setupBasic(m, true, 0, 0.3f);
-        atlas.bind();
-        glEnable(GL_CULL_FACE);
-        batch.begin(GL_TRIANGLES);
-        if (block.model == Block.Model.CUBE) {
-            cubeInto(batch, block, -0.5f, -0.5f, -0.5f, 1, brightness);
-        } else {
-            int tex = block.texSide;
-            float u0 = (tex & 15) / 16f, v0 = (tex >> 4) / 16f, u1 = u0 + 1 / 16f, v1 = v0 + 1 / 16f;
-            int c = shade(brightness, tintFor(block));
-            glDisable(GL_CULL_FACE);
-            batch.quad(-0.5f, 0.5f, 0, u0, v0, -0.5f, -0.5f, 0, u0, v1, 0.5f, -0.5f, 0, u1, v1, 0.5f, 0.5f, 0, u1, v0, c);
+        Matrix4f m = new Matrix4f(proj);
+        if (item == null) {
+            // Bare arm
+            m.translate(0.64f - swSqrt * 0.3f, -0.72f - equip * 0.6f + (float) Math.sin(Math.sqrt(swing) * Math.PI * 2) * 0.15f, -0.78f - sw * 0.3f)
+                    .rotateY((float) Math.toRadians(-18 + swSqrt * 30)).rotateX((float) Math.toRadians(-70 - sw * 20))
+                    .rotateZ((float) Math.toRadians(-8));
+            setupBasic(m, false, 0, 0);
+            basicShader.set("uLight", light);
+            white.bind();
+            batch.begin(GL_TRIANGLES);
+            armBox(batch, -0.12f, -0.1f, -0.12f, 0.24f, 0.8f, 0.24f);
+            batch.end();
+            return;
         }
+        m.translate(0.56f - swSqrt * 0.4f, -0.52f - equip * 0.6f + (float) Math.sin(Math.sqrt(swing) * Math.PI * 2) * 0.2f, -0.72f - sw * 0.2f);
+        if (useType == 1) {
+            // Eating: bring to the mouth and bob
+            float p = Math.min(1, useProgress * 4);
+            m.translate(-0.35f * p, 0.18f * p + (float) Math.abs(Math.cos(time / 4f * Math.PI)) * 0.08f * p, 0.1f * p);
+            m.rotateY((float) Math.toRadians(-40 * p)).rotateX((float) Math.toRadians(-15 * p));
+        } else if (useType == 2) {
+            // Drawing a bow: hold it upright in front of the camera
+            float shake = useProgress >= 1 ? (float) Math.sin(time * 1.3) * 0.006f : 0;
+            m.translate(-0.3f, 0.12f + shake, 0.15f + useProgress * 0.12f).rotateZ((float) Math.toRadians(-8));
+        }
+        boolean cube = ItemRenderer.isCube(item);
+        if (cube) {
+            m.rotateY((float) Math.toRadians(45 - swSqrt * 20)).rotateX((float) Math.toRadians(-sw * 40)).scale(0.4f);
+        } else if (useType == 2) {
+            m.rotateY((float) Math.toRadians(170)).rotateZ((float) Math.toRadians(-45)).scale(0.7f);
+        } else {
+            m.rotateY((float) Math.toRadians(-sw * 20)).rotateZ((float) Math.toRadians(-sw * 30)).rotateX((float) Math.toRadians(-sw * 40));
+            m.translate(0.05f, 0.12f, 0).rotateY((float) Math.toRadians(155)).rotateZ((float) Math.toRadians(item.handheld ? 5 : 0));
+            m.scale(item.handheld ? 0.85f : 0.55f);
+        }
+        setupBasic(m, true, 0, 0.3f);
+        basicShader.set("uLight", light);
+        ir.bindFor(item, this);
+        glDisable(GL_CULL_FACE);
+        batch.begin(GL_TRIANGLES);
+        ir.emit(batch, new Matrix4f(), item, ItemRenderer.tint(item));
         batch.end();
         glEnable(GL_CULL_FACE);
+    }
+
+    private void armBox(Batch b, float x, float y, float z, float w, float h, float d) {
+        int skin = 0xFFc89a70, side = 0xFFa87a55, dark = 0xFF8a6040;
+        float x1 = x + w, y1 = y + h, z1 = z + d;
+        b.quad(x, y1, z, 0, 0, x, y1, z1, 0, 0, x1, y1, z1, 0, 0, x1, y1, z, 0, 0, skin);
+        b.quad(x, y, z1, 0, 0, x, y, z, 0, 0, x1, y, z, 0, 0, x1, y, z1, 0, 0, dark);
+        b.quad(x, y1, z1, 0, 0, x, y, z1, 0, 0, x1, y, z1, 0, 0, x1, y1, z1, 0, 0, side);
+        b.quad(x1, y1, z, 0, 0, x1, y, z, 0, 0, x, y, z, 0, 0, x, y1, z, 0, 0, side);
+        b.quad(x, y1, z, 0, 0, x, y, z, 0, 0, x, y, z1, 0, 0, x, y1, z1, 0, 0, skin);
+        b.quad(x1, y1, z1, 0, 0, x1, y, z1, 0, 0, x1, y, z, 0, 0, x1, y1, z, 0, 0, dark);
     }
 
     public static int tintFor(Block b) {
@@ -401,18 +444,4 @@ public final class WorldRenderer {
         }
     }
 
-    public void renderOverlay(boolean underwater, boolean inLava, int width, int height) {
-        if (!underwater && !inLava) return;
-        Matrix4f ortho = new Matrix4f().setOrtho(0, 1, 1, 0, -1, 1);
-        setupBasic(ortho, false, 0, 0);
-        white.bind();
-        glDisable(GL_DEPTH_TEST);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        batch.begin(GL_TRIANGLES);
-        batch.rect(0, 0, 1, 1, 0, 0, 1, 1, inLava ? 0xB0FF4000 : 0x40102A80);
-        batch.end();
-        glDisable(GL_BLEND);
-        glEnable(GL_DEPTH_TEST);
-    }
 }

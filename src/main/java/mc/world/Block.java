@@ -62,8 +62,10 @@ public final class Block {
                 PUMPKIN_SIDE = 52, TNT_SIDE = 53, TNT_TOP = 54, TNT_BOTTOM = 55, BLUE_ORCHID = 56, FERN = 57,
                 SPRUCE_LOG_TOP = 58, BIRCH_LOG_TOP = 59, MELON_SIDE = 60, MELON_TOP = 61, RED_WOOL = 62, BLUE_WOOL = 63,
                 GREEN_WOOL = 64, YELLOW_WOOL = 65, BLACK_WOOL = 66, SUGAR_CANE = 67, COARSE_DIRT = 68, GRANITE = 69,
-                DIORITE = 70, ANDESITE = 71, TERRACOTTA = 72, GRASS_SIDE_ITEM = 73, GRASS_TOP_ITEM = 74, BREAK_0 = 240; // 240..249 crack stages
-        public static final int COUNT = 75;
+                DIORITE = 70, ANDESITE = 71, TERRACOTTA = 72, GRASS_SIDE_ITEM = 73, GRASS_TOP_ITEM = 74,
+                FURNACE_FRONT_LIT = 75, CHEST_TOP = 76, CHEST_SIDE = 77, CHEST_FRONT = 78, FARMLAND = 79, FARMLAND_WET = 80,
+                WHEAT_0 = 81, SAPLING = 89, IRON_BLOCK = 90, GOLD_BLOCK = 91, DIAMOND_BLOCK = 92, BREAK_0 = 240; // 240..249 crack stages
+        public static final int COUNT = 93;
     }
 
     public static final Block AIR = new Block(0, "Air", 0);
@@ -126,6 +128,14 @@ public final class Block {
     public static final Block DIORITE = new Block(57, "Diorite", Tex.DIORITE).hardness(1.5f);
     public static final Block ANDESITE = new Block(58, "Andesite", Tex.ANDESITE).hardness(1.5f);
     public static final Block TERRACOTTA = new Block(59, "Terracotta", Tex.TERRACOTTA).hardness(1.25f);
+    public static final Block LIT_FURNACE = new Block(60, "Furnace", 0).tex(Tex.FURNACE_TOP, Tex.FURNACE_TOP, Tex.FURNACE_SIDE).light(13).hardness(3.5f);
+    public static final Block CHEST = new Block(61, "Chest", 0).tex(Tex.CHEST_TOP, Tex.CHEST_TOP, Tex.CHEST_SIDE).sound(SoundType.WOOD).hardness(2.5f);
+    public static final Block FARMLAND = new Block(62, "Farmland", 0).tex(Tex.FARMLAND, Tex.DIRT, Tex.DIRT).sound(SoundType.GRAVEL).hardness(0.6f);
+    public static final Block WHEAT = new Block(63, "Wheat Crops", Tex.WHEAT_0).plant();
+    public static final Block SAPLING = new Block(64, "Oak Sapling", Tex.SAPLING).plant();
+    public static final Block IRON_BLOCK = new Block(65, "Block of Iron", Tex.IRON_BLOCK).hardness(5f);
+    public static final Block GOLD_BLOCK = new Block(66, "Block of Gold", Tex.GOLD_BLOCK).hardness(3f);
+    public static final Block DIAMOND_BLOCK = new Block(67, "Block of Diamond", Tex.DIAMOND_BLOCK).hardness(5f);
 
     static {
         AIR.model = Model.NONE; AIR.opaque = false; AIR.solid = false; AIR.replaceable = true; AIR.inCreativeInventory = false; AIR.sound = SoundType.NONE;
@@ -136,6 +146,12 @@ public final class Block {
         TORCH.model = Model.TORCH; TORCH.layer = Layer.CUTOUT; TORCH.opaque = false; TORCH.solid = false; TORCH.sound = SoundType.WOOD; TORCH.hardness = 0;
         BEDROCK.inCreativeInventory = true;
         GRASS.tintTopOnly = true;
+        LIT_FURNACE.inCreativeInventory = false;
+        WHEAT.inCreativeInventory = false;
+        WHEAT.replaceable = false;
+        SAPLING.replaceable = false;
+        DANDELION.replaceable = false; POPPY.replaceable = false; BLUE_ORCHID.replaceable = false; SUGAR_CANE.replaceable = false;
+        DEAD_BUSH.replaceable = true;
     }
 
     public static Block get(int id) {
@@ -147,10 +163,27 @@ public final class Block {
         return face == 0 ? texTop : face == 1 ? texBottom : texSide;
     }
 
-    /** Front face texture override (furnace, pumpkin); faces facing south get the front. */
+    /** Face index of the front for facing meta 0-3 (south, west, north, east). */
+    public static final int[] FRONT_FACE = {3, 4, 2, 5};
+
     public int textureForFace(int face) {
-        if (this == FURNACE && face == 3) return Tex.FURNACE_FRONT;
+        return textureForFace(face, 0);
+    }
+
+    /** Texture of a face, taking metadata (facing, growth stage, wetness) into account. */
+    public int textureForFace(int face, int meta) {
+        boolean front = face == FRONT_FACE[meta & 3];
+        if (this == FURNACE && front) return Tex.FURNACE_FRONT;
+        if (this == LIT_FURNACE && front) return Tex.FURNACE_FRONT_LIT;
+        if (this == CHEST && front) return Tex.CHEST_FRONT;
+        if (this == WHEAT) return Tex.WHEAT_0 + Math.min(7, meta & 7);
+        if (this == FARMLAND && face == 0 && meta > 0) return Tex.FARMLAND_WET;
         return textureFor(face);
+    }
+
+    /** Blocks with a front that faces the player when placed. */
+    public boolean hasFacing() {
+        return this == FURNACE || this == LIT_FURNACE || this == CHEST || this == PUMPKIN;
     }
 
     public boolean isLiquid() { return model == Model.LIQUID; }

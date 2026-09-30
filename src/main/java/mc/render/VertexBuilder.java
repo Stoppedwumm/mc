@@ -14,14 +14,14 @@ public final class VertexBuilder {
         buf = MemoryUtil.memAlloc(Math.max(1, initialQuads) * 4 * STRIDE);
     }
 
-    public void vertex(int x, int y, int z, int u, int v, int sky, int block, int shade, int rgb) {
+    public void vertex(int x, int y, int z, int u, int v, int sky, int block, int shade, int rgb, int flags) {
         if (buf.remaining() < STRIDE) {
             ByteBuffer n = MemoryUtil.memRealloc(buf, buf.capacity() * 2);
             buf = n;
         }
         buf.putShort((short) x).putShort((short) y).putShort((short) z).putShort((short) 0);
         buf.putShort((short) u).putShort((short) v);
-        buf.put((byte) sky).put((byte) block).put((byte) shade).put((byte) 0);
+        buf.put((byte) sky).put((byte) block).put((byte) shade).put((byte) flags);
         buf.put((byte) (rgb >> 16)).put((byte) (rgb >> 8)).put((byte) rgb).put((byte) (rgb >>> 24));
         vertices++;
     }

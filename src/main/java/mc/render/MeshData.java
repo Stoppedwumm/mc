@@ -7,6 +7,9 @@ public final class MeshData {
     public final int cx, cz;
     public final ByteBuffer solid, translucent;
     public final int solidQuads, translucentQuads;
+    /** Computed light of the chunk, packed (sky << 4 | block), indexed like Chunk.index; lightHeight layers. */
+    public byte[] light;
+    public int lightHeight;
 
     public MeshData(int cx, int cz, ByteBuffer solid, int solidQuads, ByteBuffer translucent, int translucentQuads) {
         this.cx = cx;

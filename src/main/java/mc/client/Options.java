@@ -6,6 +6,7 @@ import com.google.gson.GsonBuilder;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 /** User settings, persisted as options.json next to the saves folder. */
 public final class Options {
@@ -16,6 +17,7 @@ public final class Options {
     public boolean viewBobbing = true;
     public boolean vsync = true;
     public boolean clouds = true;
+    public boolean shadows = true;
     public float volume = 1f;
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -40,6 +42,14 @@ public final class Options {
         }
     }
 
+    /** Serialised chest/furnace contents. */
+    public static final class BlockEntityData {
+        public int x, y, z;
+        public String type;
+        public int[][] slots;
+        public int burnTime, burnTotal, cookTime;
+    }
+
     /** World metadata (level.json). */
     public static final class Level {
         public long seed;
@@ -49,6 +59,15 @@ public final class Options {
         public boolean flying, creative, spawned;
         public int[] hotbar;
         public int selected;
+        /** Inventory as [id, count, damage] triples (null entries for empty slots). */
+        public int[][] inventory;
+        public float health = 20;
+        public int food = 20;
+        public float saturation = 5;
+        public double spawnX, spawnY = -1, spawnZ;
+        public boolean raining;
+        public int weatherTimer;
+        public List<BlockEntityData> blockEntities;
 
         public static Level load(Path file) {
             try {

@@ -88,6 +88,20 @@ public final class TextureGen {
         paint(Tex.DIORITE, () -> speckle(0xbcbcbc, 0.06, 0x7d7d80, 0.22));
         paint(Tex.ANDESITE, () -> speckle(0x888889, 0.06, 0x6c6c6e, 0.28));
         paint(Tex.TERRACOTTA, () -> speckle(0x985e43, 0.03, 0x8a5339, 0.1));
+        paint(Tex.FURNACE_FRONT_LIT, this::furnaceLit);
+        paint(Tex.CHEST_TOP, () -> chest(0));
+        paint(Tex.CHEST_SIDE, () -> chest(1));
+        paint(Tex.CHEST_FRONT, () -> chest(2));
+        paint(Tex.FARMLAND, () -> farmland(false));
+        paint(Tex.FARMLAND_WET, () -> farmland(true));
+        for (int i = 0; i < 8; i++) {
+            final int stage = i;
+            paint(Tex.WHEAT_0 + i, () -> wheat(stage));
+        }
+        paint(Tex.SAPLING, this::sapling);
+        paint(Tex.IRON_BLOCK, () -> metalBlock(0xdcdcdc, 0xa8a8a8));
+        paint(Tex.GOLD_BLOCK, () -> metalBlock(0xf8d840, 0xc89a18));
+        paint(Tex.DIAMOND_BLOCK, () -> metalBlock(0x68e8e0, 0x2aa8a4));
         paint(Tex.GRASS_SIDE_ITEM, () -> tintedCopy(Tex.GRASS_SIDE, 0x7fb238));
         paint(Tex.GRASS_TOP_ITEM, () -> tintedCopy(Tex.GRASS_TOP, 0x7fb238));
         for (int i = 0; i < 10; i++) {
@@ -177,6 +191,67 @@ public final class TextureGen {
             for (int x = 0; x < 16; x++) {
                 int c = r.nextDouble() < spotChance ? spot : base;
                 set(x, y, scale(c, jitter(var) * (0.94 + n[y * 16 + x] * 0.12)));
+            }
+    }
+
+    private void furnaceLit() {
+        furnace(true);
+        for (int y = 9; y < 14; y++) for (int x = 4; x < 12; x++) {
+            double v = r.nextDouble();
+            set(x, y, v < 0.3 ? 0xffe070 : v < 0.7 ? 0xf09020 : 0xc04010);
+        }
+    }
+
+    private void chest(int kind) {
+        planks(0xa0782e);
+        for (int i = 0; i < 16; i++) {
+            set(i, 0, 0x4a3515); set(i, 15, 0x4a3515); set(0, i, 0x4a3515); set(15, i, 0x4a3515);
+        }
+        if (kind > 0) for (int x = 1; x < 15; x++) set(x, 5, 0x4a3515);
+        if (kind == 2) {
+            for (int y = 4; y < 8; y++) for (int x = 7; x < 9; x++) set(x, y, y == 4 ? 0xd8d8d8 : 0xa8a8a8);
+            set(7, 7, 0x303030);
+        }
+    }
+
+    private void farmland(boolean wet) {
+        dirt();
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                int c = get(x, y) & 0xFFFFFF;
+                if (y % 4 == 0) c = scale(c, 0.7);
+                if (wet) c = scale(c, 0.62);
+                set(x, y, c);
+            }
+    }
+
+    private void wheat(int stage) {
+        clearTile();
+        int h = 3 + stage * 12 / 7;
+        int stem = stage < 7 ? mix(0x3a8a1a, 0x9aa030, stage / 7.0) : 0xb09a38;
+        for (int s = 0; s < 5; s++) {
+            int x = 1 + s * 3 + r.nextInt(2);
+            for (int k = 0; k < h; k++) set(x, 15 - k, scale(stem, jitter(0.1)));
+            if (stage >= 5) for (int k = h - 4; k < h; k++) { set(x - 1, 15 - k, stage == 7 ? 0xdcc050 : 0x9ab040); set(x + 1, 15 - k, stage == 7 ? 0xc8a838 : 0x8aa038); }
+        }
+    }
+
+    private void sapling() {
+        clearTile();
+        for (int y = 9; y < 16; y++) set(7, y, 0x6b4a26);
+        for (int i = 0; i < 40; i++) {
+            int x = 3 + r.nextInt(10), y = 2 + r.nextInt(9);
+            double d = Math.abs(x - 7.5) + Math.abs(y - 6);
+            if (d < 6) set(x, y, scale(0x3c8a24, jitter(0.2)));
+        }
+    }
+
+    private void metalBlock(int light, int dark) {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                boolean edge = x == 0 || y == 0 || x == 15 || y == 15;
+                int c = edge ? dark : (x + y) % 7 == 0 ? scale(light, 1.08) : light;
+                set(x, y, scale(c, jitter(0.03)));
             }
     }
 

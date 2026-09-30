@@ -17,6 +17,7 @@ public final class ChunkMesher {
     public static final class Job {
         public final int cx, cz;
         public final byte[] region = new byte[REGION];
+        public final byte[] meta = new byte[REGION];
         public final int[] grass = new int[256], foliage = new int[256];
         public int height;
 
@@ -48,7 +49,8 @@ public final class ChunkMesher {
             {{0, 1, 0}, {0, 0, 0}, {0, 0, 1}, {0, 1, 1}},
             {{1, 1, 1}, {1, 0, 1}, {1, 0, 0}, {1, 1, 0}},
     };
-    private static final float[] FACE_SHADE = {1.0f, 0.5f, 0.8f, 0.8f, 0.6f, 0.6f};
+    /** Per-vertex flag bits (bits 0-2 hold the face index, 6 = no fixed normal). */
+    public static final int F_LEAVES = 8, F_PLANT = 16, F_WATER = 32, F_EMISSIVE = 64;
     private static final float[] AO_CURVE = {0.42f, 0.6f, 0.8f, 1.0f};
 
     private final byte[] sky = new byte[REGION];
@@ -56,7 +58,7 @@ public final class ChunkMesher {
     private final int[] queue = new int[1 << 20];
     private final int[] colTop = new int[AREA];
 
-    private byte[] b;
+    private byte[] b, m;
     private int h;
 
     // Per-face scratch
@@ -68,6 +70,11 @@ public final class ChunkMesher {
         if (y < 0) return Block.BEDROCK.id;
         if (y >= h) return 0;
         return b[idx(x, y, z)];
+    }
+
+    private int metaAt(int x, int y, int z) {
+        if (y < 0 || y >= h) return 0;
+        return m[idx(x, y, z)];
     }
 
     private int skyAt(int x, int y, int z) {
@@ -87,6 +94,7 @@ public final class ChunkMesher {
 
     public MeshData build(Job job) {
         this.b = job.region;
+        this.m = job.meta;
         this.h = Math.min(Chunk.HEIGHT, job.height + 2);
         computeLight();
 
@@ -121,6 +129,17 @@ public final class ChunkMesher {
         MeshData data = new MeshData(job.cx, job.cz,
                 solid.isEmpty() ? null : solid.finish(), solid.quads(),
                 translucent.isEmpty() ? null : translucent.finish(), translucent.quads());
+        // Export the centre chunk's light for gameplay (spawning, entity brightness)
+        int lh = Math.min(h, Chunk.HEIGHT);
+        byte[] light = new byte[lh * 256];
+        for (int y = 0; y < lh; y++)
+            for (int z = 0; z < 16; z++)
+                for (int x = 0; x < 16; x++) {
+                    int i = idx(x + 16, y, z + 16);
+                    light[(y << 8) | (z << 4) | x] = (byte) (sky[i] << 4 | blk[i]);
+                }
+        data.light = light;
+        data.lightHeight = lh;
         solid.free();
         translucent.free();
         return data;
@@ -249,10 +268,9 @@ public final class ChunkMesher {
      * UVs are derived from box coordinates like Minecraft's block models.
      */
     private void emit(VertexBuilder out, int face, int x, int y, int z, int x0, int y0, int z0, int x1, int y1, int z1,
-                      int tex, int tint, boolean ao, int uOff, int vOff) {
+                      int tex, int tint, boolean ao, int uOff, int vOff, int flags) {
         int lx = (x - 16) * 16, ly = y * 16, lz = (z - 16) * 16;
         int tu = (tex & 15) * 16 * 16, tv = (tex >> 4) * 16 * 16;
-        float fs = FACE_SHADE[face];
         boolean flip = ao && vAo[0] + vAo[2] < vAo[1] + vAo[3];
         for (int k = 0; k < 4; k++) {
             int v = flip ? (k + 1) & 3 : k;
@@ -267,8 +285,8 @@ public final class ChunkMesher {
                 default -> { u = 16 - pz; w = 16 - py; }
             }
             u += uOff; w += vOff;
-            int shade = (int) (255 * fs * (ao ? AO_CURVE[vAo[v]] : 1f));
-            out.vertex(lx + px, ly + py, lz + pz, tu + inset(u * 16), tv + inset(w * 16), vSky[v], vBlk[v], shade, tint);
+            int shade = (int) (255 * (ao ? AO_CURVE[vAo[v]] : 1f));
+            out.vertex(lx + px, ly + py, lz + pz, tu + inset(u * 16), tv + inset(w * 16), vSky[v], vBlk[v], shade, tint, flags | face);
         }
     }
 
@@ -282,40 +300,100 @@ public final class ChunkMesher {
             if (!faceVisible(block, f, x, y, z)) continue;
             smoothLight(f, x, y, z);
             int faceTint = tint;
-            emit(out, f, x, y, z, 0, 0, 0, 16, 16, 16, block.textureForFace(f), faceTint, true, 0, 0);
+            int flags = block.tint == Block.Tint.FOLIAGE || block.tint == Block.Tint.BIRCH || block.tint == Block.Tint.SPRUCE ? F_LEAVES : 0;
+            if (block.lightEmission > 0) flags |= F_EMISSIVE;
+            emit(out, f, x, y, z, 0, 0, 0, 16, 16, 16, block.textureForFace(f, metaAt(x, y, z)), faceTint, true, 0, 0, flags);
         }
     }
 
+    /** Surface height (in 1/16 block) of a liquid column at a block, or -1 if not this liquid. */
+    private float liquidLevel(int x, int y, int z, int id) {
+        if (block(x, y, z) != id) return -1;
+        if (block(x, y + 1, z) == id) return 16;
+        int meta = metaAt(x, y, z);
+        if ((meta & 8) != 0) return 14.5f;
+        return 16f * (8 - (meta & 7)) / 9f;
+    }
+
+    /** Minecraft-style corner height: weighted average of the four columns sharing the corner. */
+    private int cornerHeight(int x, int y, int z, int cx, int cz, int id) {
+        float sum = 0;
+        int weight = 0;
+        for (int dx = cx - 1; dx <= cx; dx++)
+            for (int dz = cz - 1; dz <= cz; dz++) {
+                int px = x + dx, pz = z + dz;
+                if (block(px, y + 1, pz) == id) return 16;
+                float lv = liquidLevel(px, y, pz, id);
+                if (lv >= 0) {
+                    int w = (metaAt(px, y, pz) & 15) == 0 ? 10 : 1;
+                    sum += lv * w;
+                    weight += w;
+                } else if (!Block.get(block(px, y, pz)).solid) {
+                    weight++;
+                }
+            }
+        return weight == 0 ? 14 : Math.max(1, Math.round(sum / weight));
+    }
+
     private void liquid(Block block, int x, int y, int z, VertexBuilder out) {
-        boolean sameAbove = block(x, y + 1, z) == block.id;
-        int top = sameAbove ? 16 : 14;
+        int id = block.id;
+        boolean sameAbove = block(x, y + 1, z) == id;
+        int h00, h10, h11, h01;
+        if (sameAbove) h00 = h10 = h11 = h01 = 16;
+        else {
+            h00 = cornerHeight(x, y, z, 0, 0, id);
+            h10 = cornerHeight(x, y, z, 1, 0, id);
+            h11 = cornerHeight(x, y, z, 1, 1, id);
+            h01 = cornerHeight(x, y, z, 0, 1, id);
+        }
+        int flag = block == Block.WATER ? F_WATER : F_EMISSIVE;
+        VertexBuilder o = out;
+        int tex = block.texTop;
+        int tu = (tex & 15) * 256, tv = (tex >> 4) * 256;
+        int lx = (x - 16) * 16, ly = y * 16, lz = (z - 16) * 16;
         for (int f = 0; f < 6; f++) {
             int[] d = DIR[f];
             int nid = block(x + d[0], y + d[1], z + d[2]);
-            if (nid == block.id) continue;
+            if (nid == id) continue;
             Block n = Block.get(nid);
             if (f != 0 && n.opaque) continue;
             if (f == 0 && sameAbove) continue;
             if (block == Block.WATER && nid == Block.ICE.id) continue;
-            if (f == 0) {
-                // The lowered surface is lit from the cell it sits in (or above)
-                smoothLight(f, x, y, z);
-                for (int v = 0; v < 4; v++) vAo[v] = 3;
-            } else {
-                smoothLight(f, x, y, z);
-                for (int v = 0; v < 4; v++) vAo[v] = Math.max(vAo[v], 2);
+            smoothLight(f, x, y, z);
+            int[] hs;
+            switch (f) {
+                case 0 -> hs = new int[]{h00, h01, h11, h10};
+                case 1 -> hs = new int[]{0, 0, 0, 0};
+                case 2 -> hs = new int[]{h10, 0, 0, h00};
+                case 3 -> hs = new int[]{h01, 0, 0, h11};
+                case 4 -> hs = new int[]{h00, 0, 0, h01};
+                default -> hs = new int[]{h11, 0, 0, h10};
             }
-            emit(out, f, x, y, z, 0, 0, 0, 16, top, 16, block.texTop, 0xFFFFFF, f != 0, 0, 0);
+            for (int k = 0; k < 4; k++) {
+                int[] c = CORNER[f][k];
+                int px = c[0] * 16, pz = c[2] * 16;
+                int py = f == 1 ? 0 : (c[1] == 1 ? hs[k] : 0);
+                int u, w;
+                if (f <= 1) { u = px; w = pz; }
+                else {
+                    u = (f == 2 || f == 5) ? 16 - (f == 2 ? px : pz) : (f == 3 ? px : pz);
+                    w = 16 - py;
+                }
+                int ao = f == 0 ? 255 : (int) (255 * AO_CURVE[Math.max(vAo[k], 2)]);
+                o.vertex(lx + px, ly + py, lz + pz, tu + inset(u * 16), tv + inset(w * 16), vSky[k], vBlk[k], ao, 0xFFFFFFFF, flag | f);
+            }
         }
     }
 
     private void cross(Block block, int x, int y, int z, int tint, VertexBuilder out) {
         flatLight(x, y, z);
         int lx = (x - 16) * 16, ly = y * 16, lz = (z - 16) * 16;
-        int tex = block.texSide;
+        int tex = block.textureForFace(2, metaAt(x, y, z));
         int tu = (tex & 15) * 256 + 1, tv = (tex >> 4) * 256 + 1;
         int s = vSky[0], bl = vBlk[0];
-        int shade = 235;
+        int shade = 255;
+        int wave = block == Block.SUGAR_CANE ? 0 : F_PLANT;
+        int fl = 6;
         // Slight random offset for grass so fields look less regular
         int ox = 0, oz = 0;
         if (block == Block.TALL_GRASS || block == Block.FERN) {
@@ -328,15 +406,15 @@ public final class ChunkMesher {
         for (int[] p : planes) {
             int x0 = lx + p[0] + ox, z0 = lz + p[1] + oz, x1 = lx + p[2] + ox, z1 = lz + p[3] + oz;
             // front
-            out.vertex(x0, ly + 16, z0, tu, tv, s, bl, shade, tint);
-            out.vertex(x0, ly, z0, tu, tv + 254, s, bl, shade, tint);
-            out.vertex(x1, ly, z1, tu + 254, tv + 254, s, bl, shade, tint);
-            out.vertex(x1, ly + 16, z1, tu + 254, tv, s, bl, shade, tint);
+            out.vertex(x0, ly + 16, z0, tu, tv, s, bl, shade, tint, fl | wave);
+            out.vertex(x0, ly, z0, tu, tv + 254, s, bl, shade, tint, fl);
+            out.vertex(x1, ly, z1, tu + 254, tv + 254, s, bl, shade, tint, fl);
+            out.vertex(x1, ly + 16, z1, tu + 254, tv, s, bl, shade, tint, fl | wave);
             // back
-            out.vertex(x1, ly + 16, z1, tu + 254, tv, s, bl, shade, tint);
-            out.vertex(x1, ly, z1, tu + 254, tv + 254, s, bl, shade, tint);
-            out.vertex(x0, ly, z0, tu, tv + 254, s, bl, shade, tint);
-            out.vertex(x0, ly + 16, z0, tu, tv, s, bl, shade, tint);
+            out.vertex(x1, ly + 16, z1, tu + 254, tv, s, bl, shade, tint, fl | wave);
+            out.vertex(x1, ly, z1, tu + 254, tv + 254, s, bl, shade, tint, fl);
+            out.vertex(x0, ly, z0, tu, tv + 254, s, bl, shade, tint, fl);
+            out.vertex(x0, ly + 16, z0, tu, tv, s, bl, shade, tint, fl | wave);
         }
     }
 
@@ -345,9 +423,9 @@ public final class ChunkMesher {
         for (int v = 0; v < 4; v++) vBlk[v] = 15 * 16;
         int tex = block.texSide;
         for (int f = 0; f < 6; f++) {
-            if (f == 0) emit(out, f, x, y, z, 7, 0, 7, 9, 10, 9, tex, 0xFFFFFF, false, 0, -1);
-            else if (f == 1) emit(out, f, x, y, z, 7, 0, 7, 9, 10, 9, tex, 0xFFFFFF, false, 0, 7);
-            else emit(out, f, x, y, z, 7, 0, 7, 9, 10, 9, tex, 0xFFFFFF, false, 0, 0);
+            if (f == 0) emit(out, f, x, y, z, 7, 0, 7, 9, 10, 9, tex, 0xFFFFFF, false, 0, -1, F_EMISSIVE);
+            else if (f == 1) emit(out, f, x, y, z, 7, 0, 7, 9, 10, 9, tex, 0xFFFFFF, false, 0, 7, 0);
+            else emit(out, f, x, y, z, 7, 0, 7, 9, 10, 9, tex, 0xFFFFFF, false, 0, 0, 0);
         }
     }
 }
