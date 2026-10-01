@@ -29,6 +29,7 @@ public final class MinecartEntity extends Vehicle {
         int id = world.getBlock(bx, by, bz);
         if (Rails.isRail(id)) {
             moveAlongTrack(bx, by, bz, id);
+            wasOnRail = true;
             if (id == Block.DETECTOR_RAIL.id) Rails.cartOnDetector(world, bx, by, bz);
         } else moveOffRail();
         orient();
@@ -64,20 +65,37 @@ public final class MinecartEntity extends Vehicle {
         }
     }
 
+    /** Whether the cart was on a rail last tick, and how fast it was climbing or falling along the track. */
+    private boolean wasOnRail;
+    private double trackDy;
+
+    /**
+     * Off the rails the cart keeps its momentum: it flies off the end of a track (launched upwards off a rising ramp),
+     * falls with air drag, and rolls along the ground slowing gradually instead of stopping dead.
+     */
     private void moveOffRail() {
-        motionX = clamp(motionX, MAX_SPEED);
-        motionZ = clamp(motionZ, MAX_SPEED);
-        if (onGround) {
-            motionX *= 0.5;
-            motionY *= 0.5;
-            motionZ *= 0.5;
+        if (wasOnRail) {
+            // Carry the speed the cart really had on the track (the move per tick is capped there)
+            double s = Math.sqrt(motionX * motionX + motionZ * motionZ);
+            if (s > MAX_SPEED) {
+                motionX *= MAX_SPEED / s;
+                motionZ *= MAX_SPEED / s;
+            }
+            if (trackDy > 0) motionY = Math.max(motionY, trackDy);
+            wasOnRail = false;
+        }
+        double s = Math.sqrt(motionX * motionX + motionZ * motionZ);
+        double cap = MAX_SPEED * 1.5;
+        if (s > cap) {
+            motionX *= cap / s;
+            motionZ *= cap / s;
         }
         move(motionX, motionY, motionZ);
-        if (!onGround) {
-            motionX *= 0.95;
-            motionY *= 0.95;
-            motionZ *= 0.95;
-        }
+        double friction = inWater ? 0.8 : onGround ? 0.95 : 0.99;
+        motionX *= friction;
+        motionZ *= friction;
+        motionY *= 0.98;
+        if (onGround && Math.abs(motionX) < 0.003 && Math.abs(motionZ) < 0.003) motionX = motionZ = 0;
         pitch *= 0.8f;
     }
 
@@ -168,6 +186,11 @@ public final class MinecartEntity extends Vehicle {
             motionX = s * (nbx - bx);
             motionZ = s * (nbz - bz);
         }
+        // Climbing speed on a slope (a 45 degree incline), for flying off the top of a ramp
+        int up = Rails.ascendsTo(shape);
+        trackDy = 0;
+        if (up >= 0 && motionX * Rails.HX[up] + motionZ * Rails.HZ[up] > 0)
+            trackDy = Math.min(Math.sqrt(motionX * motionX + motionZ * motionZ), MAX_SPEED) * (passenger != null ? 0.75 : 1);
         if (powered) {
             double s = Math.sqrt(motionX * motionX + motionZ * motionZ);
             if (s > 0.01) {

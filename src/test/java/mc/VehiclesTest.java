@@ -110,6 +110,40 @@ class VehiclesTest {
     }
 
     @Test
+    void cartsKeepTheirMomentumWhenTheTrackEnds() {
+        int east = Rails.fromFacing(3);
+        for (int x = 0; x < 5; x++) rail(x, 100, 5, Block.RAIL, east);
+        MinecartEntity c = cartAt(3.5, 100.0625, 5.5);
+        c.motionX = 0.4;
+        for (int i = 0; i < 20 && c.x < 5.6; i++) w.tick();
+        assertTrue(c.x > 5.6, "rolled off the end of the track: " + c.x);
+        double speedOff = c.motionX;
+        assertTrue(speedOff > 0.25, "kept its speed: " + speedOff);
+        ticks(40);
+        assertTrue(c.x > 9, "kept rolling over the ground: " + c.x);
+        assertEquals(100, c.y, 1e-6, "on the floor");
+        ticks(200);
+        assertEquals(0, c.motionX, 1e-9, "eventually stops");
+
+        // Off the top of a ramp it flies: higher than the track for a moment, landing further on
+        for (int i = 0; i < 4; i++) {
+            for (int y = 99; y < 100 + i; y++) w.setBlock(10 + i, y, 15, Block.STONE.id, 0, false);
+        }
+        for (int x = 4; x < 10; x++) rail(x, 100, 15, Block.RAIL, east);
+        for (int i = 0; i < 4; i++) rail(10 + i, 100 + i, 15, Block.RAIL, east);
+        w.setBlock(13, 103, 15, Block.RAIL.id, 2, false); // the last rail still rises: a jump
+        MinecartEntity r = cartAt(5.5, 100.0625, 15.5);
+        r.motionX = 2;
+        double top = 0;
+        for (int i = 0; i < 40; i++) {
+            w.tick();
+            if (r.x > 14) top = Math.max(top, r.y);
+        }
+        assertTrue(top > 104.2, "launched above the ramp's top: " + top);
+        assertTrue(r.x > 16, "landed beyond the ramp: " + r.x);
+    }
+
+    @Test
     void detectorRailPowersWhileACartIsOnIt() {
         int east = Rails.fromFacing(3);
         for (int x = 0; x < 6; x++) rail(x, 100, 5, x == 3 ? Block.DETECTOR_RAIL : Block.RAIL, east);

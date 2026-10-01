@@ -26,7 +26,7 @@ public final class Rails {
 
     /** Horizontal directions: north (-z), south (+z), west (-x), east (+x). */
     static final int N = 0, S = 1, W = 2, E = 3;
-    static final int[] HX = {0, 0, -1, 1}, HZ = {-1, 1, 0, 0};
+    public static final int[] HX = {0, 0, -1, 1}, HZ = {-1, 1, 0, 0};
 
     public static boolean isRail(int id) {
         return id == Block.RAIL.id || id == Block.POWERED_RAIL.id || id == Block.DETECTOR_RAIL.id;
@@ -93,7 +93,7 @@ public final class Rails {
     }
 
     /** Direction a slope rises towards, or -1 for flat shapes. */
-    static int ascendsTo(int shape) {
+    public static int ascendsTo(int shape) {
         return switch (shape) { case 2 -> E; case 3 -> W; case 4 -> N; case 5 -> S; default -> -1; };
     }
 

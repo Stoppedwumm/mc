@@ -89,7 +89,8 @@ All textures and sounds are generated procedurally at startup, so no Mojang asse
   - powered rails boost a cart, or brake it when they have no power
   - a detector rail gives off a redstone signal while a cart is on it
 - Right-click a cart to get in and Shift to get out. Pressing W gives a stopped cart a push in the direction you look.
-  An empty cart that is moving picks up mobs it runs into. Carts push each other and the entities they bump.
+  Carts keep their momentum when the track ends: they roll on over the ground, slowing gradually, and fly off the
+  top of a rising ramp. An empty cart that is moving picks up mobs it runs into. Carts push each other and the entities they bump.
   A few punches break a cart back into an item.
 - Boats float on water and are steered by where you look (Minecraft 1.8 handling). They speed up gradually and have
   rowing paddles. Crashing into something at speed smashes a boat into planks and sticks.
