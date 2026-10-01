@@ -17,7 +17,7 @@ public final class ChunkMesher {
     /** Snapshot handed to a worker. */
     public static final class Job {
         public final int cx, cz;
-        public final byte[] region = new byte[REGION];
+        public final char[] region = new char[REGION];
         public final byte[] meta = new byte[REGION];
         public final int[] grass = new int[256], foliage = new int[256];
         public int height;
@@ -30,12 +30,12 @@ public final class ChunkMesher {
         }
     }
 
-    private static final boolean[] OPAQUE = new boolean[256];
-    private static final int[] FILTER = new int[256];
-    private static final int[] EMIT = new int[256];
+    private static final boolean[] OPAQUE = new boolean[Block.MAX];
+    private static final int[] FILTER = new int[Block.MAX];
+    private static final int[] EMIT = new int[Block.MAX];
 
     static {
-        for (int i = 0; i < 256; i++) {
+        for (int i = 0; i < Block.MAX; i++) {
             Block b = Block.get(i);
             OPAQUE[i] = b.opaque;
             FILTER[i] = b.opaque ? 15 : b.lightFilter;
@@ -61,7 +61,8 @@ public final class ChunkMesher {
     private final int[] queue = new int[1 << 20];
     private final int[] colTop = new int[AREA];
 
-    private byte[] b, m;
+    private char[] b;
+    private byte[] m;
     private int h;
 
     // Per-face scratch
@@ -72,7 +73,7 @@ public final class ChunkMesher {
     private int block(int x, int y, int z) {
         if (y < 0) return Block.BEDROCK.id;
         if (y >= h) return 0;
-        return b[idx(x, y, z)] & 255;
+        return b[idx(x, y, z)];
     }
 
     /** Neighbour access for shape connections (fences, panes, walls). */
@@ -135,7 +136,7 @@ public final class ChunkMesher {
         for (int y = 0; y < Math.min(h, Chunk.HEIGHT); y++) {
             for (int z = 16; z < 32; z++) {
                 for (int x = 16; x < 32; x++) {
-                    int id = b[idx(x, y, z)] & 255;
+                    int id = b[idx(x, y, z)];
                     if (id == 0) continue;
                     Block block = Block.get(id);
                     int col = (z - 16) * 16 + (x - 16);
@@ -199,7 +200,7 @@ public final class ChunkMesher {
                 int top = -1;
                 for (int y = H - 1; y >= 0; y--) {
                     int i = idx(x, y, z);
-                    int id = b[i] & 255;
+                    int id = b[i];
                     if (light > 0) {
                         if (OPAQUE[id]) light = 0;
                         else light = Math.max(0, light - FILTER[id]);
@@ -229,7 +230,7 @@ public final class ChunkMesher {
 
         head = tail = 0;
         for (int i = 0; i < n; i++) {
-            int e = EMIT[b[i] & 255];
+            int e = EMIT[b[i]];
             if (e > 0) { blk[i] = (byte) e; queue[tail++ & mask] = i; }
         }
         propagate(blk, head, tail);
@@ -250,7 +251,7 @@ public final class ChunkMesher {
                 }
                 if (nx < 0 || nx >= W || nz < 0 || nz >= W || ny < 0 || ny >= H) continue;
                 int ni = idx(nx, ny, nz);
-                int id = b[ni] & 255;
+                int id = b[ni];
                 if (OPAQUE[id]) continue;
                 int nl = l - 1 - FILTER[id];
                 if (nl > light[ni]) {

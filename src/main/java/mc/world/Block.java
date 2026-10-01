@@ -1,7 +1,8 @@
 package mc.world;
 
 /**
- * Static block registry. Block ids are stored as unsigned bytes inside chunks, so there can be at most 256 blocks.
+ * Static block registry. Block ids are stored as 16-bit values inside chunks; built-in blocks use the low ids and
+ * mods take the free ones up to {@link #MAX}.
  */
 public final class Block {
     public enum Model { NONE, CUBE, CROSS, LIQUID, TORCH, SHAPE }
@@ -11,7 +12,10 @@ public final class Block {
     public enum Tint { NONE, GRASS, FOLIAGE, BIRCH, SPRUCE }
     public enum SoundType { STONE, WOOD, GRASS, GRAVEL, SAND, GLASS, CLOTH, SNOW, NONE }
 
-    public static final Block[] BY_ID = new Block[256];
+    public static final int MAX = 4096;
+    /** Mod blocks take ids from here up; their block items share the id, above every plain item. */
+    public static final int FIRST_MOD_ID = 1024;
+    public static final Block[] BY_ID = new Block[MAX];
 
     public final int id;
     public final String name;
@@ -70,9 +74,9 @@ public final class Block {
         return b;
     }
 
-    /** First unused block id, or -1. */
+    /** First unused mod block id, or -1. */
     public static int freeId() {
-        for (int i = 1; i < 256; i++) if (BY_ID[i] == null) return i;
+        for (int i = FIRST_MOD_ID; i < MAX; i++) if (BY_ID[i] == null) return i;
         return -1;
     }
 
@@ -339,7 +343,7 @@ public final class Block {
     }
 
     public static Block get(int id) {
-        Block b = BY_ID[id & 255];
+        Block b = id >= 0 && id < MAX ? BY_ID[id] : null;
         return b == null ? AIR : b;
     }
 

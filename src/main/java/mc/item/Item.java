@@ -3,12 +3,13 @@ package mc.item;
 import mc.world.Block;
 
 /**
- * Item registry. Ids 0-127 are the block items (same id as their block), ids 256+ are pure items.
+ * Item registry. Block items have their block's id (built-in blocks below 256, mod blocks from
+ * {@link Block#FIRST_MOD_ID}); plain items use 256 up to that.
  */
 public final class Item {
     public enum Tool { NONE, PICKAXE, AXE, SHOVEL, SWORD, HOE }
 
-    public static final Item[] BY_ID = new Item[512];
+    public static final Item[] BY_ID = new Item[Block.MAX];
 
     public final int id;
     public final String name;
@@ -52,9 +53,9 @@ public final class Item {
         return i;
     }
 
-    /** First unused item id at or above 256, or -1. */
+    /** First unused plain item id, or -1. */
     public static int freeId() {
-        for (int i = 256; i < BY_ID.length; i++) if (BY_ID[i] == null) return i;
+        for (int i = 256; i < Block.FIRST_MOD_ID; i++) if (BY_ID[i] == null) return i;
         return -1;
     }
 

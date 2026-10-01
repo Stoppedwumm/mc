@@ -122,7 +122,7 @@ final class Session {
                 for (int i = 0; i < 4; i++) player.inventory.armor[i] = readStack(b);
             }
             case C_SET_BLOCK -> {
-                int x = b.readInt(), y = b.readInt(), z = b.readInt(), block = b.readUnsignedByte(), meta = b.readUnsignedByte();
+                int x = b.readInt(), y = b.readInt(), z = b.readInt(), block = b.readUnsignedShort(), meta = b.readUnsignedByte();
                 if (!inReach(x, y, z)) { blockChanged(x, y, z, world().getBlock(x, y, z), world().getMeta(x, y, z)); return; }
                 world().setBlock(x, y, z, block, meta, true);
                 world().checkFalling(x, y, z);
@@ -331,10 +331,8 @@ final class Session {
     }
 
     private void sendChunk(Chunk c) {
-        int volume = c.blocks.length;
-        byte[] raw = new byte[volume * 2];
-        System.arraycopy(c.blocks, 0, raw, 0, volume);
-        System.arraycopy(c.meta, 0, raw, volume, volume);
+        byte[] raw = new byte[Chunk.VOLUME * 3];
+        Chunk.pack(c.blocks, c.meta, raw, 0);
         byte[] packed = deflate(raw);
         ByteBuf b = packet(S_CHUNK);
         b.writeInt(c.cx);
@@ -354,7 +352,7 @@ final class Session {
         b.writeInt(x);
         b.writeInt(y);
         b.writeInt(z);
-        b.writeByte(id);
+        b.writeShort(id);
         b.writeByte(meta);
         connection.send(b);
     }
@@ -517,7 +515,7 @@ final class Session {
         b.writeInt(x);
         b.writeInt(y);
         b.writeInt(z);
-        b.writeByte(id);
+        b.writeShort(id);
         b.writeByte(meta);
         connection.send(b);
     }

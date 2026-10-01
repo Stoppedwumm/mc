@@ -54,7 +54,7 @@ public final class Weather {
         Chunk c = world.getChunk(x >> 4, z >> 4);
         if (c == null) return 256;
         for (int y = Math.min(255, c.maxY); y >= 0; y--) {
-            int id = c.blocks[Chunk.index(x & 15, y, z & 15)] & 255;
+            int id = c.blocks[Chunk.index(x & 15, y, z & 15)];
             if (id != 0 && Block.get(id).model != Block.Model.CROSS) return y + 1;
         }
         return 0;

@@ -104,23 +104,23 @@ class MultiplayerTest {
             cb.readInt(); cb.readInt();
             byte[] packed = new byte[cb.readInt()];
             cb.readBytes(packed);
-            byte[] raw = inflate(packed, Chunk.VOLUME * 2);
+            Chunk sent = Chunk.unpack(0, 0, inflate(packed, Chunk.VOLUME * 3), 0);
             Chunk server = w.getChunk(0, 0);
-            for (int i = 0; i < Chunk.VOLUME; i += 97) assertEquals(server.blocks[i], raw[i], "block " + i);
+            for (int i = 0; i < Chunk.VOLUME; i += 97) assertEquals(server.blocks[i], sent.blocks[i], "block " + i);
             for (int i = 0; i < 200 && alice.y != 100; i++) { pump(srv, w, c); Thread.sleep(5); }
             assertEquals(100, alice.y, 1e-9);
 
             // Client places a block: the server world changes
             ByteBuf set = packet(C_SET_BLOCK);
             set.writeInt(8); set.writeInt(101); set.writeInt(8);
-            set.writeByte(Block.GOLD_BLOCK.id); set.writeByte(0);
+            set.writeShort(Block.GOLD_BLOCK.id); set.writeByte(0);
             send(c, set);
             for (int i = 0; i < 50 && w.getBlock(8, 101, 8) != Block.GOLD_BLOCK.id; i++) { pump(srv, w, c); Thread.sleep(5); }
             assertEquals(Block.GOLD_BLOCK.id, w.getBlock(8, 101, 8));
 
             // A server-side change reaches the client
             w.setBlock(9, 101, 8, Block.DIAMOND_BLOCK.id, 0, true);
-            await(srv, w, c, S_BLOCK, b -> b.readInt() == 9 && b.readInt() == 101 && b.readInt() == 8 && b.readUnsignedByte() == Block.DIAMOND_BLOCK.id);
+            await(srv, w, c, S_BLOCK, b -> b.readInt() == 9 && b.readInt() == 101 && b.readInt() == 8 && b.readUnsignedShort() == Block.DIAMOND_BLOCK.id);
 
             // Chat is broadcast with the sender's name
             ByteBuf chat = packet(C_CHAT);
@@ -252,8 +252,9 @@ class MultiplayerTest {
             public void breakBlock(int x, int y, int z, mc.item.ItemStack tool, boolean drop) { sent.add("break " + x + " " + y + " " + z + " " + drop); }
             public void addEntity(mc.entity.Entity e) { sent.add("entity " + e.getClass().getSimpleName()); }
         };
-        byte[] blocks = new byte[Chunk.VOLUME], meta = new byte[Chunk.VOLUME];
-        for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) blocks[Chunk.index(x, 10, z)] = (byte) Block.STONE.id;
+        char[] blocks = new char[Chunk.VOLUME];
+        byte[] meta = new byte[Chunk.VOLUME];
+        for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) blocks[Chunk.index(x, 10, z)] = (char) Block.STONE.id;
         w.putNetChunk(new Chunk(0, 0, blocks, meta));
         assertEquals(Block.STONE.id, w.getBlock(3, 10, 3));
 

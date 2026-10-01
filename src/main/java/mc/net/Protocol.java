@@ -16,7 +16,7 @@ import java.util.zip.Inflater;
 public final class Protocol {
     private Protocol() { }
 
-    public static final int VERSION = 4;
+    public static final int VERSION = 5;
 
     /** Handshake intents. */
     public static final int INTENT_STATUS = 0, INTENT_LOGIN = 1;

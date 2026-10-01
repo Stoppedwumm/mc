@@ -22,6 +22,10 @@
         <log4j.version>2.22.1</log4j.version>
     </properties>
 
+    <repositories>
+        <repository><id>minecraft-libraries</id><url>https://libraries.minecraft.net</url></repository>
+    </repositories>
+
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -41,6 +45,8 @@
         <dependency><groupId>org.lwjgl</groupId><artifactId>lwjgl-openal</artifactId></dependency>
         <dependency><groupId>org.lwjgl</groupId><artifactId>lwjgl-stb</artifactId></dependency>
         <dependency><groupId>org.joml</groupId><artifactId>joml</artifactId><version>${joml.version}</version></dependency>
+        <!-- Mojang's serialization library (MIT), which mods use for codecs -->
+        <dependency><groupId>com.mojang</groupId><artifactId>datafixerupper</artifactId><version>8.0.16</version></dependency>
         <dependency><groupId>it.unimi.dsi</groupId><artifactId>fastutil</artifactId><version>${fastutil.version}</version></dependency>
         <dependency><groupId>com.google.code.gson</groupId><artifactId>gson</artifactId><version>${gson.version}</version></dependency>
         <!-- Networking (multiplayer), like Minecraft -->

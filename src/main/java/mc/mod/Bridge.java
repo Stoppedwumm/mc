@@ -75,7 +75,7 @@ public final class Bridge {
 
     // ------------------------------------------------------------------ blocks and items
 
-    private static final Block[] BLOCKS = new Block[256];
+    private static final Block[] BLOCKS = new Block[mc.world.Block.MAX];
     private static final Item[] ITEMS = new Item[mc.item.Item.BY_ID.length];
 
     static void bind(Block compat, mc.world.Block engine) {
@@ -94,7 +94,7 @@ public final class Bridge {
 
     /** The compat block for an engine block id (built-in blocks get a stand-in on first use). */
     public static synchronized Block compatBlock(int id) {
-        Block b = BLOCKS[id & 255];
+        Block b = BLOCKS[id];
         if (b == null) {
             mc.world.Block engine = mc.world.Block.get(id);
             b = new VanillaBlock(engine);

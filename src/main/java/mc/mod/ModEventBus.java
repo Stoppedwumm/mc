@@ -56,6 +56,19 @@ public final class ModEventBus implements IEventBus {
         listeners.add(new Listener(m.getParameterTypes()[0], ann.priority(), ann.receiveCanceled(), e -> invoke(m, null, e), m.getDeclaringClass()));
     }
 
+    /** Adds a static listener found by the analyzer, called through a method handle. */
+    public void registerHandle(Class<?> event, EventPriority priority, boolean receiveCanceled, java.lang.invoke.MethodHandle h, Object owner) {
+        listeners.add(new Listener(event, priority, receiveCanceled, e -> {
+            try {
+                h.invoke(e);
+            } catch (RuntimeException | Error t) {
+                throw t;
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
+        }, owner));
+    }
+
     private static void invoke(Method m, Object receiver, Object event) {
         try {
             m.invoke(receiver, event);

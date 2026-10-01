@@ -12,7 +12,8 @@ import java.util.zip.InflaterInputStream;
 
 /** Stores each chunk as a small deflate-compressed file. Writes happen on a background IO thread. */
 public final class WorldStorage {
-    private static final int VERSION = 2;
+    /** 1: byte ids only, 2: byte ids + metadata, 3: 16-bit ids + metadata. */
+    private static final int VERSION = 3;
     private final Path chunkDir;
     private final ExecutorService io = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "Chunk IO");
@@ -35,10 +36,9 @@ public final class WorldStorage {
     }
 
     public void save(Chunk chunk) {
-        byte[] data = new byte[Chunk.VOLUME * 2 + 1];
+        byte[] data = new byte[Chunk.VOLUME * 3 + 1];
         data[0] = (byte) chunk.state;
-        System.arraycopy(chunk.blocks, 0, data, 1, Chunk.VOLUME);
-        System.arraycopy(chunk.meta, 0, data, 1 + Chunk.VOLUME, Chunk.VOLUME);
+        Chunk.pack(chunk.blocks, chunk.meta, data, 1);
         long key = chunk.key();
         int cx = chunk.cx, cz = chunk.cz;
         pending.put(key, data);
@@ -61,7 +61,7 @@ public final class WorldStorage {
         });
     }
 
-    /** Returns [state byte + blocks + meta] or null. Safe to call from worker threads. */
+    /** Returns [state byte + packed blocks and meta (see Chunk.pack)] or null. Safe to call from worker threads. */
     public byte[] load(int cx, int cz) {
         byte[] p = pending.get(Chunk.key(cx, cz));
         if (p != null) return p.clone();
@@ -69,10 +69,18 @@ public final class WorldStorage {
         if (!Files.exists(f)) return null;
         try (DataInputStream in = new DataInputStream(new BufferedInputStream(new InflaterInputStream(Files.newInputStream(f))))) {
             int version = in.readInt();
-            byte[] data = new byte[Chunk.VOLUME * 2 + 1];
-            if (version == 1) in.readFully(data, 0, Chunk.VOLUME + 1);
-            else if (version == VERSION) in.readFully(data);
-            else return null;
+            byte[] data = new byte[Chunk.VOLUME * 3 + 1];
+            if (version == VERSION) {
+                in.readFully(data);
+                return data;
+            }
+            if (version != 1 && version != 2) return null;
+            // Older saves: one byte per block id
+            byte[] old = new byte[Chunk.VOLUME * 2 + 1];
+            in.readFully(old, 0, version == 1 ? Chunk.VOLUME + 1 : old.length);
+            data[0] = old[0];
+            for (int i = 0; i < Chunk.VOLUME; i++) data[2 + 2 * i] = old[1 + i];
+            System.arraycopy(old, 1 + Chunk.VOLUME, data, 1 + 2 * Chunk.VOLUME, Chunk.VOLUME);
             return data;
         } catch (IOException e) {
             System.err.println("Corrupt chunk " + cx + "," + cz + ": " + e);

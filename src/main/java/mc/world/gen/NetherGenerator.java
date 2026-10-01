@@ -34,7 +34,7 @@ public final class NetherGenerator {
 
     public void generate(Chunk chunk) {
         int bx = chunk.cx * 16, bz = chunk.cz * 16;
-        byte[] blocks = chunk.blocks;
+        char[] blocks = chunk.blocks;
         Random rand = new Random(seed * 341873128712L + chunk.cx * 132897987541L + chunk.cz);
         // Density on a 4x8x4 grid, trilinearly interpolated
         int gx = 5, gy = HEIGHT / 8 + 1, gz = 5;
@@ -54,18 +54,18 @@ public final class NetherGenerator {
                     if (d > 0) id = Block.NETHERRACK.id;
                     else if (y <= LAVA_LEVEL) id = Block.LAVA.id;
                     else id = 0;
-                    blocks[Chunk.index(x, y, z)] = (byte) id;
+                    blocks[Chunk.index(x, y, z)] = (char) id;
                 }
                 // Bedrock floor and ceiling with a ragged edge
-                for (int y = 0; y < 5; y++) if (y == 0 || rand.nextInt(y + 1) == 0) blocks[Chunk.index(x, y, z)] = (byte) Block.BEDROCK.id;
-                for (int y = HEIGHT - 5; y < HEIGHT; y++) if (y == HEIGHT - 1 || rand.nextInt(HEIGHT - y) == 0) blocks[Chunk.index(x, y, z)] = (byte) Block.BEDROCK.id;
+                for (int y = 0; y < 5; y++) if (y == 0 || rand.nextInt(y + 1) == 0) blocks[Chunk.index(x, y, z)] = (char) Block.BEDROCK.id;
+                for (int y = HEIGHT - 5; y < HEIGHT; y++) if (y == HEIGHT - 1 || rand.nextInt(HEIGHT - y) == 0) blocks[Chunk.index(x, y, z)] = (char) Block.BEDROCK.id;
                 // Soul sand and gravel near the lava sea
                 double s = shore.sample2((bx + x) / 30.0, (bz + z) / 30.0);
                 for (int y = LAVA_LEVEL - 4; y < LAVA_LEVEL + 6; y++) {
                     int idx = Chunk.index(x, y, z);
                     if (blocks[idx] != Block.NETHERRACK.id || blocks[Chunk.index(x, y + 1, z)] != 0) continue;
-                    if (s > 0.25) { blocks[idx] = (byte) Block.SOUL_SAND.id; if (y > 1) blocks[Chunk.index(x, y - 1, z)] = (byte) Block.SOUL_SAND.id; }
-                    else if (s < -0.3) blocks[idx] = (byte) Block.GRAVEL.id;
+                    if (s > 0.25) { blocks[idx] = (char) Block.SOUL_SAND.id; if (y > 1) blocks[Chunk.index(x, y - 1, z)] = (char) Block.SOUL_SAND.id; }
+                    else if (s < -0.3) blocks[idx] = (char) Block.GRAVEL.id;
                 }
             }
         // Quartz ore
@@ -74,7 +74,7 @@ public final class NetherGenerator {
             for (int k = 0; k < 6; k++) {
                 int px = Math.min(15, Math.max(0, x + rand.nextInt(3) - 1)), py = y + rand.nextInt(3) - 1, pz = Math.min(15, Math.max(0, z + rand.nextInt(3) - 1));
                 int idx = Chunk.index(px, py, pz);
-                if (blocks[idx] == Block.NETHERRACK.id) blocks[idx] = (byte) Block.NETHER_QUARTZ_ORE.id;
+                if (blocks[idx] == Block.NETHERRACK.id) blocks[idx] = (char) Block.NETHER_QUARTZ_ORE.id;
             }
         }
         computeBiomeData(chunk);

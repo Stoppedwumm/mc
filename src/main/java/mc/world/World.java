@@ -160,7 +160,7 @@ public final class World implements Shapes.Getter {
         if (y < 0 || y >= Chunk.HEIGHT) return 0;
         Chunk c = chunks.get(Chunk.key(x >> 4, z >> 4));
         if (c == null) return 0;
-        return c.blocks[Chunk.index(x & 15, y, z & 15)] & 255;
+        return c.blocks[Chunk.index(x & 15, y, z & 15)];
     }
 
     public int getMeta(int x, int y, int z) {
@@ -224,7 +224,7 @@ public final class World implements Shapes.Getter {
         int cx = x >> 4, cz = z >> 4;
         Chunk c = chunks.get(Chunk.key(cx, cz));
         if (c == null) return false;
-        int old = c.blocks[Chunk.index(x & 15, y, z & 15)] & 255;
+        int old = c.blocks[Chunk.index(x & 15, y, z & 15)];
         int oldMeta = c.meta[Chunk.index(x & 15, y, z & 15)] & 255;
         c.set(x & 15, y, z & 15, id, meta);
         c.touched = true;
@@ -734,7 +734,7 @@ public final class World implements Shapes.Getter {
         for (int s = 0; s < sections; s++)
             for (int k = 0; k < 3; k++) {
                 int x = c.cx * 16 + random.nextInt(16), y = s * 16 + random.nextInt(16), z = c.cz * 16 + random.nextInt(16);
-                int id = c.blocks[Chunk.index(x & 15, y, z & 15)] & 255;
+                int id = c.blocks[Chunk.index(x & 15, y, z & 15)];
                 if (id != 0) randomTick(x, y, z, Block.get(id));
             }
     }
@@ -1182,11 +1182,13 @@ public final class World implements Shapes.Getter {
                 height = Math.max(height, chunks.get(Chunk.key(c.cx + dx, c.cz + dz)).maxY);
         job.height = height;
         job.lightOnly = headless;
-        byte[] region = job.region, metaRegion = job.meta;
+        char[] region = job.region;
+        byte[] metaRegion = job.meta;
         for (int dx = -1; dx <= 1; dx++) {
             for (int dz = -1; dz <= 1; dz++) {
                 Chunk n = chunks.get(Chunk.key(c.cx + dx, c.cz + dz));
-                byte[] src = n.blocks, srcMeta = n.meta;
+                char[] src = n.blocks;
+                byte[] srcMeta = n.meta;
                 int ox = (dx + 1) * 16, oz = (dz + 1) * 16;
                 for (int y = 0; y < height; y++) {
                     int srcBase = y << 8;
@@ -1210,10 +1212,7 @@ public final class World implements Shapes.Getter {
     private Chunk loadOrGenerate(int cx, int cz) {
         byte[] data = storage.load(cx, cz);
         if (data != null) {
-            byte[] blocks = new byte[Chunk.VOLUME], meta = new byte[Chunk.VOLUME];
-            System.arraycopy(data, 1, blocks, 0, Chunk.VOLUME);
-            System.arraycopy(data, 1 + Chunk.VOLUME, meta, 0, Chunk.VOLUME);
-            Chunk c = new Chunk(cx, cz, blocks, meta);
+            Chunk c = Chunk.unpack(cx, cz, data, 1);
             if (nether != null) nether.computeBiomeData(c);
             else generator.computeBiomeData(c);
             c.state = data[0];

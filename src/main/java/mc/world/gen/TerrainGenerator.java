@@ -122,7 +122,7 @@ public final class TerrainGenerator {
 
     public void generate(Chunk chunk) {
         int bx = chunk.cx * 16, bz = chunk.cz * 16;
-        byte[] blocks = chunk.blocks;
+        char[] blocks = chunk.blocks;
 
         // Column parameters on a 5x5 grid (every 4 blocks) for density interpolation
         double[][] params = new double[25][4];
@@ -167,7 +167,7 @@ public final class TerrainGenerator {
                     int id = 0;
                     if (d > 0 || y < 5) id = Block.STONE.id;
                     else if (y <= SEA_LEVEL) id = Block.WATER.id;
-                    blocks[Chunk.index(x, y, z)] = (byte) id;
+                    blocks[Chunk.index(x, y, z)] = (char) id;
                 }
             }
         }
@@ -210,13 +210,13 @@ public final class TerrainGenerator {
         for (int x = 0; x < 16; x++)
             for (int z = 0; z < 16; z++)
                 for (int y = 0; y < 5; y++)
-                    if (y == 0 || rand.nextInt(y + 1) == 0) blocks[Chunk.index(x, y, z)] = (byte) Block.BEDROCK.id;
+                    if (y == 0 || rand.nextInt(y + 1) == 0) blocks[Chunk.index(x, y, z)] = (char) Block.BEDROCK.id;
 
         chunk.recomputeMaxY();
         chunk.state = Chunk.STATE_TERRAIN;
     }
 
-    private static int topOf(byte[] blocks, int x, int z) {
+    private static int topOf(char[] blocks, int x, int z) {
         for (int y = 255; y >= 0; y--) {
             int id = blocks[Chunk.index(x, y, z)];
             if (id != 0 && id != Block.WATER.id) return y;
@@ -225,7 +225,7 @@ public final class TerrainGenerator {
     }
 
     private void applySurface(Chunk chunk, int x, int z, int top, Biome biome, int slope, Random rand, int wx, int wz, double temp) {
-        byte[] b = chunk.blocks;
+        char[] b = chunk.blocks;
         double sn = surfaceNoise.sample2(wx / 24.0, wz / 24.0);
         int depth = -1;
         int fillerDepth = 3 + (int) (sn * 2 + 1.5 + rand.nextDouble());
@@ -258,11 +258,11 @@ public final class TerrainGenerator {
             if (id != Block.STONE.id) continue;
             if (depth == -1) {
                 depth = fillerDepth;
-                b[i] = (byte) (y >= SEA_LEVEL - 1 || underwater ? topId : fillerId);
-                if (topId == Block.GRASS.id && y < SEA_LEVEL) b[i] = (byte) Block.DIRT.id;
+                b[i] = (char) (y >= SEA_LEVEL - 1 || underwater ? topId : fillerId);
+                if (topId == Block.GRASS.id && y < SEA_LEVEL) b[i] = (char) Block.DIRT.id;
             } else if (depth > 0) {
                 depth--;
-                b[i] = (byte) fillerId;
+                b[i] = (char) fillerId;
                 if (depth == 0 && (biome == Biome.DESERT || biome == Biome.BEACH) && fillerId == Block.SAND.id) {
                     depth = 2 + rand.nextInt(3);
                     fillerId = Block.SANDSTONE.id;
@@ -277,7 +277,7 @@ public final class TerrainGenerator {
                 int i = Chunk.index(x, y, z);
                 if (b[i] == Block.TERRACOTTA.id || b[i] == Block.STONE.id) {
                     int band = Math.floorMod(y + (int) (sn * 3), 9);
-                    b[i] = (byte) (band == 0 ? Block.RED_WOOL.id : band == 4 ? Block.YELLOW_WOOL.id : band == 6 ? Block.WHITE_WOOL.id : Block.TERRACOTTA.id);
+                    b[i] = (char) (band == 0 ? Block.RED_WOOL.id : band == 4 ? Block.YELLOW_WOOL.id : band == 6 ? Block.WHITE_WOOL.id : Block.TERRACOTTA.id);
                 }
             }
         }
@@ -285,13 +285,13 @@ public final class TerrainGenerator {
         // Freeze the ocean surface in cold biomes
         if (temp < 0.18 && top < SEA_LEVEL) {
             int i = Chunk.index(x, SEA_LEVEL, z);
-            if (b[i] == Block.WATER.id) b[i] = (byte) Block.ICE.id;
+            if (b[i] == Block.WATER.id) b[i] = (char) Block.ICE.id;
         }
     }
 
     private void carveCaves(Chunk chunk, double[][] params) {
         int bx = chunk.cx * 16, bz = chunk.cz * 16;
-        byte[] b = chunk.blocks;
+        char[] b = chunk.blocks;
         // Cave field on a 5 x 65 x 5 grid (cell 4x4x4); positive = air
         double[] cave = new double[5 * 65 * 5];
         for (int gx = 0; gx < 5; gx++) {
@@ -347,13 +347,13 @@ public final class TerrainGenerator {
                     int above = b[Chunk.index(x, y + 1, z)];
                     if (above == Block.WATER.id || above == Block.ICE.id) continue;
                     if (y <= 10) {
-                        b[i] = (byte) Block.LAVA.id;
+                        b[i] = (char) Block.LAVA.id;
                     } else {
                         b[i] = 0;
                         // Expose the grass beneath a cave opening
                         int belowI = Chunk.index(x, y - 1, z);
                         if (b[belowI] == Block.DIRT.id && y > SEA_LEVEL && b[Chunk.index(x, Math.min(255, y + 1), z)] == 0) {
-                            b[belowI] = (byte) Block.GRASS.id;
+                            b[belowI] = (char) Block.GRASS.id;
                         }
                     }
                 }
@@ -382,7 +382,7 @@ public final class TerrainGenerator {
 
     /** Minecraft style ellipsoid vein generator, clipped to the chunk. */
     private static void vein(Chunk chunk, Random rand, int ore, int count, int size, int minY, int maxY) {
-        byte[] b = chunk.blocks;
+        char[] b = chunk.blocks;
         for (int n = 0; n < count; n++) {
             double cx = rand.nextInt(16), cy = minY + rand.nextInt(maxY - minY), cz = rand.nextInt(16);
             double angle = rand.nextDouble() * Math.PI;
@@ -404,7 +404,7 @@ public final class TerrainGenerator {
                             double dz = (z + 0.5 - pz) / r;
                             if (dx * dx + dy * dy + dz * dz < 1) {
                                 int idx = Chunk.index(x, y, z);
-                                if (b[idx] == Block.STONE.id) b[idx] = (byte) ore;
+                                if (b[idx] == Block.STONE.id) b[idx] = (char) ore;
                             }
                         }
                     }

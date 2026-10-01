@@ -198,8 +198,18 @@ class ModsTest {
 
     @Test
     void theAnalyzerReportsWhatReamcDoesNotProvide() throws Exception {
+        // An entry point that calls a method reamc lacks and creates a class reamc lacks
         ClassWriter cw = new ClassWriter(0);
         cw.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, "bad/Bad", null, "java/lang/Object", null);
+        cw.visitAnnotation("Lnet/neoforged/fml/common/Mod;", true).visitEnd();
+        MethodVisitor init = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitMethodInsn(Opcodes.INVOKESTATIC, "bad/Bad", "run", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
         MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "run", "()V", null, null);
         mv.visitCode();
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, "net/minecraft/world/level/block/Block", "reamcHasNoSuchMethod", "()V", false);
@@ -209,15 +219,23 @@ class ModsTest {
         mv.visitMaxs(1, 0);
         mv.visitEnd();
         cw.visitEnd();
+        // A class nothing reaches (like an integration with another mod): its references don't count
+        ClassWriter unused = new ClassWriter(0);
+        unused.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, "bad/Unused", null, "net/minecraft/world/level/NoSuchBase", null);
+        unused.visitEnd();
         Path jar = Files.createTempFile("bad", ".jar");
         try (JarOutputStream j = new JarOutputStream(Files.newOutputStream(jar))) {
             j.putNextEntry(new JarEntry("bad/Bad.class"));
             j.write(cw.toByteArray());
             j.closeEntry();
+            j.putNextEntry(new JarEntry("bad/Unused.class"));
+            j.write(unused.toByteArray());
+            j.closeEntry();
         }
         ModAnalyzer a = ModAnalyzer.analyze(new ZipFile(jar.toFile()), ModsTest.class.getClassLoader());
         assertTrue(a.missing.contains("net.minecraft.world.level.block.Block.reamcHasNoSuchMethod()V"), a.missing.toString());
         assertTrue(a.missing.contains("net.minecraft.world.level.NoSuchClass"));
+        assertFalse(a.missing.contains("net.minecraft.world.level.NoSuchBase"), "unreachable classes are not checked");
         ModAnalyzer good = ModAnalyzer.analyze(new ZipFile(modsDir.resolve("fixture.jar").toFile()), ModsTest.class.getClassLoader());
         assertTrue(good.missing.isEmpty(), good.missing.toString());
         assertEquals(List.of("fixture.FixtureMod"), good.modClasses);

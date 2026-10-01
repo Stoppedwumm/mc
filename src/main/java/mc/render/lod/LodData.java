@@ -52,14 +52,14 @@ public final class LodData {
     /** Summarises a loaded chunk's surface (called on the main thread whenever its mesh is rebuilt). */
     public void capture(Chunk c) {
         int[] d = new int[256 * STRIDE];
-        byte[] blocks = c.blocks;
+        char[] blocks = c.blocks;
         int top0 = Math.min(Chunk.HEIGHT - 1, Math.max(c.maxY, 1));
         for (int z = 0; z < 16; z++)
             for (int x = 0; x < 16; x++) {
                 int col = z * 16 + x;
                 int water = 0, h = 0, id = 0;
                 for (int y = top0; y >= 0; y--) {
-                    int b = blocks[Chunk.index(x, y, z)] & 255;
+                    int b = blocks[Chunk.index(x, y, z)];
                     if (b == 0) continue;
                     if (b == Block.WATER.id) {
                         if (water == 0) water = y + 1;
@@ -78,7 +78,7 @@ public final class LodData {
                 int ground = 0, groundId = 0;
                 if (isFoliage(id)) {
                     for (int y = h - 2; y >= 0; y--) {
-                        int b = blocks[Chunk.index(x, y, z)] & 255;
+                        int b = blocks[Chunk.index(x, y, z)];
                         if (b == 0 || isFoliage(b) || isLog(b)) continue;
                         Block bl = Block.get(b);
                         if (bl.model == Block.Model.CROSS || bl.model == Block.Model.TORCH) continue;

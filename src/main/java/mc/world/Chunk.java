@@ -10,7 +10,8 @@ public final class Chunk {
     public static final int STATE_TERRAIN = 1, STATE_DECORATED = 2;
 
     public final int cx, cz;
-    public final byte[] blocks;
+    /** Block ids (16-bit: built-in blocks plus those added by mods). */
+    public final char[] blocks;
     /** Per-block metadata: liquid level, crop age, facing... */
     public final byte[] meta;
     /** Per-column biome tint colours (0xRRGGBB). */
@@ -37,14 +38,14 @@ public final class Chunk {
     public boolean hasEntityFile;
 
     public Chunk(int cx, int cz) {
-        this(cx, cz, new byte[VOLUME]);
+        this(cx, cz, new char[VOLUME]);
     }
 
-    public Chunk(int cx, int cz, byte[] blocks) {
+    public Chunk(int cx, int cz, char[] blocks) {
         this(cx, cz, blocks, new byte[VOLUME]);
     }
 
-    public Chunk(int cx, int cz, byte[] blocks, byte[] meta) {
+    public Chunk(int cx, int cz, char[] blocks, byte[] meta) {
         this.cx = cx;
         this.cz = cz;
         this.blocks = blocks;
@@ -57,7 +58,7 @@ public final class Chunk {
 
     public int get(int x, int y, int z) {
         if (y < 0 || y >= HEIGHT) return 0;
-        return blocks[(y << 8) | (z << 4) | x] & 255;
+        return blocks[(y << 8) | (z << 4) | x];
     }
 
     public void set(int x, int y, int z, int id) {
@@ -67,7 +68,7 @@ public final class Chunk {
     public void set(int x, int y, int z, int id, int m) {
         if (y < 0 || y >= HEIGHT) return;
         int i = (y << 8) | (z << 4) | x;
-        blocks[i] = (byte) id;
+        blocks[i] = (char) id;
         meta[i] = (byte) m;
         if (id != 0 && y + 1 > maxY) maxY = y + 1;
     }
@@ -90,10 +91,28 @@ public final class Chunk {
     /** y of the highest block that is neither air nor a non-solid plant, or -1. */
     public int topSolid(int x, int z) {
         for (int y = HEIGHT - 1; y >= 0; y--) {
-            int id = blocks[(y << 8) | (z << 4) | x] & 255;
+            int id = blocks[(y << 8) | (z << 4) | x];
             if (id != 0 && Block.get(id).solid) return y;
         }
         return -1;
+    }
+
+    /** Bytes of the block ids (high byte, low byte) followed by the metadata: 3 * VOLUME bytes from offset. */
+    public static void pack(char[] blocks, byte[] meta, byte[] out, int offset) {
+        for (int i = 0; i < VOLUME; i++) {
+            out[offset + 2 * i] = (byte) (blocks[i] >> 8);
+            out[offset + 2 * i + 1] = (byte) blocks[i];
+        }
+        System.arraycopy(meta, 0, out, offset + 2 * VOLUME, VOLUME);
+    }
+
+    /** Reads what {@link #pack} wrote into a new chunk. */
+    public static Chunk unpack(int cx, int cz, byte[] in, int offset) {
+        char[] blocks = new char[VOLUME];
+        byte[] meta = new byte[VOLUME];
+        for (int i = 0; i < VOLUME; i++) blocks[i] = (char) ((in[offset + 2 * i] & 255) << 8 | in[offset + 2 * i + 1] & 255);
+        System.arraycopy(in, offset + 2 * VOLUME, meta, 0, VOLUME);
+        return new Chunk(cx, cz, blocks, meta);
     }
 
     public static long key(int cx, int cz) {

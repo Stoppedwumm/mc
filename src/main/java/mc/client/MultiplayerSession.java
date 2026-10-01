@@ -204,7 +204,7 @@ final class MultiplayerSession implements World.Remote {
         b.writeInt(x);
         b.writeInt(y);
         b.writeInt(z);
-        b.writeByte(id);
+        b.writeShort(id);
         b.writeByte(meta);
         connection.send(b);
     }
@@ -294,15 +294,14 @@ final class MultiplayerSession implements World.Remote {
                 int cx = b.readInt(), cz = b.readInt(), len = b.readInt();
                 byte[] packed = new byte[len];
                 b.readBytes(packed);
-                byte[] raw = inflate(packed, Chunk.VOLUME * 2);
-                byte[] blocks = Arrays.copyOfRange(raw, 0, Chunk.VOLUME), meta = Arrays.copyOfRange(raw, Chunk.VOLUME, Chunk.VOLUME * 2);
-                Chunk c = new Chunk(cx, cz, blocks, meta);
+                byte[] raw = inflate(packed, Chunk.VOLUME * 3);
+                Chunk c = Chunk.unpack(cx, cz, raw, 0);
                 w.computeBiomeData(c);
                 w.putNetChunk(c);
             }
             case S_UNLOAD -> w.removeNetChunk(b.readInt(), b.readInt());
             case S_BLOCK -> {
-                int x = b.readInt(), y = b.readInt(), z = b.readInt(), block = b.readUnsignedByte(), meta = b.readUnsignedByte();
+                int x = b.readInt(), y = b.readInt(), z = b.readInt(), block = b.readUnsignedShort(), meta = b.readUnsignedByte();
                 if (w.getBlock(x, y, z) == block && w.getMeta(x, y, z) == meta) return;
                 w.applyingRemote = true;
                 try {
@@ -383,7 +382,7 @@ final class MultiplayerSession implements World.Remote {
                 g.particles.spawn(type, b.readDouble(), b.readDouble(), b.readDouble());
             }
             case S_BROKEN -> {
-                int x = b.readInt(), y = b.readInt(), z = b.readInt(), block = b.readUnsignedByte(), meta = b.readUnsignedByte();
+                int x = b.readInt(), y = b.readInt(), z = b.readInt(), block = b.readUnsignedShort(), meta = b.readUnsignedByte();
                 g.blockBroken(x, y, z, Block.get(block), meta);
             }
             case S_CHAT -> g.hud.chat(readString(b));

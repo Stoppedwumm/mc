@@ -31,6 +31,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.Event;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -47,6 +48,9 @@ import net.neoforged.neoforge.registries.RegisterEvent;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -79,7 +83,10 @@ public final class ModLoader {
     public static final List<LoadedMod> MODS = new ArrayList<>();
     private static final List<ZipFile> JARS = new ArrayList<>();
     private static final Map<String, ModEventBus> BUSES = new LinkedHashMap<>();
+    /** Each loaded mod's class loader, by mod id. */
+    public static final Map<String, ClassLoader> LOADERS = new LinkedHashMap<>();
     private static boolean done;
+    private static ModIds ids = new ModIds(null);
 
     /** Display name of a loaded mod by id (the id itself if unknown). */
     public static String displayName(String modId) {
@@ -113,6 +120,7 @@ public final class ModLoader {
             return MODS;
         }
         if (jars.isEmpty()) return MODS;
+        ids = new ModIds(dir);
         List<ModContainer> containers = new ArrayList<>();
         for (Path jar : jars) {
             try {
@@ -131,6 +139,7 @@ public final class ModLoader {
             if (r == BuiltInRegistries.BLOCK) bindBlocks();
             if (r == BuiltInRegistries.ITEM) bindItems();
         }
+        ids.save();
         loadData();
         post(new FMLCommonSetupEvent());
         post(new RegisterPayloadHandlersEvent());
@@ -164,27 +173,35 @@ public final class ModLoader {
             System.err.println("[mods] " + jarPath.getFileName() + ": no @Mod class");
             return null;
         }
-        if ((!report.missing.isEmpty() || report.usesMixins) && !force) {
-            String why = report.usesMixins ? "uses Mixins" : report.missing.size() + " unsupported references";
+        if (!report.missing.isEmpty() && !force) {
+            String why = report.missing.size() + " unsupported references";
             System.err.println("[mods] Not loading " + name + ": " + why + " (start with -Dreamc.forceMods=true to try anyway)");
-            for (String m : report.missing) System.err.println("[mods]   missing " + m);
+            for (String m : report.missing) System.err.println("[mods]   missing " + m + "   (used by " + report.missingFrom.get(m) + ")");
             MODS.add(new LoadedMod(id, version, name, jarPath, false, why));
             return null;
         }
+        if (report.usesMixins) System.err.println("[mods] " + name + ": mixins are not applied (the features they patch in are missing)");
         JARS.add(jar);
         loadLang(jar);
         URLClassLoader loader = new URLClassLoader(id, new URL[]{jarPath.toUri().toURL()}, ModLoader.class.getClassLoader());
+        LOADERS.put(id, loader);
         ModEventBus bus = new ModEventBus(id);
         BUSES.put(id, bus);
         ModContainer container = new ModContainer(id, version, name, bus);
         for (ModAnalyzer.Subscriber s : report.subscribers) {
             if (dist == Dist.CLIENT ? !s.client() : !s.server()) continue;
             Class<?> c = Class.forName(s.className(), true, loader);
-            for (Method m : c.getDeclaredMethods()) {
-                if (!Modifier.isStatic(m.getModifiers()) || m.getAnnotation(SubscribeEvent.class) == null || m.getParameterCount() != 1) continue;
-                boolean modBus = IModBusEvent.class.isAssignableFrom(m.getParameterTypes()[0]);
-                if (modBus) bus.registerMethod(m);
-                else ((ModEventBus) NeoForge.EVENT_BUS).registerMethod(m);
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(c, MethodHandles.lookup());
+            for (ModAnalyzer.Listener l : s.listeners()) {
+                Class<?> event;
+                try {
+                    event = Class.forName(l.eventClass(), false, loader);
+                } catch (ClassNotFoundException | LinkageError e) {
+                    continue;
+                }
+                MethodHandle h = lookup.findStatic(c, l.name(), MethodType.methodType(void.class, event));
+                ModEventBus target = IModBusEvent.class.isAssignableFrom(event) ? bus : (ModEventBus) NeoForge.EVENT_BUS;
+                target.registerHandle(event, EventPriority.valueOf(l.priority()), l.receiveCanceled(), h, c);
             }
         }
         for (String main : report.modClasses) {
@@ -381,7 +398,7 @@ public final class ModLoader {
             ResourceLocation id = e.getKey();
             Block b = e.getValue();
             if (b.reamc$block != null || b instanceof Bridge.VanillaBlock) continue;
-            int engineId = mc.world.Block.freeId();
+            int engineId = ids.block(id.toString());
             if (engineId < 0) {
                 System.err.println("[mods] No free block id for " + id);
                 continue;
@@ -483,7 +500,7 @@ public final class ModLoader {
                 else engine.key = id.toString();
                 if (CROSS.containsKey(bi.getBlock())) block.itemTex = block.texSide;
             } else {
-                int engineId = mc.item.Item.freeId();
+                int engineId = ids.item(id.toString());
                 if (engineId < 0) {
                     System.err.println("[mods] No free item id for " + id);
                     continue;

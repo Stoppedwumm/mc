@@ -7,11 +7,11 @@ import mc.world.Block;
  * into single colours. Grass and leaves are greyscale in the atlas and get their biome tint on top.
  */
 public final class LodPalette {
-    private final int[] top = new int[256], side = new int[256];
+    private final int[] top = new int[Block.MAX], side = new int[Block.MAX];
 
     public LodPalette(int[] atlas, int atlasSize) {
         int tilesPerRow = atlasSize / 16;
-        for (int id = 1; id < 256; id++) {
+        for (int id = 1; id < Block.MAX; id++) {
             Block b = Block.BY_ID[id];
             if (b == null) continue;
             top[id] = average(atlas, atlasSize, tilesPerRow, b.textureForFace(0, 0));
@@ -55,7 +55,7 @@ public final class LodPalette {
     /** Colour of a block seen from above, with grass/foliage tints applied. */
     public int top(int id, int grass, int foliage) {
         Block b = Block.get(id);
-        int c = top[id & 255];
+        int c = top[id];
         return switch (b.tint) {
             case GRASS -> multiply(c, grass);
             case FOLIAGE -> multiply(c, foliage);
@@ -68,7 +68,7 @@ public final class LodPalette {
     /** Colour of a block's sides (cliffs, walls between LOD cells). */
     public int side(int id, int grass, int foliage) {
         Block b = Block.get(id);
-        int c = side[id & 255];
+        int c = side[id];
         if (b.tint == Block.Tint.NONE || b.tintTopOnly) return c;
         return top(id, grass, foliage);
     }
