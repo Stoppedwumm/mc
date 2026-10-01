@@ -37,6 +37,8 @@ public final class WorldRenderer {
     public float near = 0.05f, far = 512;
     public int renderedChunks;
     public float fogEnd;
+    /** Exponential haze; lowered when distant terrain extends the view. */
+    public float fogDensity = 0.0025f;
     public float daylight, celestialAngle, time, rain;
     public final Vector3f sunDir = new Vector3f(), lightDir = new Vector3f();
     public float brightness = 0.5f;
@@ -224,6 +226,7 @@ public final class WorldRenderer {
         chunkShader.set("uLightDir", lightDir.x, lightDir.y, lightDir.z);
         chunkShader.set("uTranslucent", translucent ? 1 : 0);
         chunkShader.set("uFogEnd", inLava ? 3f : fogEnd);
+        chunkShader.set("uFogDensity", fogDensity);
         chunkShader.set("uUnderwater", underwater ? 1 : 0);
         chunkShader.set("uScreen", (float) width, (float) height);
         chunkShader.set("uNear", near);

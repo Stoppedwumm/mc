@@ -19,6 +19,8 @@ public final class Options {
     public boolean clouds = true;
     public boolean shadows = true;
     public float volume = 1f;
+    /** Distant terrain (level-of-detail) range in chunks; 0 turns it off. */
+    public int lodDistance = 64;
     /** Name shown to other players in multiplayer. */
     public String playerName = "Player" + (100 + new java.util.Random().nextInt(900));
     /** Last address typed into Direct Connection. */

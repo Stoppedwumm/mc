@@ -748,7 +748,7 @@ final class Menus {
         String n = playerName.value().replaceAll("[^A-Za-z0-9_]", "");
         if (!n.isEmpty()) g.options.playerName = n;
         g.screens.settingsButtons(gui, x, y + 40, mx, my, click, rclick);
-        if (button(gui, "Done", x, Math.min(h - 26, y + 40 + 4 * 24 + 8), 200, true) || g.input.pressed(GLFW_KEY_ESCAPE)) {
+        if (button(gui, "Done", x, Math.min(h - 26, y + 40 + 5 * 24 + 8), 200, true) || g.input.pressed(GLFW_KEY_ESCAPE)) {
             resetFields();
             g.options.save(g.gameDir.resolve("options.json"));
             g.setScreen(optionsReturn);

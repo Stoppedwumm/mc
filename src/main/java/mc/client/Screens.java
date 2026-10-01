@@ -669,17 +669,17 @@ final class Screens {
     void renderPause(Gui gui, Input input) {
         double mx = input.mouseX / gui.scale, my = input.mouseY / gui.scale;
         gui.gradient(0, 0, gui.width, gui.height, 0xA0101010, 0xC0101010);
-        gui.centered("Game Menu", gui.width / 2, 30, 0xFFFFFFFF);
-        gui.centered("Left-click a setting to change it, right-click to go back", gui.width / 2, 44, 0xFF909090);
         float bw = 200, bh = 20, x = gui.width / 2 - bw / 2;
-        // Keep the whole column (176 GUI pixels) on screen at large GUI scales
-        float y = Math.max(56, Math.min(gui.height / 4 + 8, gui.height - 176 - 6));
+        // Keep the whole column (200 GUI pixels) on screen at large GUI scales; the title moves up when it's tight
+        float y = Math.max(20, Math.min(gui.height / 4 + 8, gui.height - 200 - 4));
+        gui.centered("Game Menu", gui.width / 2, Math.min(30, y - 14), 0xFFFFFFFF);
+        if (y >= 56) gui.centered("Left-click a setting to change it, right-click to go back", gui.width / 2, 44, 0xFF909090);
         boolean click = input.clicked(GLFW_MOUSE_BUTTON_LEFT);
         boolean rclick = input.clicked(GLFW_MOUSE_BUTTON_RIGHT);
         if (gui.button("Back to Game", x, y, bw, bh, mx, my) && click) { g.sound.click(); g.closeScreen(); return; }
         y += 24;
         settingsButtons(gui, x, y, mx, my, click, rclick);
-        y += 96;
+        y += 120;
         if (!g.isMultiplayer()) {
             if (gui.button("Game Mode: " + (g.player.creative ? "Creative" : "Survival"), x, y, 98, bh, mx, my) && click) {
                 g.sound.click();
@@ -702,7 +702,7 @@ final class Screens {
         }
     }
 
-    /** Video and control settings shared by the pause menu and the options screen (4 rows, 96 pixels). */
+    /** Video and control settings shared by the pause menu and the options screen (5 rows, 120 pixels). */
     void settingsButtons(Gui gui, float x, float y, double mx, double my, boolean click, boolean rclick) {
         Options options = g.options;
         float bw = 200, bh = 20;
@@ -747,6 +747,15 @@ final class Screens {
             options.sensitivity = Math.round((options.sensitivity + (click ? 0.1f : -0.1f)) * 10) / 10f;
             if (options.sensitivity > 1) options.sensitivity = 0.1f;
             if (options.sensitivity < 0.1f) options.sensitivity = 1f;
+        }
+        y += 24;
+        String lodLabel = options.lodDistance <= 0 ? "OFF" : options.lodDistance + " chunks";
+        if (gui.button("Distant Terrain: " + lodLabel, x, y, bw, bh, mx, my) && any) {
+            g.sound.click();
+            int[] steps = {0, 32, 48, 64, 96, 128, 192, 256};
+            int idx = 0;
+            for (int i = 0; i < steps.length; i++) if (steps[i] <= options.lodDistance) idx = i;
+            options.lodDistance = steps[Math.floorMod(idx + (click ? 1 : -1), steps.length)];
         }
     }
 

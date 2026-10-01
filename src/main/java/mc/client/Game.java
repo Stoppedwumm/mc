@@ -38,6 +38,8 @@ public final class Game implements World.Listener {
     PostProcess post;
     Gui gui;
     private ItemRenderer itemRenderer;
+    /** Distant terrain beyond the render distance. */
+    mc.render.lod.LodRenderer lod;
     final EntityRenderer entityRenderer = new EntityRenderer();
     final Weather weather = new Weather();
     final Particles particles = new Particles();
@@ -129,7 +131,9 @@ public final class Game implements World.Listener {
         renderer = new WorldRenderer(0);
         post = new PostProcess(window.width, window.height);
         itemRenderer = new ItemRenderer();
-        itemRenderer.setBlockPixels(new TextureGen().generate());
+        int[] atlasPixels = new TextureGen().generate();
+        itemRenderer.setBlockPixels(atlasPixels);
+        lod = new mc.render.lod.LodRenderer(atlasPixels, TextureGen.ATLAS);
         entityRenderer.items = itemRenderer;
         gui = new Gui(renderer, new Font());
         gui.items = itemRenderer;
@@ -427,6 +431,7 @@ public final class Game implements World.Listener {
             world.shutdown();
         }
         options.save(gameDir.resolve("options.json"));
+        lod.shutdown();
         sound.destroy();
         window.destroy();
     }
@@ -442,6 +447,7 @@ public final class Game implements World.Listener {
         level.blockEntities = null;
         level.dimension = world.dimension.name();
         Options.BlockEntityData.saveList(dimensionDir(world.dimension).resolve("blockentities.json"), Options.BlockEntityData.capture(world));
+        lod.save();
         level.save(worldDir.resolve("level.json"));
         if (lanServer != null) lanServer.savePlayers();
     }
@@ -838,6 +844,10 @@ public final class Game implements World.Listener {
         }
         handleInput();
         glViewport(0, 0, window.width, window.height);
+        if (lod.world() != world) {
+            Path dir = world != null && !inMenu && worldDir != null ? dimensionDir(world.dimension).resolve("lod") : null;
+            lod.setWorld(world, dir);
+        }
         if (world == null) {
             // Connecting to a server, or no panorama: menus over a plain background
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -881,6 +891,13 @@ public final class Game implements World.Listener {
         renderer.nether = world.dimension == Dimension.NETHER;
         float rain = renderer.nether ? 0 : weather.rain(pt);
         renderer.updateEnvironment(world, pt, underwater, inLava, options.renderDistance, rain);
+        // Distant terrain pushes the fog out to its own range and thins the haze
+        int lodChunks = inMenu ? Math.max(options.lodDistance, 0) : options.lodDistance;
+        boolean lodOn = lodChunks > options.renderDistance && !renderer.nether && !underwater && !inLava;
+        if (lodOn) {
+            renderer.fogEnd = lodChunks * 16f;
+            renderer.fogDensity = Math.min(0.0025f, 1.1f / renderer.fogEnd);
+        } else renderer.fogDensity = 0.0025f;
         renderer.setupCamera(player, pt, fovNow, window.width, window.height, options.renderDistance, options.viewBobbing, perspective, world);
         sound.listener(renderer.camX, renderer.camY, renderer.camZ, player.yaw, player.pitch);
         int ex = (int) Math.floor(renderer.camX), ey = (int) Math.floor(renderer.camY), ez = (int) Math.floor(renderer.camZ);
@@ -901,6 +918,8 @@ public final class Game implements World.Listener {
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
         renderer.renderSky();
+        if (lodOn && lod.render(renderer, inMenu ? Math.min(options.renderDistance, 8) : options.renderDistance, lodChunks, renderer.fogDensity))
+            glClear(GL_DEPTH_BUFFER_BIT);
         renderer.renderOpaque(world);
         entityRenderer.render(world, renderer, pt, this::lightValue);
         for (Player np : world.networkPlayers())
@@ -933,12 +952,12 @@ public final class Game implements World.Listener {
         post.finish(window.width, window.height, renderer.time, underwater || inLava, Math.max(damageFlash, 0));
         renderGui();
 
-        if (screenshotAfter != null && inMenu && startupCommands.isEmpty() && ticks > 100 && (world.pendingJobs() == 0 || ticks > 220)) {
+        if (screenshotAfter != null && inMenu && startupCommands.isEmpty() && ticks > 100 && ((world.pendingJobs() == 0 && !lod.busy()) || ticks > 400)) {
             screenshot(Path.of(screenshotAfter));
             running = false;
             return;
         }
-        if (screenshotAfter != null && startupCommands.isEmpty() && ticks - loadedTick > 60 && (world.pendingJobs() == 0 || ticks - loadedTick > 300) && ticks % 20 == 0) {
+        if (screenshotAfter != null && startupCommands.isEmpty() && ticks - loadedTick > 60 && ((world.pendingJobs() == 0 && !lod.busy()) || ticks - loadedTick > 600) && ticks % 20 == 0) {
             screenshot(Path.of(screenshotAfter));
             running = false;
         }

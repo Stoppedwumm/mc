@@ -25,6 +25,7 @@ uniform float uFar;
 uniform float uBrightness;
 uniform int uNether;
 uniform float uNightVision;
+uniform float uFogDensity;
 
 const vec3 NETHER_FOG = vec3(0.045, 0.006, 0.004);
 
@@ -61,7 +62,7 @@ vec3 fog(vec3 col, float dist, vec3 viewDir, out float amount) {
         amount = 1.0 - exp(-dist * 0.08);
         return mix(col * exp(-vec3(0.4, 0.08, 0.05) * dist * 0.4), water, amount);
     }
-    float density = 0.0025 + uRain * 0.012;
+    float density = uFogDensity + uRain * 0.012;
     float f = 1.0 - exp(-dist * density);
     // Hide the edge of the loaded world
     f = max(f, smoothstep(uFogEnd * 0.78, uFogEnd, dist));

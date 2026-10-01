@@ -29,6 +29,14 @@ All textures and sounds are generated procedurally at startup, so no Mojang asse
   Mob hits, knockback, potion effects and teleports reach the right player. Item and experience pickups, chests and furnaces are shared, and chat is broadcast.
 
 **Graphics (shader-pack style renderer)**
+- **Distant terrain** (level of detail, using techniques from Distant Horizons and Voxy) out to 256 chunks, 4096 blocks, beyond the normal render distance:
+  - a quadtree of 32×32-cell tiles whose cells double in size with distance (1 to 128 blocks)
+  - tiles are built on background threads, nearest first; a parent tile stays visible until its children are ready
+  - places you have visited use real chunk summaries (top block, height, water, the ground under tree crowns), saved per world in `lod/` region files like Voxy's database
+  - unexplored land is estimated straight from the terrain noise (biomes, beaches, snow, sea level, forests), like Distant Horizons' fast generator mode
+  - drawn in its own pass with a long-range projection before the normal terrain; a per-chunk mask hides it wherever real chunks are drawn
+  - columns have cliff walls, skirts that close cracks between detail levels, shading in valleys, floating tree crowns, and water with Fresnel sky reflection that darkens with depth
+  - fog and haze stretch to the new view distance, so mountains fade into the atmosphere
 - HDR rendering with ACES filmic tonemapping, bloom, vignette and automatic eye adaptation (caves and nights adapt, stepping into daylight is briefly bright)
 - Real-time sun/moon shadows (stabilised 2048² shadow map with soft PCF filtering) plus Minecraft-style smooth lighting and ambient occlusion
 - Atmospheric sky: blue zenith-to-horizon gradient, sunrise/sunset glow, round sun with halo, cratered moon, twinkling stars and soft drifting procedural clouds; distance fog uses the sky colour
@@ -140,7 +148,7 @@ Command-line options:
 | Q / Ctrl+Q | drop one item / the whole stack |
 | E | inventory (creative: all items) |
 | T or / | chat / commands |
-| Esc | pause menu (settings, Open to LAN, Save and Quit to Title / Disconnect) |
+| Esc | pause menu (settings including Distant Terrain, Open to LAN, Save and Quit to Title / Disconnect) |
 | F1 | hide HUD |
 | F2 | screenshot (saved to `run/screenshots`) |
 | F3 | debug screen |
@@ -158,7 +166,7 @@ Command-line options:
 /xp <points>   /armor <material>   /dimension   /locate village [tp]   /perspective <0-2>
 /kill [@e]   /weather <clear|rain>   /heal   /clear   /spawnpoint
 /fill <x1> <y1> <z1> <x2> <y2> <z2> <block>
-/fly   /seed   /rd <chunks>   /publish (open to LAN)   /menu <worlds|multiplayer|options>   /help
+/fly   /seed   /rd <chunks>   /lod <chunks> (distant terrain, 0 = off)   /publish (open to LAN)   /menu <worlds|multiplayer|options>   /help
 ```
 
 In multiplayer, `/time`, `/weather`, `/list`, `/say`, `/kick` and `/tp <player>` run on the server; the other commands affect your own player.
@@ -179,6 +187,7 @@ mc/world/                    Block registry, Chunk, World (streaming, ticks, exp
 mc/world/gen/                Noise, TerrainGenerator, Decorator (trees/plants), Biome
 mc/render/                   ChunkMesher, WorldRenderer (shadows/sky/water), PostProcess (HDR/bloom), MobModel,
                              EntityRenderer, ItemRenderer, TextureGen/ItemTextureGen, Gui, Font, Particles
+mc/render/lod/               distant terrain: LodData (chunk summaries + noise estimates), LodMesher, LodRenderer
 src/main/resources/shaders/  GLSL 330 shaders (chunk lighting & water, shadow, sky, post-processing)
 ```
 
@@ -190,6 +199,7 @@ Run the tests with `mvn test`. They check:
 - building blocks, animals, villages and dungeons, the Nether, redstone circuits, enchanting and brewing
 - multiplayer over a real local socket: login, chunk streaming, block edits both ways, chat, mob tracking,
   forwarded damage, mining with item pickup, duplicate names, the status ping, and client-side remote worlds
+- distant terrain: chunk summaries (trees, water, flowers ignored), saving and reloading them, noise estimates, tile meshes
 
 ## Not implemented
 

@@ -236,6 +236,10 @@ final class Commands {
                     chat("Successfully filled " + vol + " blocks");
                 }
                 case "seed" -> chat("Seed: [" + world.seed + "]");
+                case "lod" -> {
+                    g.options.lodDistance = Math.max(0, Math.min(512, Integer.parseInt(a[1])));
+                    chat(g.options.lodDistance == 0 ? "Distant terrain off" : "Distant terrain: " + g.options.lodDistance + " chunks");
+                }
                 case "publish" -> {
                     if (g.multiplayer != null) chat("Already playing on a server");
                     else if (g.lanServer != null) chat("Already hosted on port " + g.lanServer.port());

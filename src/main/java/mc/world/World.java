@@ -75,6 +75,8 @@ public final class World implements Shapes.Getter {
     public interface BlockWatcher { void blockChanged(int x, int y, int z, int id, int meta); }
 
     public BlockWatcher blockWatcher;
+    /** Told whenever a chunk's mesh is (re)built, e.g. to update distant terrain. */
+    public java.util.function.Consumer<Chunk> meshListener;
     /** No rendering (dedicated server): meshing only computes light, nothing is uploaded to the GPU. */
     public boolean headless;
     /** Players connected over the network (the local player, if any, is separate). */
@@ -1044,6 +1046,7 @@ public final class World implements Shapes.Getter {
             c.meshInFlight = false;
             c.light = m.light;
             c.lightHeight = m.lightHeight;
+            if (meshListener != null && !headless) meshListener.accept(c);
         }
 
         // 6. Unload far chunks (a server with nobody online keeps what it has)
