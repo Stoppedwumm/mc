@@ -1,0 +1,1 @@
+{"type": "minecraft:crafting_shaped", "pattern": ["GGG", " S ", " S "], "key": {"G": {"item": "fixture:gem"}, "S": {"item": "minecraft:stick"}}, "result": {"id": "fixture:gem_pickaxe"}}

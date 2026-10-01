@@ -154,6 +154,29 @@ Command-line options:
 --viewDistance <n>      furthest chunk distance the server sends (default 10)
 ```
 
+## Mods (NeoForge 1.21.1)
+
+Simple NeoForge 1.21.1 mods run through a compatibility layer: put the mod jars in `<gameDir>/mods` (`run/mods` by
+default) for both the game and a dedicated server. Mods compiled for Java 21 need a Java 21 runtime.
+
+The layer (`src/compat/java`) is a clean-room set of classes with the Minecraft and NeoForge names that mods link
+against, written on top of this engine. Supported:
+- `@Mod` entry points, `@EventBusSubscriber` classes, the mod and game event buses, common/client/server setup events
+- `DeferredRegister` for blocks, items, block entity types, menus, creative tabs, sounds and armor materials
+- simple blocks, directional blocks with blockstate rotations, block entities with ticking, NBT saving and containers
+- items, tools and armor with custom tiers and materials, rarity, food
+- textures, block and item models, blockstates and language files from the jar
+- shaped, shapeless and smelting recipes, loot tables for block drops, mining tags (`mineable/*`, `needs_*_tool`)
+- ore generation from `neoforge:add_features` biome modifiers
+- menus and container screens (`AbstractContainerMenu`, `AbstractContainerScreen`, `MenuScreens`), item handlers,
+  capabilities, payload registration (delivered in-process)
+- `ServerTickEvent`
+
+Before loading, each jar is scanned with ASM: every Minecraft/NeoForge class, field and method it references must exist
+in the layer, and mixins are rejected. A mod that fails the check is skipped with the list of what is missing;
+`-Dreamc.forceMods=true` loads it anyway. Mod screens and block interactions work in singleplayer and for the LAN
+host; clients joining a server see modded blocks and items but cannot open their menus.
+
 ## Controls
 
 | Key | Action |
@@ -210,6 +233,9 @@ mc/world/                    Block registry, Chunk, World (streaming, ticks, exp
 mc/world/gen/                Noise, TerrainGenerator, Decorator (trees/plants), Biome
 mc/render/                   ChunkMesher, WorldRenderer (shadows/sky/water), PostProcess (HDR/bloom), MobModel,
                              EntityRenderer, ItemRenderer, TextureGen/ItemTextureGen, Gui, Font, Particles
+mc/mod/                      mod loading: ModLoader (jars, assets, data), ModAnalyzer (ASM link check), Bridge
+                             (compat classes <-> engine), ModEventBus, ModUi
+src/compat/java/             net.minecraft / net.neoforged / com.mojang compatibility classes for NeoForge mods
 mc/render/lod/               distant terrain: LodData (chunk summaries + noise estimates), LodMesher, LodRenderer
 src/main/resources/shaders/  GLSL 330 shaders (chunk lighting & water, shadow, sky, post-processing)
 ```
@@ -224,6 +250,9 @@ Run the tests with `mvn test`. They check:
   forwarded damage, mining with item pickup, duplicate names, the status ping, and client-side remote worlds
 - rails joining into lines, corners and slopes; carts round corners, down slopes, braked and boosted by powered rails;
   detector rails; riding and breaking carts; boats floating and rowing; fishing bites and catches; riding over the network
+- mods: a fixture mod compiled at test time is loaded, its blocks, items, textures, recipes, loot, tags, events,
+  block entity saving and placement facing are checked, and the analyzer reports missing members
+  (`-Dreamc.testJar=<jar>` also loads a real mod)
 - distant terrain: chunk summaries (trees, water, flowers ignored), saving and reloading them, noise estimates, tile meshes
 
 ## Not implemented

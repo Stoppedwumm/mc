@@ -233,6 +233,7 @@ final class Screens {
     }
 
     private static Item repairMaterial(Item it) {
+        if (it.repairItem != null || it.armorMaterial >= 5) return it.repairItem;
         if (it.isArmor()) return new Item[]{Item.LEATHER, Item.IRON_INGOT, Item.IRON_INGOT, Item.GOLD_INGOT, Item.DIAMOND}[it.armorMaterial];
         if (!it.isTool()) return null;
         if (it.name.startsWith("Wooden")) return Item.of(Block.PLANKS);
@@ -653,15 +654,21 @@ final class Screens {
         g.player.inventory.cleanup();
         if (!ItemStack.isEmpty(cursor)) gui.stack(cursor, (float) mx - 8, (float) my - 8);
         else if (hover != null && !ItemStack.isEmpty(get(hover))) {
-            ItemStack hs = get(hover);
-            String name = Item.displayName(hs);
-            if (hs.item.maxDamage > 0) name += " (" + (hs.item.maxDamage - hs.damage) + "/" + hs.item.maxDamage + ")";
-            List<String> lines = new ArrayList<>();
-            lines.add(name);
-            if (hs.enchants != null) for (var e : hs.enchants.entrySet()) lines.add("§7" + e.getKey().describe(e.getValue()));
-            if (hs.item == Item.POTION || hs.item == Item.SPLASH_POTION) lines.add("§7" + mc.item.Potions.describe(hs.damage));
-            gui.tooltip(lines, (float) mx, (float) my);
+            gui.tooltip(tooltipLines(get(hover)), (float) mx, (float) my);
         }
+    }
+
+    /** Tooltip of a stack: name (coloured by rarity), durability, enchantments, potion effects. */
+    static List<String> tooltipLines(ItemStack hs) {
+        String name = Item.displayName(hs);
+        if (hs.item.maxDamage > 0) name += " (" + (hs.item.maxDamage - hs.damage) + "/" + hs.item.maxDamage + ")";
+        List<String> lines = new ArrayList<>();
+        lines.add((hs.item.rarity == 3 ? "§d" : hs.item.rarity == 2 ? "§b" : hs.item.rarity == 1 ? "§e" : "") + name);
+        if (hs.enchants != null) for (var e : hs.enchants.entrySet()) lines.add("§7" + e.getKey().describe(e.getValue()));
+        if (hs.item == Item.POTION || hs.item == Item.SPLASH_POTION) lines.add("§7" + mc.item.Potions.describe(hs.damage));
+        if (hs.item.armorSlot >= 0 && hs.item.armorPoints > 0) lines.add("§9+" + hs.item.armorPoints + " Armor");
+        if (hs.item.key != null && !hs.item.key.startsWith("minecraft:")) lines.add("§9§o" + mc.mod.ModLoader.displayName(hs.item.key.substring(0, hs.item.key.indexOf(':'))));
+        return lines;
     }
 
     // ------------------------------------------------------------------ pause & death

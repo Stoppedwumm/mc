@@ -46,6 +46,52 @@ public final class Block {
     /** Fire spreads to and burns this block. */
     public boolean flammable;
 
+    // ------------------------------------------------------------------ blocks added by mods
+
+    /** Namespaced id ("minecraft:stone", "jans_mod:ruby_block"). */
+    public String key;
+    /** Mod blocks: texture of each face per block state (metadata), faces in mesh order (up, down, north, south, west, east). */
+    public int[][] stateFaceTex;
+    /** Tool that mines it efficiently and the pickaxe tier it needs to drop (overrides for mod blocks). */
+    public mc.item.Item.Tool toolOverride;
+    public int requiredTierOverride = Integer.MIN_VALUE;
+    /** Fixed drop from a loot table (null = the block itself); a zero count drops nothing. */
+    public mc.item.Item dropItem;
+    public int dropCount = 1;
+    /** Added by a mod: interaction, placement and removal go through World.modHooks. */
+    public boolean modded;
+
+    /** Registers a block from a mod in a free id. */
+    public static Block register(int id, String name, String key, int tex) {
+        if (BY_ID[id] != null) throw new IllegalStateException("Block id " + id + " is taken by " + BY_ID[id].name);
+        Block b = new Block(id, name, tex);
+        b.key = key;
+        b.modded = true;
+        return b;
+    }
+
+    /** First unused block id, or -1. */
+    public static int freeId() {
+        for (int i = 1; i < 256; i++) if (BY_ID[i] == null) return i;
+        return -1;
+    }
+
+    /** Default namespaced id of a built-in block, derived from its name like Minecraft's ("Block of Gold" -> gold_block). */
+    public static String vanillaKey(String name) {
+        String n = name.toLowerCase(java.util.Locale.ROOT);
+        if (n.startsWith("block of ")) n = n.substring(9) + " block";
+        if (n.equals("planks")) n = "oak planks";
+        if (n.equals("log")) n = "oak log";
+        return "minecraft:" + n.replaceAll("[^a-z0-9]+", "_").replaceAll("^_|_$", "");
+    }
+
+    public String key() { return key != null ? key : (key = vanillaKey(name)); }
+
+    public static Block byKey(String key) {
+        for (Block b : BY_ID) if (b != null && b.key().equals(key)) return b;
+        return null;
+    }
+
     private Block(int id, String name, int tex) {
         this.id = id;
         this.name = name;
@@ -313,6 +359,7 @@ public final class Block {
 
     /** Texture of a face, taking metadata (facing, growth stage, wetness) into account. */
     public int textureForFace(int face, int meta) {
+        if (stateFaceTex != null) return stateFaceTex[Math.min(meta & 255, stateFaceTex.length - 1)][face];
         boolean front = face == FRONT_FACE[meta & 3];
         if (this == FURNACE && front) return Tex.FURNACE_FRONT;
         if (this == LIT_FURNACE && front) return Tex.FURNACE_FRONT_LIT;

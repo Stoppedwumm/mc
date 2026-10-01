@@ -19,6 +19,9 @@ final class Commands {
     private void chat(String s) { g.hud.chat(s); }
 
     static Item itemByName(String name) {
+        // Namespaced ids first ("jans_mod:ruby_ingot", "minecraft:stick")
+        Item byKey = Item.byKey(name.contains(":") ? name : "minecraft:" + name);
+        if (byKey != null) return byKey;
         String n = name.replace("minecraft:", "").replace('_', ' ').trim();
         for (Item i : Item.BY_ID) if (i != null && i.name.equalsIgnoreCase(n)) return i;
         if (n.equalsIgnoreCase("grass block")) return Item.of(Block.GRASS);
@@ -26,6 +29,8 @@ final class Commands {
     }
 
     static Block blockByName(String name) {
+        Block byKey = Block.byKey(name.contains(":") ? name : "minecraft:" + name);
+        if (byKey != null) return byKey;
         String n = name.replace("minecraft:", "").replace('_', ' ');
         for (Block b : Block.BY_ID) if (b != null && b.name.equalsIgnoreCase(n)) return b;
         if (n.equalsIgnoreCase("grass block")) return Block.GRASS;

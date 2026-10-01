@@ -27,6 +27,16 @@ public final class ItemTextureGen {
             {0x5ef0e0, 0x1c9c94, 0xc8fff8}, // diamond
     };
 
+    private static final java.util.Map<Integer, int[]> EXTRA = new java.util.LinkedHashMap<>();
+    private static int nextExtra = 146;
+
+    /** Reserves an item-atlas tile for a mod texture (16 x 16 ARGB); returns its index. */
+    public static synchronized int addTile(int[] argb) {
+        if (nextExtra >= 256) throw new IllegalStateException("The item texture atlas is full");
+        EXTRA.put(nextExtra, argb);
+        return nextExtra++;
+    }
+
     public int[] generate() {
         tile(0, () -> handle(2, 14, 12, 4));
         tile(1, () -> lump(0x2a2a2a, 0x121212, 0x5a5a5a));
@@ -147,6 +157,14 @@ public final class ItemTextureGen {
         tile(FLAME, this::flame);
         tile(PROGRESS, () -> progressArrow(0x8b8b8b));
         tile(PROGRESS_FULL, () -> progressArrow(0xffffff));
+        for (var e : EXTRA.entrySet()) {
+            tile = e.getKey();
+            int[] src = e.getValue();
+            for (int i = 0; i < 256; i++) {
+                int a = src[i] >>> 24;
+                px[((tile >> 4) * 16 + (i >> 4)) * 256 + (tile & 15) * 16 + (i & 15)] = a >= 128 ? 0xFF000000 | src[i] : 0;
+            }
+        }
         return px;
     }
 

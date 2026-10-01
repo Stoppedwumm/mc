@@ -166,6 +166,16 @@ public final class Gui {
         glDisable(GL_DEPTH_TEST);
     }
 
+    /** Draws part of any texture (mod screen backgrounds). */
+    public void image(Texture tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1, int argb) {
+        glActiveTexture(GL_TEXTURE0);
+        tex.bind();
+        shader(ortho, true, 0.01f);
+        batch.begin(GL_TRIANGLES);
+        batch.rect(x, y, w, h, u0, v0, u1, v1, argb);
+        batch.end();
+    }
+
     /** Draws a HUD icon from the item atlas (hearts, food...) at size w x h. */
     public void hudIcon(int tile, float x, float y, float w, float h) {
         glActiveTexture(GL_TEXTURE0);
@@ -225,16 +235,26 @@ public final class Gui {
     /** Multi-line tooltip; lines starting with §7 are drawn grey (enchantments). */
     public void tooltip(java.util.List<String> lines, float x, float y) {
         float tw = 0;
-        for (String l : lines) tw = Math.max(tw, textWidth(l.replace("§7", "")));
+        for (String l : lines) tw = Math.max(tw, textWidth(stripCodes(l)));
         float h = lines.size() * 10 + 2;
         fill(x + 8, y - 12, tw + 6, h, 0xF0100010);
         frame(x + 8, y - 12, tw + 6, h, 1, 0xFF3a0080);
         for (int i = 0; i < lines.size(); i++) {
             String l = lines.get(i);
-            boolean grey = l.startsWith("§7");
-            text(grey ? l.substring(2) : l, x + 11, y - 10 + i * 10, grey ? 0xFFA0A0FF : 0xFFFFFFFF);
+            int color = 0xFFFFFFFF;
+            // Leading colour codes: §7 grey-blue (enchantments), §9 blue, §d purple (epic), §b aqua (rare), §e yellow (uncommon)
+            while (l.length() >= 2 && l.charAt(0) == '§') {
+                color = switch (l.charAt(1)) {
+                    case '7' -> 0xFFA0A0FF; case '9' -> 0xFF5555FF; case 'd' -> 0xFFFF55FF; case 'b' -> 0xFF55FFFF; case 'e' -> 0xFFFFFF55;
+                    default -> color;
+                };
+                l = l.substring(2);
+            }
+            text(l, x + 11, y - 10 + i * 10, color);
         }
     }
+
+    private static String stripCodes(String l) { return l.replaceAll("§.", ""); }
 
     public void tooltip(String textLine, float x, float y) {
         float tw = textWidth(textLine);

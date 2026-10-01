@@ -34,6 +34,48 @@ public final class Item {
     /** Armor material index (see ARMOR_MATERIALS) for rendering. */
     public int armorMaterial = -1;
 
+    /** Namespaced id ("minecraft:stick", "jans_mod:ruby_ingot"). */
+    public String key;
+    /** Mod armor: model colour (built-in materials use ARMOR_COLORS). */
+    public int armorColor = -1;
+    /** Shown in the tooltip colour of Minecraft's rarities (0 common, 1 uncommon, 2 rare, 3 epic). */
+    public int rarity;
+    /** Mod items: enchantability (-1 = built-in rules) and the item that repairs it in an anvil. */
+    public int enchantValue = -1;
+    public Item repairItem;
+
+    /** Registers an item from a mod in a free id (block items pass their block, whose id they take). */
+    public static Item register(int id, String name, String key, Block block, int icon) {
+        if (BY_ID[id] != null) throw new IllegalStateException("Item id " + id + " is taken by " + BY_ID[id].name);
+        Item i = new Item(id, name, block, icon);
+        i.key = key;
+        return i;
+    }
+
+    /** First unused item id at or above 256, or -1. */
+    public static int freeId() {
+        for (int i = 256; i < BY_ID.length; i++) if (BY_ID[i] == null) return i;
+        return -1;
+    }
+
+    public String key() {
+        if (key != null) return key;
+        if (block != null) return key = block.key();
+        String n = switch (name) {
+            case "Raw Porkchop" -> "porkchop"; case "Raw Beef" -> "beef"; case "Steak" -> "cooked_beef";
+            case "Raw Chicken" -> "chicken"; case "Raw Fish" -> "cod"; case "Cooked Fish" -> "cooked_cod";
+            case "Raw Salmon" -> "salmon"; case "Clownfish" -> "tropical_fish"; case "Redstone Dust" -> "redstone";
+            case "Nether Quartz" -> "quartz"; case "Bottle o' Enchanting" -> "experience_bottle"; case "Melon Slice" -> "melon_slice";
+            case "Glistering Melon Slice" -> "glistering_melon_slice"; default -> name;
+        };
+        return key = "minecraft:" + n.toLowerCase(java.util.Locale.ROOT).replace("'", "").replaceAll("[^a-z0-9]+", "_").replaceAll("^_|_$", "");
+    }
+
+    public static Item byKey(String key) {
+        for (Item i : BY_ID) if (i != null && i.key().equals(key)) return i;
+        return null;
+    }
+
     private Item(int id, String name, Block block, int icon) {
         this.id = id;
         this.name = name;
@@ -239,6 +281,7 @@ public final class Item {
 
     /** Which tool type mines a block efficiently. */
     public static Tool effectiveTool(Block b) {
+        if (b.toolOverride != null) return b.toolOverride;
         if (b == Block.STONE || b == Block.COBBLESTONE || b == Block.MOSSY_COBBLESTONE || b == Block.SANDSTONE || b == Block.BRICKS
                 || b == Block.STONE_BRICKS || b == Block.FURNACE || b == Block.LIT_FURNACE || b == Block.OBSIDIAN || b == Block.GRANITE
                 || b == Block.DIORITE || b == Block.ANDESITE || b == Block.TERRACOTTA || b == Block.ICE || b.name.endsWith("Ore")
@@ -256,6 +299,7 @@ public final class Item {
 
     /** Minimum pickaxe tier needed for the block to drop anything (-1 = no tool needed). */
     public static int requiredTier(Block b) {
+        if (b.requiredTierOverride != Integer.MIN_VALUE) return b.requiredTierOverride;
         if (b == Block.OBSIDIAN) return 3;
         if (b == Block.DIAMOND_ORE || b == Block.GOLD_ORE || b == Block.EMERALD_ORE || b == Block.EMERALD_BLOCK || b == Block.DIAMOND_BLOCK) return 2;
         if (b == Block.IRON_BLOCK) return 1;

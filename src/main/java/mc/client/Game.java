@@ -25,7 +25,7 @@ import static org.lwjgl.opengl.GL33C.*;
 public final class Game implements World.Listener {
     private static final double TICK = 0.05;
 
-    enum Screen { LOADING, NONE, TITLE, WORLDS, CREATE_WORLD, DELETE_WORLD, MULTIPLAYER, ADD_SERVER, DIRECT_CONNECT, CONNECTING, DISCONNECTED, OPTIONS, PAUSE, INVENTORY, CRAFTING, FURNACE, CHEST, CREATIVE, CHAT, DEATH, TRADING, ENCHANTING, ANVIL, BREWING }
+    enum Screen { LOADING, NONE, TITLE, WORLDS, CREATE_WORLD, DELETE_WORLD, MULTIPLAYER, ADD_SERVER, DIRECT_CONNECT, CONNECTING, DISCONNECTED, OPTIONS, PAUSE, INVENTORY, CRAFTING, FURNACE, CHEST, CREATIVE, CHAT, DEATH, TRADING, ENCHANTING, ANVIL, BREWING, MOD }
 
     final Path gameDir;
     private Path worldDir;
@@ -48,6 +48,8 @@ public final class Game implements World.Listener {
     Interaction interaction;
     Screens screens;
     Hud hud;
+    /** Screens opened by mods (their container GUIs). */
+    final ModScreens modScreens = new ModScreens(this);
     private Commands commands;
 
     private Screen screen = Screen.LOADING;
@@ -140,6 +142,7 @@ public final class Game implements World.Listener {
         interaction = new Interaction(this);
         screens = new Screens(this);
         hud = new Hud(this);
+        mc.mod.Bridge.setUi(modScreens);
         commands = new Commands(this);
         menus = new Menus(this);
         if (startWorld != null) loadWorld(startWorld, seedGiven ? seedArg : null, null, null);
@@ -458,6 +461,7 @@ public final class Game implements World.Listener {
 
     void setScreen(Screen s) {
         if (isContainer(screen) && !isContainer(s)) screens.onClose();
+        if (screen == Screen.MOD && s != Screen.MOD) modScreens.leaving();
         screen = s;
         input.releaseAll();
     }
@@ -1006,6 +1010,7 @@ public final class Game implements World.Listener {
             hud.render(gui);
         }
         if (isContainer(screen)) screens.renderContainer(gui, input);
+        else if (screen == Screen.MOD) modScreens.render(gui, input, lastPt);
         else if (screen == Screen.PAUSE) screens.renderPause(gui, input);
         else if (screen == Screen.DEATH) screens.renderDeath(gui, input);
         if (showDebug && screen != Screen.NONE) {

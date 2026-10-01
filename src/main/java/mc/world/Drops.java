@@ -29,6 +29,11 @@ public final class Drops {
         }
         int required = Item.requiredTier(b);
         if (required >= 0 && (t == null || t.tool != Item.Tool.PICKAXE || t.tier < required)) return out;
+        if (b.modded) {
+            if (b.dropItem != null) add(out, b.dropItem, b.dropCount);
+            else if (b.dropCount > 0 && Item.get(b.id) != null) add(out, Item.get(b.id), 1);
+            return out;
+        }
         switch (b.id) {
             case 0, 7, 40, 6 -> { }
             case 1 -> add(out, Item.of(Block.COBBLESTONE), 1);

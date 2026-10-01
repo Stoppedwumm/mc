@@ -14,6 +14,17 @@ public final class TextureGen {
     private Random r;
     private int tile;
 
+    /** 16 x 16 ARGB tiles added by mods, painted after the built-in ones. */
+    private static final java.util.Map<Integer, int[]> EXTRA = new java.util.LinkedHashMap<>();
+    private static int nextExtra = Tex.COUNT;
+
+    /** Reserves an atlas tile for a mod texture (16 x 16 ARGB, row by row); returns its index. */
+    public static synchronized int addTile(int[] argb) {
+        if (nextExtra >= Tex.BREAK_0) throw new IllegalStateException("The block texture atlas is full");
+        EXTRA.put(nextExtra, argb);
+        return nextExtra++;
+    }
+
     public int[] generate() {
         paint(Tex.STONE, this::stone);
         paint(Tex.DIRT, this::dirt);
@@ -181,6 +192,13 @@ public final class TextureGen {
         for (int i = 0; i < 10; i++) {
             final int stage = i;
             paint(Tex.BREAK_0 + i, () -> crack(stage));
+        }
+        for (var e : EXTRA.entrySet()) {
+            tile = e.getKey();
+            int[] src = e.getValue();
+            // Mostly-opaque pixels become plain pixels; the rest are holes (alpha 153 would mean "tinted" here)
+            for (int i = 0; i < 256; i++) set(i & 15, i >> 4, src[i] & 0xFFFFFF, (src[i] >>> 24) >= 128 ? 255 : 0);
+            fixTransparentColors();
         }
         return px;
     }

@@ -194,6 +194,30 @@ public final class Recipes {
         smelt(Block.NETHER_QUARTZ_ORE, Item.QUARTZ);
     }
 
+    // ------------------------------------------------------------------ recipes added by mods
+
+    /** Shaped recipe; rows may differ in length (short rows are padded with empty cells). */
+    public static void addShaped(Item result, int count, String[] rows, Map<Character, Item[]> keys) {
+        int w = 0;
+        for (String r : rows) w = Math.max(w, r.length());
+        int h = rows.length;
+        Item[][] opts = new Item[w * h][];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++) {
+                char c = x < rows[y].length() ? rows[y].charAt(x) : ' ';
+                opts[y * w + x] = c == ' ' ? null : keys.get(c);
+            }
+        RECIPES.add(new Recipe(w, h, opts, result, count, false));
+    }
+
+    public static void addShapeless(Item result, int count, List<Item[]> ingredients) {
+        RECIPES.add(new Recipe(ingredients.size(), 1, ingredients.toArray(new Item[0][]), result, count, true));
+    }
+
+    public static void addSmelting(Item input, Item output, int count) {
+        SMELTING.put(input, new ItemStack(output, count));
+    }
+
     /** Finds the crafting result for a square grid (size 2 or 3), or null. */
     public static ItemStack match(ItemStack[] grid, int size) {
         int minX = size, minY = size, maxX = -1, maxY = -1;

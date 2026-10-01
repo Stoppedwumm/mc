@@ -1,0 +1,1 @@
+{"variants": {"facing=north": {"model": "fixture:block/lamp"}, "facing=east": {"model": "fixture:block/lamp", "y": 90}, "facing=south": {"model": "fixture:block/lamp", "y": 180}, "facing=west": {"model": "fixture:block/lamp", "y": 270}}}

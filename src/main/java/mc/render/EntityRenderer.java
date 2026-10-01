@@ -23,11 +23,13 @@ public final class EntityRenderer {
     }
 
     private MobModel playerModel;
-    private final MobModel[] armorModels = new MobModel[5];
+    private final Map<Integer, MobModel> armorModels = new java.util.HashMap<>();
 
-    private MobModel armorModel(int material) {
-        if (armorModels[material] == null) armorModels[material] = MobModel.createArmor(material, ItemTextureGen.ARMOR_COLORS[material]);
-        return armorModels[material];
+    /** Armor overlay for a material; mod materials (index 5 and up) use the item's colour. */
+    private MobModel armorModel(Item item) {
+        int material = item.armorMaterial;
+        return armorModels.computeIfAbsent(material, m -> MobModel.createArmor(m < 5 ? m : 2,
+                m < ItemTextureGen.ARMOR_COLORS.length ? ItemTextureGen.ARMOR_COLORS[m] : item.armorColor));
     }
 
     /** Draws worn armor over a biped model that has already been posed. */
@@ -35,7 +37,7 @@ public final class EntityRenderer {
         if (armor == null) return;
         for (int slot = 0; slot < 4; slot++) {
             if (mc.item.ItemStack.isEmpty(armor[slot])) continue;
-            MobModel am = armorModel(armor[slot].item.armorMaterial);
+            MobModel am = armorModel(armor[slot].item);
             am.copyPose(body);
             glActiveTexture(GL_TEXTURE0);
             am.skin.bind();
@@ -130,7 +132,7 @@ public final class EntityRenderer {
         gui.model(model.skin, m, b -> model.render(b, new Matrix4f(), 0xFFFFFF));
         for (int slot = 0; slot < 4; slot++) {
             if (mc.item.ItemStack.isEmpty(p.inventory.armor[slot])) continue;
-            MobModel am = armorModel(p.inventory.armor[slot].item.armorMaterial);
+            MobModel am = armorModel(p.inventory.armor[slot].item);
             am.copyPose(model);
             int mask = 1 << slot;
             gui.model(am.skin, m, b -> am.render(b, new Matrix4f(), 0xFFFFFF, mask));

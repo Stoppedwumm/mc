@@ -22,6 +22,9 @@ public final class WorldStorage {
     /** Chunks queued for writing; readers consult this first so they never see stale files. */
     private final ConcurrentHashMap<Long, byte[]> pending = new ConcurrentHashMap<>();
 
+    /** Folder of this dimension's save data. */
+    public Path dir() { return chunkDir.getParent(); }
+
     public WorldStorage(Path dir) throws IOException {
         this.chunkDir = dir.resolve("chunks");
         Files.createDirectories(chunkDir);

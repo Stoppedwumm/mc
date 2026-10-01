@@ -216,12 +216,16 @@ public final class World implements Shapes.Getter {
      * Sets a block and its metadata, schedules remeshing of every chunk whose lighting may change and,
      * if requested, runs neighbour updates (liquids flow, unsupported plants pop off, sand falls).
      */
+    /** Loaded mods (null when none). */
+    public static ModHooks modHooks;
+
     public boolean setBlock(int x, int y, int z, int id, int meta, boolean notify) {
         if (y < 0 || y >= Chunk.HEIGHT) return false;
         int cx = x >> 4, cz = z >> 4;
         Chunk c = chunks.get(Chunk.key(cx, cz));
         if (c == null) return false;
         int old = c.blocks[Chunk.index(x & 15, y, z & 15)] & 255;
+        int oldMeta = c.meta[Chunk.index(x & 15, y, z & 15)] & 255;
         c.set(x & 15, y, z & 15, id, meta);
         c.touched = true;
         if (blockWatcher != null) blockWatcher.blockChanged(x, y, z, id, meta);
@@ -252,6 +256,8 @@ public final class World implements Shapes.Getter {
                 if (ddx <= 1 && ddz <= 1) n.urgentMesh = true;
             }
         }
+        if (modHooks != null && remote == null && (old != id || oldMeta != (meta & 255)) && (Block.get(old).modded || Block.get(id).modded))
+            modHooks.blockChanged(this, x, y, z, old, oldMeta, id, meta & 255);
         if (notify) {
             notifyNeighbors(x, y, z);
             if (Redstone.relevant(old) || Redstone.relevant(id) || redstoneNearby(x, y, z)) Redstone.update(this, x, y, z);
@@ -683,6 +689,7 @@ public final class World implements Shapes.Getter {
         checkPlates();
         for (Player p : players()) if (!p.isDead()) spawner.tick(this, p, random);
         tickNetworkPlayers();
+        if (modHooks != null) modHooks.worldTicked(this);
     }
 
     /** Entities standing on pressure plates press them. */
@@ -1240,6 +1247,7 @@ public final class World implements Shapes.Getter {
     /** Saves every modified chunk; called on exit. */
     public void saveAll() {
         if (remote != null) return;
+        if (modHooks != null) modHooks.worldSaved(this);
         Long2ObjectOpenHashMap<List<Entity>> byChunk = entitiesByChunk();
         for (Chunk c : chunks.values()) if (c.entityJson == null) saveEntities(c, byChunk.get(c.key()));
         for (Chunk c : chunks.values()) {

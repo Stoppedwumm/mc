@@ -39,12 +39,15 @@ public final class Main {
         }
         java.nio.file.Files.createDirectories(dir);
         if (server) {
+            mc.mod.ModLoader.loadAll(dir.resolve("mods"), net.neoforged.api.distmarker.Dist.DEDICATED_SERVER);
             new mc.server.DedicatedServer(dir, world != null ? world : "world", port, seed, motd, maxPlayers, viewDistance).run();
             System.exit(0);
         }
         if (relaunchOnMac(args)) return;
         // A seed without a world name keeps the old behaviour of opening "world" directly
         if (world == null && seed != null && connect == null) world = "world";
+        // NeoForge mods from <gameDir>/mods, before anything builds the block and item tables
+        mc.mod.ModLoader.loadAll(dir.resolve("mods"), net.neoforged.api.distmarker.Dist.CLIENT);
         new Game(dir, world, seed, rd, screenshot, commands, connect).run();
         System.exit(0);
     }

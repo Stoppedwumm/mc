@@ -86,6 +86,7 @@ public enum Enchantment {
     /** How easily an item takes enchantments (Minecraft's enchantability). */
     public static int enchantability(Item item) {
         if (item == Item.BOOK) return 1;
+        if (item.enchantValue >= 0) return item.enchantValue;
         if (item.isArmor()) return new int[]{15, 12, 9, 25, 10}[item.armorMaterial];
         if (item == Item.BOW || item == Item.FISHING_ROD) return 1;
         if (item.isTool()) {

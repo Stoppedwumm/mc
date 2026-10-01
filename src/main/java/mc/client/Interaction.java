@@ -436,6 +436,10 @@ final class Interaction {
         // Interactive blocks first (sneak to place against them instead)
         if (hit != null && !p.sneaking && fresh) {
             int id = w().getBlock(hit.x, hit.y, hit.z);
+            if (Block.get(id).modded && World.modHooks != null && w().remote == null && World.modHooks.useBlock(w(), p, hit.x, hit.y, hit.z, hit)) {
+                startSwing();
+                return;
+            }
             if (id == Block.CRAFTING_TABLE.id) { g.screens.openCrafting(); startSwing(); return; }
             if (id == Block.ENCHANTING_TABLE.id) { g.screens.openEnchanting(hit.x, hit.y, hit.z); return; }
             if (id == Block.ANVIL.id) { g.screens.openAnvil(); return; }
@@ -925,7 +929,9 @@ final class Interaction {
                 w().setBlock(hx, y, hz, b.id, f | 4, false);
                 return finishPlace(h, b, x, y, z, f);
             }
-            default -> { }
+            default -> {
+                if (b.modded && World.modHooks != null) meta = World.modHooks.placementMeta(w(), b, p, x, y, z, hit);
+            }
         }
         return finishPlace(h, b, x, y, z, meta);
     }

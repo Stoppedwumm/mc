@@ -361,6 +361,9 @@ public final class TerrainGenerator {
         }
     }
 
+    /** Ore veins added by mods: {block id, veins per chunk, vein size, min y, max y}. */
+    public static final java.util.List<int[]> EXTRA_ORES = new java.util.concurrent.CopyOnWriteArrayList<>();
+
     private void placeOres(Chunk chunk, Random rand) {
         vein(chunk, rand, Block.DIRT.id, 10, 33, 0, 150);
         vein(chunk, rand, Block.GRAVEL.id, 8, 33, 0, 150);
@@ -373,6 +376,8 @@ public final class TerrainGenerator {
         vein(chunk, rand, Block.DIAMOND_ORE.id, 1, 8, 5, 17);
         vein(chunk, rand, Block.REDSTONE_ORE.id, 8, 8, 5, 17);
         vein(chunk, rand, Block.LAPIS_ORE.id, 1, 7, 5, 32);
+        // After the built-in ores, so adding a mod doesn't move them
+        for (int[] o : EXTRA_ORES) vein(chunk, rand, o[0], o[1], o[2], o[3], o[4]);
     }
 
     /** Minecraft style ellipsoid vein generator, clipped to the chunk. */

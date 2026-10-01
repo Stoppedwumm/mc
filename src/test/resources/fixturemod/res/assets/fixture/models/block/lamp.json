@@ -1,0 +1,1 @@
+{"parent": "minecraft:block/orientable", "textures": {"top": "fixture:block/gem_block", "side": "fixture:block/gem_block", "front": "fixture:block/lamp_front"}}
