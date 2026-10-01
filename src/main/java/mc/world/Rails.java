@@ -86,7 +86,15 @@ public final class Rails {
         int nx = x + HX[d], ny = y + dy, nz = z + HZ[d];
         int self = shape(w.getBlock(x, y, z), w.getMeta(x, y, z));
         int other = shape(w.getBlock(nx, ny, nz), w.getMeta(nx, ny, nz));
+        // A step up or down only links through a slope rising towards the higher rail
+        if (dy == 1 && ascendsTo(self) != d) return false;
+        if (dy == -1 && ascendsTo(other) != (d ^ 1)) return false;
         return exitsTo(self, d) && exitsTo(other, d ^ 1);
+    }
+
+    /** Direction a slope rises towards, or -1 for flat shapes. */
+    static int ascendsTo(int shape) {
+        return switch (shape) { case 2 -> E; case 3 -> W; case 4 -> N; case 5 -> S; default -> -1; };
     }
 
     /** Whether the neighbour rail in direction d would accept a new connection from us. */
@@ -201,6 +209,14 @@ public final class Rails {
             boolean was = (meta & ACTIVE) != 0;
             if (on != was) w.setBlock(p[0], p[1], p[2], Block.POWERED_RAIL.id, on ? meta | ACTIVE : meta & ~ACTIVE, false);
         }
+    }
+
+    /** Whether a minecart is on the rail block. */
+    public static boolean cartOn(World w, int x, int y, int z) {
+        mc.util.AABB area = new mc.util.AABB(x + 0.125, y, z + 0.125, x + 0.875, y + 0.875, z + 0.875);
+        for (mc.entity.Entity e : w.entities())
+            if (e instanceof mc.entity.MinecartEntity && !e.removed && e.box().intersects(area)) return true;
+        return false;
     }
 
     /** A minecart rolled onto a detector rail. */

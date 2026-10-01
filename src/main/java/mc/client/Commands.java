@@ -162,6 +162,17 @@ final class Commands {
                 }
                 case "clear" -> { p.inventory.clear(); chat("Cleared the inventory"); }
                 case "summon" -> {
+                    String kind = a[1].replace("minecraft:", "").toLowerCase();
+                    if (kind.equals("minecart") || kind.equals("boat")) {
+                        mc.entity.Vehicle v = kind.equals("boat") ? new mc.entity.BoatEntity() : new mc.entity.MinecartEntity();
+                        boolean at = a.length > 4 && !a[2].equals("ride");
+                        v.setPos(at ? coord(a[2], p.x) : p.x + 2, at ? coord(a[3], p.y) : p.y, at ? coord(a[4], p.z) : p.z);
+                        v.yaw = v.prevYaw = p.yaw;
+                        world.addEntity(v);
+                        if (a[a.length - 1].equals("ride") && g.multiplayer == null) v.mount(p);
+                        chat("Summoned new " + (kind.equals("boat") ? "Boat" : "Minecart"));
+                        return;
+                    }
                     MobType t = MobType.valueOf(a[1].replace("minecraft:", "").toUpperCase());
                     Mob m = new Mob(t);
                     double x = a.length > 4 ? coord(a[2], p.x) : p.x + 3, y = a.length > 4 ? coord(a[3], p.y) : p.y, z = a.length > 4 ? coord(a[4], p.z) : p.z;
@@ -262,11 +273,12 @@ final class Commands {
                         }
                     }
                 }
+                case "use" -> g.interaction.useClick();
                 case "fly" -> { p.flying = !p.flying; chat("Flying " + (p.flying ? "enabled" : "disabled")); }
                 case "rd", "renderdistance" -> { g.options.renderDistance = Math.max(2, Math.min(32, Integer.parseInt(a[1]))); chat("Render distance: " + g.options.renderDistance); }
                 case "help" -> {
                     chat("/time set <day|night|n>, /gamemode <c|s>, /tp x y z, /give <item> [n], /clear");
-                    chat("/summon <mob> [x y z], /kill [@e], /weather <clear|rain>, /heal, /spawnpoint");
+                    chat("/summon <mob|minecart|boat> [x y z] [ride], /kill [@e], /weather <clear|rain>, /heal, /spawnpoint, /use");
                     chat("/setblock x y z <block> [meta], /fill x1 y1 z1 x2 y2 z2 <block> [meta], /fly, /seed, /rd <n>");
                 }
                 default -> chat("Unknown command. Type /help for help.");

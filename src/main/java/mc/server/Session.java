@@ -33,6 +33,8 @@ final class Session {
     private final Int2ObjectOpenHashMap<Tracked> tracked = new Int2ObjectOpenHashMap<>();
     private BlockEntity openContainer;
     private int ticksAlive;
+    /** Vehicle the client was last told it rides (-1 = none). */
+    private int lastRiding = -1;
 
     /** What a client last saw of an entity, to send only changes. */
     private static final class Tracked {
@@ -145,6 +147,7 @@ final class Session {
                 int fire = b.readInt();
                 int looting = b.readUnsignedByte();
                 Entity e = find(target);
+                if (e instanceof Vehicle v && v.distanceTo(player) < 8) { v.hit(player, damage); return; }
                 if (!(e instanceof LivingEntity le) || le.distanceTo(player) > 8) return;
                 if (le instanceof Mob m) m.lootingBonus = looting;
                 if (le.damage(DamageSource.ATTACK, damage, player)) {
@@ -159,6 +162,10 @@ final class Session {
                 int target = b.readInt();
                 ItemStack held = readStack(b);
                 Entity e = find(target);
+                if (e instanceof Vehicle v) {
+                    if (v.distanceTo(player) < 8 && player.vehicle == null) v.mount(player);
+                    return;
+                }
                 java.util.Arrays.fill(player.inventory.slots, null);
                 player.inventory.slots[player.inventory.selected] = held;
                 if (e instanceof Mob m && m.distanceTo(player) < 8) m.interact(player);
@@ -198,6 +205,21 @@ final class Session {
             case C_SWING -> {
                 for (Session s : server.sessions) if (s != this && s.player != null) s.sendEvent(player.id, EV_SWING);
                 player.swingTicks = 6;
+            }
+            case C_STEER -> {
+                float forward = b.readFloat(), strafe = b.readFloat();
+                boolean off = b.readBoolean();
+                Vehicle v = player.vehicle;
+                if (v == null) return;
+                if (off) v.dismount();
+                else {
+                    v.riderForward = Math.max(-1, Math.min(1, forward));
+                    v.riderStrafe = Math.max(-1, Math.min(1, strafe));
+                }
+            }
+            case C_REEL -> {
+                for (Entity e : world().entities())
+                    if (e instanceof FishingBobberEntity f && f.owner == player && !f.removed) f.reel();
             }
             case C_VIEW -> viewDistance = b.readUnsignedByte();
             case C_RESPAWN -> {
@@ -259,6 +281,13 @@ final class Session {
         if (player == null) return;
         sendChunks();
         trackEntities();
+        int riding = player.vehicle != null && !player.vehicle.removed ? player.vehicle.id : -1;
+        if (riding != lastRiding) {
+            lastRiding = riding;
+            ByteBuf b = packet(S_RIDE);
+            b.writeInt(riding);
+            connection.send(b);
+        }
         pickups();
         if (server.ticks % 20 == 0) sendTime();
         if (openContainer != null && server.ticks % 4 == 0) {

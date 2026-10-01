@@ -921,6 +921,8 @@ public final class Game implements World.Listener {
         if (lodOn && lod.render(renderer, inMenu ? Math.min(options.renderDistance, 8) : options.renderDistance, lodChunks, renderer.fogDensity))
             glClear(GL_DEPTH_BUFFER_BIT);
         renderer.renderOpaque(world);
+        entityRenderer.firstPerson = perspective == 0 ? player : null;
+        entityRenderer.localPlayer = player;
         entityRenderer.render(world, renderer, pt, this::lightValue);
         for (Player np : world.networkPlayers())
             entityRenderer.renderOtherPlayer(np, renderer, pt, lightValue(np.x, np.y + 1, np.z));

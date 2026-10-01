@@ -42,6 +42,7 @@ final class MultiplayerSession implements World.Remote {
     private String lastEquip = "";
     private BlockEntity lastContainer;
     private String lastContainerSig = "";
+    private boolean wasRiding;
 
     MultiplayerSession(Game g, String address) {
         this.g = g;
@@ -116,6 +117,22 @@ final class MultiplayerSession implements World.Remote {
         b.writeFloat(p.health);
         b.writeByte(Math.max(0, Math.min(255, p.food)));
         connection.send(b);
+
+        // Steering whatever we ride, and telling the server when we got off
+        if (p.vehicle != null) {
+            ByteBuf s = packet(C_STEER);
+            s.writeFloat(p.vehicle.riderForward);
+            s.writeFloat(p.vehicle.riderStrafe);
+            s.writeBoolean(false);
+            connection.send(s);
+        } else if (wasRiding) {
+            ByteBuf s = packet(C_STEER);
+            s.writeFloat(0);
+            s.writeFloat(0);
+            s.writeBoolean(true);
+            connection.send(s);
+        }
+        wasRiding = p.vehicle != null;
 
         String equip = p.inventory.selected + ":" + sig(p.inventory.held()) + ":" + sig(p.inventory.armor);
         if (!equip.equals(lastEquip)) {
@@ -231,6 +248,10 @@ final class MultiplayerSession implements World.Remote {
         connection.send(b);
     }
 
+    void reel() {
+        if (connection != null) connection.send(packet(C_REEL));
+    }
+
     void chat(String msg) {
         if (connection == null) return;
         ByteBuf b = packet(C_CHAT);
@@ -320,6 +341,20 @@ final class MultiplayerSession implements World.Remote {
                 e.setNetTarget(x, y, z, yaw, pitch, head);
                 e.onGround = (flags & 1) != 0;
                 if (e instanceof Player p) p.sneaking = (flags & 2) != 0;
+            }
+            case S_RIDE -> {
+                Entity v = entities.get(b.readInt());
+                Player p = g.player;
+                if (p.vehicle != null && p.vehicle != v) {
+                    p.vehicle.passenger = null;
+                    p.vehicle = null;
+                }
+                if (v instanceof Vehicle veh && p.vehicle == null) {
+                    if (veh.passenger != null) veh.passenger.vehicle = null;
+                    veh.passenger = null;
+                    veh.mount(p);
+                }
+                wasRiding = p.vehicle != null;
             }
             case S_STATE -> {
                 int eid = b.readInt();

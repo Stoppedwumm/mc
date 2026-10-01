@@ -35,7 +35,8 @@ public final class Redstone {
         return id == Block.REDSTONE_WIRE.id || isTorch(id) || isRepeater(id) || id == Block.LEVER.id || b.shape == Block.Shape.BUTTON
                 || b.shape == Block.Shape.PLATE || id == Block.REDSTONE_LAMP.id || id == Block.LIT_REDSTONE_LAMP.id
                 || id == Block.PISTON.id || id == Block.STICKY_PISTON.id || id == Block.REDSTONE_BLOCK.id || id == Block.TNT.id
-                || b.shape == Block.Shape.DOOR || b.shape == Block.Shape.TRAPDOOR || b.shape == Block.Shape.GATE;
+                || b.shape == Block.Shape.DOOR || b.shape == Block.Shape.TRAPDOOR || b.shape == Block.Shape.GATE
+                || id == Block.POWERED_RAIL.id || id == Block.DETECTOR_RAIL.id;
     }
 
     // ------------------------------------------------------------------ what blocks emit
@@ -71,6 +72,7 @@ public final class Redstone {
         }
         if (id == Block.LEVER.id || b.shape == Block.Shape.BUTTON) return (meta & 8) != 0 ? 15 : 0;
         if (b.shape == Block.Shape.PLATE) return (meta & 1) != 0 ? 15 : 0;
+        if (id == Block.DETECTOR_RAIL.id) return (meta & Rails.ACTIVE) != 0 ? 15 : 0;
         if (id == Block.POWERED_REPEATER.id) {
             int f = meta & 3;
             return tx == x + Shapes.DX[f] && tz == z + Shapes.DZ[f] && ty == y ? 15 : 0;
@@ -107,6 +109,7 @@ public final class Redstone {
             if (id == Block.REDSTONE_TORCH.id && d[1] == -1) p = 15; // torch below
             else if ((id == Block.LEVER.id || b.shape == Block.Shape.BUTTON) && (meta & 8) != 0 && same(attachSupport(nx, ny, nz, meta), x, y, z)) p = 15;
             else if (b.shape == Block.Shape.PLATE && (meta & 1) != 0 && d[1] == 1) p = 15;
+            else if (id == Block.DETECTOR_RAIL.id && (meta & Rails.ACTIVE) != 0 && d[1] == 1) p = 15;
             else if (id == Block.POWERED_REPEATER.id) {
                 int f = meta & 3;
                 if (nx + Shapes.DX[f] == x && nz + Shapes.DZ[f] == z && ny == y) p = 15;
@@ -141,7 +144,7 @@ public final class Redstone {
     private static boolean connectsTo(int id, int meta, int dir) {
         if (id == Block.REDSTONE_WIRE.id || isTorch(id) || id == Block.LEVER.id || id == Block.REDSTONE_BLOCK.id) return true;
         Block b = Block.get(id);
-        if (b.shape == Block.Shape.BUTTON || b.shape == Block.Shape.PLATE) return true;
+        if (b.shape == Block.Shape.BUTTON || b.shape == Block.Shape.PLATE || id == Block.DETECTOR_RAIL.id) return true;
         if (isRepeater(id)) return (meta & 1) == (dir & 1);
         return false;
     }
@@ -324,6 +327,8 @@ public final class Redstone {
                 if (w.getBlock(x, lower + 1, z) == id) w.setBlock(x, lower + 1, z, id, w.getMeta(x, lower + 1, z) ^ 4, false);
                 w.playSound(p ? "door_open" : "door_close", x + 0.5, y + 0.5, z + 0.5, 1, 1);
             }
+        } else if (id == Block.POWERED_RAIL.id) {
+            Rails.updatePowered(w, x, y, z);
         } else if (b.shape == Block.Shape.TRAPDOOR || b.shape == Block.Shape.GATE) {
             boolean p = powered(w, x, y, z);
             if (p != ((meta & 4) != 0)) {
@@ -391,6 +396,11 @@ public final class Redstone {
             if (!Pistons.entityOn(w, x, y, z, b == Block.STONE_PRESSURE_PLATE)) {
                 w.setBlock(x, y, z, id, 0, false);
                 w.playSound("click", x + 0.5, y + 0.1, z + 0.5, 0.3f, 0.5f);
+                changedAround(w, x, y, z, new int[]{x, y - 1, z});
+            } else w.scheduleTick(x, y, z, 20);
+        } else if (id == Block.DETECTOR_RAIL.id && (meta & Rails.ACTIVE) != 0) {
+            if (!Rails.cartOn(w, x, y, z)) {
+                w.setBlock(x, y, z, id, meta & ~Rails.ACTIVE, false);
                 changedAround(w, x, y, z, new int[]{x, y - 1, z});
             } else w.scheduleTick(x, y, z, 20);
         } else if (id == Block.PISTON.id || id == Block.STICKY_PISTON.id) {

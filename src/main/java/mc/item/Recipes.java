@@ -94,6 +94,11 @@ public final class Recipes {
         shaped(Item.of(Block.LAPIS_BLOCK), 1, new String[]{"###", "###", "###"}, '#', Item.LAPIS_LAZULI);
         shapeless(Item.LAPIS_LAZULI, 9, Block.LAPIS_BLOCK);
         shaped(Item.FISHING_ROD, 1, new String[]{"  S", " SX", "S X"}, 'S', Item.STICK, 'X', Item.STRING);
+        shaped(Item.of(Block.RAIL), 16, new String[]{"I I", "ISI", "I I"}, 'I', Item.IRON_INGOT, 'S', Item.STICK);
+        shaped(Item.of(Block.POWERED_RAIL), 6, new String[]{"G G", "GSG", "GRG"}, 'G', Item.GOLD_INGOT, 'S', Item.STICK, 'R', Item.REDSTONE);
+        shaped(Item.of(Block.DETECTOR_RAIL), 6, new String[]{"I I", "IPI", "IRI"}, 'I', Item.IRON_INGOT, 'P', Block.STONE_PRESSURE_PLATE, 'R', Item.REDSTONE);
+        shaped(Item.MINECART, 1, new String[]{"I I", "III"}, 'I', Item.IRON_INGOT);
+        shaped(Item.BOAT, 1, new String[]{"P P", "PPP"}, 'P', PLANKS);
         shaped(Item.GLASS_BOTTLE, 3, new String[]{"# #", " # "}, '#', Block.GLASS);
         shaped(Item.BOWL, 4, new String[]{"# #", " # "}, '#', PLANKS);
         shaped(Item.of(Block.BREWING_STAND), 1, new String[]{" B ", "CCC"}, 'B', Item.BLAZE_ROD, 'C', Block.COBBLESTONE);
@@ -165,6 +170,8 @@ public final class Recipes {
         shapeless(Item.of(Block.MOSSY_COBBLESTONE), 1, Block.COBBLESTONE, Block.TALL_GRASS);
 
         smelt(Block.IRON_ORE, Item.IRON_INGOT);
+        smelt(Item.RAW_FISH, Item.COOKED_FISH);
+        smelt(Item.RAW_SALMON, Item.COOKED_SALMON);
         smelt(Block.GOLD_ORE, Item.GOLD_INGOT);
         smelt(Block.DIAMOND_ORE, Item.DIAMOND);
         smelt(Block.EMERALD_ORE, Item.EMERALD);

@@ -464,6 +464,42 @@ public final class MobModel {
         return m;
     }
 
+    /** Iron minecart: a floor and four walls, 20 pixels long (along +Z) and 16 wide. */
+    public static MobModel createMinecart() {
+        MobModel m = new MobModel();
+        Painter iron = (f, x, y, w, h, r) -> {
+            boolean edge = x == 0 || y == 0 || x == w - 1 || y == h - 1;
+            boolean rivet = (x % 6 == 2) && (y % 6 == 2);
+            return noise(edge ? 0x5a5a5a : rivet ? 0xb8b8b8 : 0x8a8a8a, r, 0.08);
+        };
+        Painter floor = (f, x, y, w, h, r) -> noise(f == TOP ? 0x4a4a4a : 0x6a6a6a, r, 0.1);
+        m.part("cart", 0, 0, 0)
+                .box(-8, 1, -10, 16, 2, 20, floor)
+                .box(-8, 3, -10, 2, 8, 20, iron)
+                .box(6, 3, -10, 2, 8, 20, iron)
+                .box(-6, 3, -10, 12, 8, 2, iron)
+                .box(-6, 3, 8, 12, 8, 2, iron);
+        m.bake(9001);
+        return m;
+    }
+
+    /** Wooden rowing boat with a pair of paddles. */
+    public static MobModel createBoat() {
+        MobModel m = new MobModel();
+        Painter planks = (f, x, y, w, h, r) -> noise((y % 4 == 3 || (f == TOP && x % 4 == 3)) ? 0x6a5030 : 0x9a7a48, r, 0.08);
+        m.part("hull", 0, 0, 0)
+                .box(-10, 0, -14, 20, 3, 28, planks)
+                .box(-10, 3, -14, 2, 6, 28, planks)
+                .box(8, 3, -14, 2, 6, 28, planks)
+                .box(-8, 3, -14, 16, 6, 2, planks)
+                .box(-8, 3, 12, 16, 6, 2, planks);
+        Painter oar = (f, x, y, w, h, r) -> noise(0x7a5a32, r, 0.08);
+        m.part("paddleL", -10, 8, 2).box(-1, -1, -1, 2, 2, 2, oar).box(-15, -0.5f, -0.5f, 14, 1, 1, oar).box(-19, -0.5f, -2, 5, 1, 4, oar);
+        m.part("paddleR", 10, 8, 2).box(-1, -1, -1, 2, 2, 2, oar).box(1, -0.5f, -0.5f, 14, 1, 1, oar).box(14, -0.5f, -2, 5, 1, 4, oar);
+        m.bake(9002);
+        return m;
+    }
+
     /** Steve-like player model: biped with skin, hair, shirt and trousers. */
     public static MobModel createPlayer() {
         MobModel m = new MobModel();

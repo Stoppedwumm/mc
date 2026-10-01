@@ -134,6 +134,12 @@ public final class TextureGen {
         paint(Tex.REDSTONE_ORE, () -> ore(0xe01010, 0x8a0000));
         paint(Tex.REDSTONE_BLOCK, () -> metalBlock(0xc81a10, 0x7a0a04));
         paint(Tex.REPEATER_ITEM, this::repeaterItem);
+        paint(Tex.RAIL, () -> rail(0, false));
+        paint(Tex.RAIL_CORNER, this::railCorner);
+        paint(Tex.POWERED_RAIL, () -> rail(1, false));
+        paint(Tex.POWERED_RAIL_ON, () -> rail(1, true));
+        paint(Tex.DETECTOR_RAIL, () -> rail(2, false));
+        paint(Tex.DETECTOR_RAIL_ON, () -> rail(2, true));
         paint(Tex.ENCH_TOP, this::enchTop);
         paint(Tex.ENCH_SIDE, this::enchSide);
         paint(Tex.ENCH_BOTTOM, this::obsidian);
@@ -1095,6 +1101,52 @@ public final class TextureGen {
         speckle(0xa0a0a0, 0.03, 0x949494, 0.1);
         for (int y = 2; y < 14; y++) set(7, y, on ? 0xff2010 : 0x6a1a14);
         for (int y = 2; y < 14; y++) set(8, y, on ? 0xd01a10 : 0x5a1410);
+    }
+
+    private static final int TIE = 0x6b5030, IRON = 0xa8a8a8, IRON_D = 0x6a6a6a;
+
+    /** Straight rail running top to bottom: wooden ties under two rails (iron, gold, or iron with a sensor plate). */
+    private void rail(int kind, boolean on) {
+        clearTile();
+        for (int y = 1; y < 16; y += 4)
+            for (int x = 1; x < 15; x++) {
+                set(x, y, scale(TIE, jitter(0.08)));
+                set(x, y + 1, scale(TIE, 0.75 * jitter(0.08)));
+            }
+        int light = kind == 1 ? 0xf0d040 : IRON, dark = kind == 1 ? 0xa07818 : IRON_D;
+        for (int y = 0; y < 16; y++)
+            for (int x : new int[]{2, 12}) {
+                set(x, y, scale(light, jitter(0.04)));
+                set(x + 1, y, scale(dark, jitter(0.04)));
+            }
+        if (kind == 1) {
+            // Redstone strip between the rails: dark when unpowered, glowing when on
+            for (int y = 0; y < 16; y++) for (int x = 7; x <= 8; x++) set(x, y, on ? scale(0xff3020, jitter(0.1)) : scale(0x5a2018, jitter(0.1)));
+        } else if (kind == 2) {
+            for (int y = 4; y < 12; y++) for (int x = 5; x < 11; x++) set(x, y, scale(y == 4 || x == 5 ? 0x9a9a9a : 0x7a7a7a, jitter(0.04)));
+            int dot = on ? 0xff2010 : 0x6a1a14;
+            set(7, 7, dot); set(8, 8, dot); set(7, 8, scale(dot, 0.8)); set(8, 7, scale(dot, 0.8));
+        }
+    }
+
+    /** Curved rail joining the bottom (south) and right (east) edges. */
+    private void railCorner() {
+        clearTile();
+        for (double a : new double[]{8, 30, 52, 74}) {
+            double rad = Math.toRadians(a);
+            for (double d = 1.5; d < 15.5; d += 0.25) {
+                for (double w = -0.9; w <= 0.9; w += 0.3) {
+                    double px = 15.5 - Math.cos(rad) * d - Math.sin(rad) * w, py = 15.5 - Math.sin(rad) * d + Math.cos(rad) * w;
+                    set((int) px, (int) py, scale(TIE, (w > 0.3 ? 0.75 : 1) * jitter(0.05)));
+                }
+            }
+        }
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                double d = Math.hypot(x + 0.5 - 16, y + 0.5 - 16);
+                if ((d >= 2 && d < 3) || (d >= 12 && d < 13)) set(x, y, scale(IRON, jitter(0.04)));
+                else if ((d >= 3 && d < 4) || (d >= 13 && d < 14)) set(x, y, scale(IRON_D, jitter(0.04)));
+            }
     }
 
     private void pistonFace(boolean sticky) {

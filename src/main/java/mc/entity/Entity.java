@@ -24,6 +24,8 @@ public abstract class Entity {
     public float fallDistance;
     public int fireTicks;
     protected final Random random = new Random();
+    /** What this entity is riding (its position then follows the vehicle). */
+    public Vehicle vehicle;
 
     // ------------------------------------------------------------------ network copies
 
@@ -100,7 +102,20 @@ public abstract class Entity {
         if (y < -64) remove();
     }
 
-    public void remove() { removed = true; }
+    public void remove() {
+        removed = true;
+        if (vehicle != null && vehicle.passenger == this) vehicle.passenger = null;
+        vehicle = null;
+    }
+
+    /** Tick while riding: the vehicle moves us, so only timers advance. */
+    public void rideTick() {
+        prevYaw = yaw;
+        prevPitch = pitch;
+        age++;
+        if (fireTicks > 0) fireTicks--;
+        if (world != null) inWater = touching(Block.WATER.id);
+    }
 
     public double eyeY() { return y + height * 0.85; }
 

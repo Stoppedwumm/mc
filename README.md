@@ -68,7 +68,7 @@ All textures and sounds are generated procedurally at startup, so no Mojang asse
 - Experience orbs from mobs, mining and smelting, the XP bar and levels
 - Enchanting table with bookshelves, enchantment rolls, enchanted books and lapis; anvils for repairing and combining.
   Enchantments include Sharpness, Smite, Knockback, Fire Aspect, Looting, Efficiency, Silk Touch, Fortune, Unbreaking,
-  Protection, Feather Falling, Thorns, Respiration, Power, Punch, Flame and Infinity.
+  Protection, Feather Falling, Thorns, Respiration, Power, Punch, Flame, Infinity, Lure and Luck of the Sea.
 - Status effects: Speed, Slowness, Haste, Strength, Weakness, Regeneration, Poison, Resistance, Fire Resistance,
   Water Breathing, Invisibility, Night Vision, Jump Boost and Absorption. They show in the HUD, emit coloured particles
   and are saved with the world.
@@ -79,6 +79,27 @@ All textures and sounds are generated procedurally at startup, so no Mojang asse
 **Redstone**
 - Wire with signal strength, torches, levers, buttons, pressure plates, repeaters, lamps, TNT
 - Pistons and sticky pistons, and powered doors, trapdoors and gates
+
+**Rails, minecarts, boats and fishing**
+- Rails, powered rails and detector rails (crafted like Minecraft's). Placed rails join their neighbours: they make
+  straight lines, curves at corners, and slopes up to a rail one block higher. A rail pops off if its floor is removed.
+- Minecarts follow Minecraft's rail physics:
+  - their speed stays along the track and carries round corners
+  - slopes speed them up or slow them down
+  - powered rails boost a cart, or brake it when they have no power
+  - a detector rail gives off a redstone signal while a cart is on it
+- Right-click a cart to get in and Shift to get out. Pressing W gives a stopped cart a push in the direction you look.
+  An empty cart that is moving picks up mobs it runs into. Carts push each other and the entities they bump.
+  A few punches break a cart back into an item.
+- Boats float on water and are steered by where you look (Minecraft 1.8 handling). They speed up gradually and have
+  rowing paddles. Crashing into something at speed smashes a boat into planks and sticks.
+- Fishing rods cast a bobber with a sagging line:
+  - after a wait, a fish's trail of bubbles heads for the bobber, then it bites with a splash
+  - reel in during the bite to catch fish (cod, salmon, clownfish, pufferfish), junk or enchanted treasure, plus experience
+  - Lure makes bites come sooner; Luck of the Sea improves the odds of treasure
+  - the rod can also hook a mob and pull it towards you
+- Fish can be cooked in a furnace. Pufferfish poison you.
+- In multiplayer you can ride, steer and break carts and boats, and fish.
 
 **The Nether**
 - Obsidian portals lit with flint and steel; travel scales 8:1 and links to portals on the other side
@@ -138,11 +159,11 @@ Command-line options:
 |---|---|
 | W A S D | move |
 | Space | jump / swim up (Creative: double-tap to fly, hold to ascend) |
-| Left Shift | sneak / descend while flying |
+| Left Shift | sneak / descend while flying / get out of a minecart or boat |
 | Left Ctrl or double-tap W | sprint |
 | Mouse | look |
 | Left click (hold) | break block / attack |
-| Right click | place block, use item (eat, draw bow, bucket, hoe, seeds…), open crafting table / furnace / chest |
+| Right click | place block, use item (eat, draw bow, bucket, hoe, seeds, cast/reel a fishing rod, put a cart on rails or a boat on water…), get in a minecart or boat, open crafting table / furnace / chest |
 | Middle click | pick block |
 | 1–9 / mouse wheel | select hotbar slot |
 | Q / Ctrl+Q | drop one item / the whole stack |
@@ -161,7 +182,7 @@ Command-line options:
 /time set <day|noon|sunset|night|midnight|sunrise|ticks>   /time add <ticks>
 /gamemode <creative|survival>     /tp <x> <y> <z>   (~ relative coordinates work)
 /give <item_name> [count]         /setblock <x> <y> <z> <block>
-/summon <mob> [x y z] [baby|tamed|angry|<armor material>]
+/summon <mob> [x y z] [baby|tamed|angry|<armor material>]   /summon <minecart|boat> [x y z] [ride]   /use (right click)
 /effect <effect|clear> [seconds] [amplifier]   /potion <type> [splash]   /enchant <name> [level]
 /xp <points>   /armor <material>   /dimension   /locate village [tp]   /perspective <0-2>
 /kill [@e]   /weather <clear|rain>   /heal   /clear   /spawnpoint
@@ -180,9 +201,10 @@ mc/client/                   Game loop, Interaction (mining/combat/items), Scree
                              Sound (OpenAL), Options (Gson)
 mc/net/                      Netty connections, packet ids and encoding, server list ping, LAN discovery
 mc/server/                   Server (LAN or dedicated), Session (one client), NetPlayer, DedicatedServer
-mc/entity/                   Entity physics, LivingEntity (health/damage), Player (hunger), Mob AI, items, arrows, TNT
+mc/entity/                   Entity physics, LivingEntity (health/damage), Player (hunger), Mob AI, items, arrows, TNT,
+                             Vehicle (riding), MinecartEntity, BoatEntity, FishingBobberEntity
 mc/item/                     Item registry, ItemStack, Inventory, Recipes (crafting + smelting)
-mc/world/                    Block registry, Chunk, World (streaming, ticks, explosions), Liquids, Drops,
+mc/world/                    Block registry, Chunk, World (streaming, ticks, explosions), Liquids, Drops, Rails, Redstone,
                              BlockEntity (furnace/chest), MobSpawner, WorldStorage
 mc/world/gen/                Noise, TerrainGenerator, Decorator (trees/plants), Biome
 mc/render/                   ChunkMesher, WorldRenderer (shadows/sky/water), PostProcess (HDR/bloom), MobModel,
@@ -199,11 +221,13 @@ Run the tests with `mvn test`. They check:
 - building blocks, animals, villages and dungeons, the Nether, redstone circuits, enchanting and brewing
 - multiplayer over a real local socket: login, chunk streaming, block edits both ways, chat, mob tracking,
   forwarded damage, mining with item pickup, duplicate names, the status ping, and client-side remote worlds
+- rails joining into lines, corners and slopes; carts round corners, down slopes, braked and boosted by powered rails;
+  detector rails; riding and breaking carts; boats floating and rowing; fishing bites and catches; riding over the network
 - distant terrain: chunk summaries (trees, water, flowers ignored), saving and reloading them, noise estimates, tile meshes
 
 ## Not implemented
 
 The real game is far larger than this project. Missing so far:
 - the End, nether fortresses, strongholds
-- fishing, boats, minecarts and rails, signs, paintings, maps
+- signs, paintings, maps, storage/TNT/hopper minecarts, activator rails
 - Nether travel in multiplayer (a server hosts the Overworld only), sleeping through the night in multiplayer

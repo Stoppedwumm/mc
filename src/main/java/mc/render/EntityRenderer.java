@@ -76,7 +76,14 @@ public final class EntityRenderer {
         model.get("armL").rx = legA * 0.8f - (float) Math.sin(swing * Math.PI) * 1.4f - (held != null ? 0.3f : 0);
         model.get("armL").rz = -0.05f;
         model.get("armR").rz = 0.05f;
-        if (p.sneaking) {
+        if (p.vehicle != null || p.seated) {
+            // Sitting: legs forward and slightly apart, arms resting
+            model.get("legL").rx = model.get("legR").rx = -1.4f;
+            model.get("legL").ry = -0.3f;
+            model.get("legR").ry = 0.3f;
+            model.get("armL").rx -= 0.6f;
+            model.get("armR").rx -= 0.6f;
+        } else if (p.sneaking) {
             model.get("body").rx = 0.5f;
             model.get("head").rx += 0.3f;
         }
@@ -186,8 +193,120 @@ public final class EntityRenderer {
                 int flash = (tnt.fuse / 5) % 2 == 0 ? 0xFFFFFF : 0xFFFFFF;
                 renderBlock(Block.TNT, wr, ex, ey + 0.49, ez, 0.98f * s, (tnt.fuse / 5) % 2 == 0 ? l * 3 : l, flash);
             } else if (e instanceof ArrowEntity a) renderArrow(a, wr, pt, ex, ey, ez, l);
+            else if (e instanceof Vehicle v) renderVehicle(v, wr, pt, ex, ey, ez, l);
+            else if (e instanceof FishingBobberEntity b) renderBobber(b, world, wr, pt, ex, ey, ez, l);
         }
         glEnable(GL_CULL_FACE);
+    }
+
+    /** The local player when seen in first person (its rod tip is near the camera), else null. */
+    public Player firstPerson;
+    public Player localPlayer;
+
+    /** A camera-facing quad of one item-atlas tile. */
+    private void iconQuad(WorldRenderer wr, int tile, Matrix4f m, int color) {
+        float u0 = (tile & 15) / 16f, v0 = (tile >> 4) / 16f, u1 = u0 + 1 / 16f, v1 = v0 + 1 / 16f;
+        org.joml.Vector3f a = m.transformPosition(new org.joml.Vector3f(-1, 1, 0)), b = m.transformPosition(new org.joml.Vector3f(-1, -1, 0));
+        org.joml.Vector3f c = m.transformPosition(new org.joml.Vector3f(1, -1, 0)), d = m.transformPosition(new org.joml.Vector3f(1, 1, 0));
+        wr.batch.quad(a.x, a.y, a.z, u0, v0, b.x, b.y, b.z, u0, v1, c.x, c.y, c.z, u1, v1, d.x, d.y, d.z, u1, v0, color);
+    }
+
+    private Player ownerOf(FishingBobberEntity b, World world) {
+        if (b.owner != null) return b.owner;
+        if (localPlayer != null && localPlayer.name.equals(b.ownerName)) return localPlayer;
+        for (Entity e : world.entities()) if (e instanceof Player p && p.name.equals(b.ownerName)) return p;
+        for (Player p : world.networkPlayers()) if (p.name.equals(b.ownerName)) return p;
+        return null;
+    }
+
+    /** The bobber sprite and the sagging line back to the rod's tip. */
+    private void renderBobber(FishingBobberEntity b, World world, WorldRenderer wr, float pt, double ex, double ey, double ez, float light) {
+        wr.setupBasic(wr.projView, true, 0, 0.1f);
+        wr.basicShader.set("uLight", light);
+        glActiveTexture(GL_TEXTURE0);
+        items.itemAtlas.bind();
+        Matrix4f m = new Matrix4f().translate((float) ex, (float) ey + 0.12f, (float) ez)
+                .rotateY((float) Math.toRadians(-wr.camYaw + 180)).rotateX((float) Math.toRadians(-wr.camPitch)).scale(0.13f);
+        wr.batch.begin(GL_TRIANGLES);
+        iconQuad(wr, ItemTextureGen.BOBBER, m, 0xFFFFFFFF);
+        Player o = ownerOf(b, world);
+        if (o != null) {
+            double sx, sy, sz;
+            if (o == firstPerson) {
+                // Rod tip: right of and below the view centre
+                double ry = Math.toRadians(wr.camYaw), rp = Math.toRadians(wr.camPitch);
+                double fx = -Math.sin(ry) * Math.cos(rp), fy = -Math.sin(rp), fz = Math.cos(ry) * Math.cos(rp);
+                double rx = -Math.cos(ry), rz = -Math.sin(ry);
+                sx = fx * 0.9 + rx * 0.4;
+                sy = fy * 0.9 - 0.17;
+                sz = fz * 0.9 + rz * 0.4;
+            } else {
+                double r = Math.toRadians(lerpAngle(o.prevYaw, o.yaw, pt));
+                double fx = -Math.sin(r), fz = Math.cos(r), rx = -Math.cos(r), rz = -Math.sin(r);
+                sx = o.interpX(pt) + fx * 0.8 + rx * 0.35 - wr.camX;
+                sy = o.interpY(pt) + (o.vehicle != null || o.seated ? 1.3 : 1.75) - (o.sneaking ? 0.3 : 0) - wr.camY;
+                sz = o.interpZ(pt) + fz * 0.8 + rz * 0.35 - wr.camZ;
+            }
+            double tx = ex, ty = ey + 0.2, tz = ez;
+            double len = Math.sqrt((tx - sx) * (tx - sx) + (ty - sy) * (ty - sy) + (tz - sz) * (tz - sz));
+            float u = (ItemTextureGen.WHITE & 15) / 16f + 1 / 32f, v = (ItemTextureGen.WHITE >> 4) / 16f + 1 / 32f;
+            int n = 16;
+            double[] prev = null;
+            for (int i = 0; i <= n; i++) {
+                double t = (double) i / n;
+                double sag = Math.min(1.5, len * 0.06) * 4 * t * (1 - t);
+                double[] p = {sx + (tx - sx) * t, sy + (ty - sy) * t - sag, sz + (tz - sz) * t};
+                if (prev != null) {
+                    // Ribbon facing the camera (which sits at the origin)
+                    double dx = p[0] - prev[0], dy = p[1] - prev[1], dz = p[2] - prev[2];
+                    double cx = (p[0] + prev[0]) / 2, cy = (p[1] + prev[1]) / 2, cz = (p[2] + prev[2]) / 2;
+                    double wx = dy * cz - dz * cy, wy = dz * cx - dx * cz, wz = dx * cy - dy * cx;
+                    double wl = Math.sqrt(wx * wx + wy * wy + wz * wz);
+                    if (wl < 1e-9) { prev = p; continue; }
+                    double w = 0.012 * Math.max(1, Math.sqrt(cx * cx + cy * cy + cz * cz) * 0.15) / wl;
+                    wx *= w; wy *= w; wz *= w;
+                    wr.batch.quad((float) (prev[0] - wx), (float) (prev[1] - wy), (float) (prev[2] - wz), u, v,
+                            (float) (prev[0] + wx), (float) (prev[1] + wy), (float) (prev[2] + wz), u, v,
+                            (float) (p[0] + wx), (float) (p[1] + wy), (float) (p[2] + wz), u, v,
+                            (float) (p[0] - wx), (float) (p[1] - wy), (float) (p[2] - wz), u, v, 0xFF262626);
+                }
+                prev = p;
+            }
+        }
+        wr.batch.end();
+    }
+
+    private MobModel cartModel, boatModel;
+
+    private void renderVehicle(Vehicle v, WorldRenderer wr, float pt, double ex, double ey, double ez, float light) {
+        boolean cart = v instanceof MinecartEntity;
+        if (cart && cartModel == null) cartModel = MobModel.createMinecart();
+        if (!cart && boatModel == null) boatModel = MobModel.createBoat();
+        MobModel model = cart ? cartModel : boatModel;
+        for (MobModel.Part p : model.parts) p.reset();
+        float yaw = lerpAngle(v.prevYaw, v.yaw, pt);
+        Matrix4f mat = new Matrix4f().translate((float) ex, (float) ey, (float) ez).rotateY((float) Math.toRadians(-yaw));
+        if (cart) {
+            float pitch = v.prevPitch + (v.pitch - v.prevPitch) * pt;
+            mat.translate(0, 0.35f, 0).rotateX((float) Math.toRadians(pitch)).translate(0, -0.35f, 0);
+        } else if (v instanceof BoatEntity b) {
+            float paddle = b.prevPaddle + (b.paddle - b.prevPaddle) * pt;
+            model.get("paddleL").rx = (float) Math.sin(paddle) * 0.7f;
+            model.get("paddleR").rx = (float) Math.sin(paddle + Math.PI) * 0.7f;
+            model.get("paddleL").rz = 0.3f;
+            model.get("paddleR").rz = -0.3f;
+        }
+        // Hits make it rock from side to side
+        float ht = v.hurtTicks - pt, dmg = Math.max(0, v.damageTaken - pt);
+        if (ht > 0) mat.rotateZ((float) Math.toRadians(Math.sin(ht) * ht * dmg / 10 * v.hurtDir));
+        mat.scale(1 / 16f);
+        wr.setupBasic(wr.projView, true, 0, 0.1f);
+        wr.basicShader.set("uLight", light);
+        glActiveTexture(GL_TEXTURE0);
+        model.skin.bind();
+        wr.batch.begin(GL_TRIANGLES);
+        model.render(wr.batch, mat, 0xFFFFFF);
+        wr.batch.end();
     }
 
     private static float lerpAngle(float a, float b, float t) {

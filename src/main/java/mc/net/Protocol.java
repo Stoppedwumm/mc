@@ -16,7 +16,7 @@ import java.util.zip.Inflater;
 public final class Protocol {
     private Protocol() { }
 
-    public static final int VERSION = 3;
+    public static final int VERSION = 4;
 
     /** Handshake intents. */
     public static final int INTENT_STATUS = 0, INTENT_LOGIN = 1;
@@ -24,13 +24,14 @@ public final class Protocol {
     // Client to server
     public static final int C_HELLO = 0, C_POS = 1, C_SET_BLOCK = 2, C_BREAK = 3, C_ADD_ENTITY = 4, C_ATTACK = 5,
             C_INTERACT = 6, C_CHAT = 7, C_OPEN = 8, C_CONTAINER = 9, C_CLOSE = 10, C_SWING = 11, C_VIEW = 12,
-            C_EQUIP = 13, C_KEEPALIVE = 14, C_RESPAWN = 15;
+            C_EQUIP = 13, C_KEEPALIVE = 14, C_RESPAWN = 15, C_STEER = 16, C_REEL = 17;
 
     // Server to client
     public static final int S_STATUS = 64, S_LOGIN = 65, S_KICK = 66, S_CHUNK = 67, S_UNLOAD = 68, S_BLOCK = 69,
             S_TIME = 70, S_SPAWN = 71, S_MOVE = 72, S_STATE = 73, S_REMOVE = 74, S_EVENT = 75, S_SOUND = 76,
             S_PARTICLE = 77, S_BROKEN = 78, S_CHAT = 79, S_HURT = 80, S_KNOCKBACK = 81, S_EFFECT = 82, S_HEAL = 83,
-            S_GIVE = 84, S_XP = 85, S_SET_HELD = 86, S_CONTAINER = 87, S_TELEPORT = 88, S_KEEPALIVE = 89, S_PLAYERS = 90;
+            S_GIVE = 84, S_XP = 85, S_SET_HELD = 86, S_CONTAINER = 87, S_TELEPORT = 88, S_KEEPALIVE = 89, S_PLAYERS = 90,
+            S_RIDE = 91;
 
     /** Entity events. */
     public static final int EV_HURT = 0, EV_SWING = 1, EV_DEATH = 2;

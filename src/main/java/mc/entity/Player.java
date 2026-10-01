@@ -30,6 +30,10 @@ public class Player extends LivingEntity {
 
     /** Name shown above the head in multiplayer. */
     public String name = "Player";
+    /** Another player seen over the network is sitting in a vehicle. */
+    public boolean seated;
+    /** Our cast fishing line (singleplayer and hosts). */
+    public FishingBobberEntity fishing;
     /** Arm swing of another player seen over the network (ticks left). */
     public int swingTicks;
 
@@ -125,6 +129,7 @@ public class Player extends LivingEntity {
     }
 
     public void respawn() {
+        if (vehicle != null) vehicle.dismount();
         health = maxHealth;
         food = 20;
         saturation = 5;
@@ -154,6 +159,21 @@ public class Player extends LivingEntity {
         boolean wasInWater = inWater;
         super.tick();
         if (isDead()) return;
+        if (vehicle != null && (vehicle.removed || vehicle.passenger != this)) vehicle = null;
+        if (vehicle != null) {
+            // Riding: the vehicle moves us; our input steers it, sneaking gets off
+            sneaking = sprinting = false;
+            bob *= 0.6f;
+            tilt *= 0.6f;
+            eyeHeight += ((float) EYE - eyeHeight) * 0.5f;
+            if (sneak) vehicle.dismount();
+            else {
+                vehicle.riderForward = forward;
+                vehicle.riderStrafe = strafe;
+            }
+            tickFood();
+            return;
+        }
         if (inWater && !wasInWater && motionY < -0.2) splashThisTick = true;
         if (jumpCooldown > 0) jumpCooldown--;
 

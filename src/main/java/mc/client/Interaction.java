@@ -12,6 +12,7 @@ import mc.world.Chunk;
 import mc.world.Liquids;
 import mc.world.Shapes;
 import mc.world.Portal;
+import mc.world.Rails;
 import mc.world.Redstone;
 import mc.world.World;
 
@@ -25,6 +26,8 @@ final class Interaction {
     private final Game g;
     RayCast.Hit hit;
     LivingEntity targetEntity;
+    /** Minecart or boat under the crosshair. */
+    Vehicle targetVehicle;
     float breakProgress;
     private int breakX, breakY, breakZ = Integer.MIN_VALUE;
     private int breakDelay, placeDelay, hitSoundTimer;
@@ -57,20 +60,32 @@ final class Interaction {
         double ex = p.interpX(pt), ey = p.interpY(pt) + p.eyeHeight, ez = p.interpZ(pt);
         hit = RayCast.cast(w(), ex, ey, ez, dx, dy, dz, reach());
         targetEntity = null;
+        targetVehicle = null;
         double best = hit != null ? hit.distance : reach();
         double entityReach = p.creative ? 5 : 3;
         List<Entity> candidates = new java.util.ArrayList<>(w().entities());
         candidates.addAll(w().networkPlayers());
         for (Entity e : candidates) {
-            if (!(e instanceof LivingEntity le) || le.isDead()) continue;
+            if (e instanceof Vehicle v && !v.removed && v != p.vehicle) {
+                AABB b = v.box();
+                double t = rayBox(ex, ey, ez, dx, dy, dz, b.minX, b.minY, b.minZ, b.maxX, b.maxY, b.maxZ);
+                if (t >= 0 && t < best && t <= entityReach) {
+                    best = t;
+                    targetVehicle = v;
+                    targetEntity = null;
+                }
+                continue;
+            }
+            if (!(e instanceof LivingEntity le) || le.isDead() || e == p.vehicle || e.vehicle == p.vehicle && p.vehicle != null) continue;
             AABB b = e.box();
             double t = rayBox(ex, ey, ez, dx, dy, dz, b.minX - 0.1, b.minY - 0.1, b.minZ - 0.1, b.maxX + 0.1, b.maxY + 0.1, b.maxZ + 0.1);
             if (t >= 0 && t < best && t <= entityReach) {
                 best = t;
                 targetEntity = le;
+                targetVehicle = null;
             }
         }
-        if (targetEntity != null) hit = null;
+        if (targetEntity != null || targetVehicle != null) hit = null;
     }
 
     static double rayBox(double ox, double oy, double oz, double dx, double dy, double dz,
@@ -104,6 +119,7 @@ final class Interaction {
         startSwing();
         breakDelay = 0;
         if (targetEntity != null) attack(targetEntity);
+        else if (targetVehicle != null) hitVehicle(targetVehicle);
     }
 
     private void attack(LivingEntity target) {
@@ -149,6 +165,18 @@ final class Interaction {
             }
             p.addExhaustion(0.1f);
         }
+    }
+
+    /** Punching a minecart or boat: a few hits break it (one in creative) and drop it as an item. */
+    private void hitVehicle(Vehicle v) {
+        ItemStack h = held();
+        float dmg = ItemStack.isEmpty(h) ? 1 : h.item.attackDamage;
+        g.sound.play("hit", v.x, v.y, v.z, 0.6f, 1.2f);
+        if (g.multiplayer != null) {
+            g.multiplayer.attack(v, dmg, 0, 0, 0);
+            return;
+        }
+        v.hit(p(), dmg);
     }
 
     private void breakHeld() {
@@ -235,6 +263,10 @@ final class Interaction {
                 p.addEffect(mc.entity.Effect.ABSORPTION, 0, 2400);
             }
             if (h.item == Item.SPIDER_EYE) p.addEffect(mc.entity.Effect.POISON, 0, 100);
+            if (h.item == Item.PUFFERFISH) {
+                p.addEffect(mc.entity.Effect.POISON, 3, 1200);
+                p.food = Math.max(0, p.food - 3);
+            }
             if (h.item == Item.MUSHROOM_STEW && !p.creative) {
                 p.inventory.setHeld(new ItemStack(Item.BOWL, 1));
                 g.sound.play("burp", p.x, p.y + 1.5, p.z, 0.5f, 0.9f + random.nextFloat() * 0.1f);
@@ -378,6 +410,15 @@ final class Interaction {
         Player p = p();
         ItemStack h = held();
         lastUseWasPlace = false;
+        if (fresh && targetVehicle != null) {
+            // Get in (an empty vehicle; whoever rides it stays)
+            if (p.vehicle == null && targetVehicle.passenger == null) {
+                if (g.multiplayer != null) g.multiplayer.interact(targetVehicle, h == null ? null : h.copy());
+                else targetVehicle.mount(p);
+                startSwing();
+            }
+            return;
+        }
         if (fresh && targetEntity instanceof Mob v && v.type == MobType.VILLAGER && !v.isBaby()) {
             g.screens.openTrading(v);
             return;
@@ -500,6 +541,9 @@ final class Interaction {
             return;
         }
         if (item == Item.BUCKET) { if (fresh) fillBucket(h); return; }
+        if (item == Item.BOAT) { if (fresh) placeBoat(h); return; }
+        if (item == Item.FISHING_ROD) { if (fresh) useRod(h); return; }
+        if (item == Item.MINECART) { if (fresh) placeMinecart(h); return; }
         if (item == Item.WATER_BUCKET || item == Item.LAVA_BUCKET) { if (fresh) emptyBucket(h, item == Item.WATER_BUCKET ? Block.WATER : Block.LAVA); return; }
         if (hit == null) return;
         int target = w().getBlock(hit.x, hit.y, hit.z);
@@ -661,6 +705,83 @@ final class Interaction {
         }
     }
 
+    /** Our bobber, if one is out (in multiplayer it is the server's copy, recognised by its owner's name). */
+    private FishingBobberEntity ownBobber() {
+        Player p = p();
+        if (g.multiplayer == null) return p.fishing != null && !p.fishing.removed ? p.fishing : null;
+        for (Entity e : w().entities()) if (e instanceof FishingBobberEntity f && !f.removed && f.ownerName.equals(p.name)) return f;
+        return null;
+    }
+
+    /** Casts the line, or reels it in (catching whatever bit, or pulling a hooked mob). */
+    private void useRod(ItemStack h) {
+        Player p = p();
+        FishingBobberEntity out = ownBobber();
+        if (out != null) {
+            int damage;
+            if (g.multiplayer != null) {
+                g.multiplayer.reel();
+                damage = 1;
+            } else damage = out.reel();
+            p.fishing = null;
+            g.sound.play("bow", p.x, p.y + 1, p.z, 0.4f, 0.6f);
+            if (damage > 0 && !p.creative && h.damageTool(damage)) breakHeld();
+        } else {
+            FishingBobberEntity b = new FishingBobberEntity(p);
+            b.world = w();
+            b.cast();
+            w().addEntity(b);
+            if (g.multiplayer == null) p.fishing = b;
+            g.sound.play("bow", p.x, p.y + 1, p.z, 0.5f, 0.4f);
+        }
+        startSwing();
+    }
+
+    /** Minecarts go on rails (at the track's height on slopes). */
+    private void placeMinecart(ItemStack h) {
+        if (hit == null) return;
+        int id = w().getBlock(hit.x, hit.y, hit.z);
+        if (!Rails.isRail(id)) return;
+        boolean slope = Rails.ascending(Rails.shape(id, w().getMeta(hit.x, hit.y, hit.z)));
+        MinecartEntity cart = new MinecartEntity();
+        cart.setPos(hit.x + 0.5, hit.y + 0.0625 + (slope ? 0.5 : 0), hit.z + 0.5);
+        cart.yaw = cart.prevYaw = Math.round(p().yaw / 90f) * 90f;
+        w().addEntity(cart);
+        g.sound.dig(Block.RAIL, hit.x + 0.5, hit.y, hit.z + 0.5);
+        consume(h);
+        startSwing();
+    }
+
+    /** Boats go on the water surface the player looks at (or on top of a block). */
+    private void placeBoat(ItemStack h) {
+        Player p = p();
+        double ry = Math.toRadians(p.yaw), rp = Math.toRadians(p.pitch);
+        double dx = -Math.sin(ry) * Math.cos(rp), dy = -Math.sin(rp), dz = Math.cos(ry) * Math.cos(rp);
+        double ex = p.x, ey = p.y + p.eyeHeight, ez = p.z;
+        double px = 0, py = 0, pz = 0;
+        boolean found = false;
+        for (double t = 0; t <= reach(); t += 0.05) {
+            double x = ex + dx * t, y = ey + dy * t, z = ez + dz * t;
+            int bx = (int) Math.floor(x), by = (int) Math.floor(y), bz = (int) Math.floor(z);
+            Block b = Block.get(w().getBlock(bx, by, bz));
+            if (b == Block.WATER) { px = x; py = by + 0.6; pz = z; found = true; break; }
+            if (b.solid) {
+                if (hit != null) { px = hit.px; py = hit.y + 1; pz = hit.pz; found = hit.ny == 1; }
+                break;
+            }
+        }
+        if (!found) return;
+        BoatEntity boat = new BoatEntity();
+        boat.setPos(px, py, pz);
+        boat.yaw = boat.prevYaw = p.yaw;
+        boat.world = w();
+        if (!boat.fitsAnywhere()) return;
+        w().addEntity(boat);
+        g.sound.dig(Block.PLANKS, px, py, pz);
+        consume(h);
+        startSwing();
+    }
+
     private void emptyBucket(ItemStack h, Block liquid) {
         if (hit == null) return;
         int x = hit.x, y = hit.y, z = hit.z;
@@ -779,6 +900,14 @@ final class Interaction {
                 else meta = Shapes.H_TO_6[facingToPlayer()];
             }
             case SNOW_LAYER -> { if (!below.opaque) return false; }
+            case RAIL -> {
+                if (!w().sturdyTop(x, y - 1, z)) return false;
+                meta = Rails.placementShape(w(), x, y, z, b.id, Rails.fromFacing(facingToPlayer()));
+                finishPlace(h, b, x, y, z, meta);
+                Rails.connectNeighbours(w(), x, y, z);
+                if (b == Block.POWERED_RAIL) Rails.updatePowered(w(), x, y, z);
+                return true;
+            }
             case DOOR -> {
                 if (!w().sturdyTop(x, y - 1, z) || !replaceableAt(x, y + 1, z) || !fitsEntities(x, y + 1, z)) return false;
                 int f = facingToPlayer();

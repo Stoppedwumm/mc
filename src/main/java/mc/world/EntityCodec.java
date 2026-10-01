@@ -16,7 +16,7 @@ public final class EntityCodec {
     private EntityCodec() { }
 
     public static boolean persistent(Entity e) {
-        return !e.removed && (e instanceof Mob m ? !m.isDead() : e instanceof ItemEntity || e instanceof XpOrbEntity);
+        return !e.removed && (e instanceof Mob m ? !m.isDead() : e instanceof ItemEntity || e instanceof XpOrbEntity || e instanceof Vehicle);
     }
 
     private static JsonArray stack(ItemStack s) {
@@ -66,6 +66,12 @@ public final class EntityCodec {
         } else if (e instanceof XpOrbEntity orb) {
             o.addProperty("kind", "xp");
             o.addProperty("value", orb.value);
+        } else if (e instanceof Vehicle v) {
+            o.addProperty("kind", v instanceof BoatEntity ? "boat" : "minecart");
+            o.addProperty("pitch", v.pitch);
+            o.addProperty("damage", v.damageTaken);
+            o.addProperty("hurt", v.hurtTicks);
+            o.addProperty("hurtDir", v.hurtDir);
         }
         return o;
     }
@@ -104,6 +110,8 @@ public final class EntityCodec {
                 e = it;
             }
             case "xp" -> e = new XpOrbEntity(o.get("value").getAsInt());
+            case "minecart" -> e = new MinecartEntity();
+            case "boat" -> e = new BoatEntity();
             default -> { return null; }
         }
         e.setPos(o.get("x").getAsDouble(), o.get("y").getAsDouble(), o.get("z").getAsDouble());
@@ -133,6 +141,7 @@ public final class EntityCodec {
             for (ItemStack s : p.inventory.armor) armor.add(ItemStack.isEmpty(s) ? null : stack(s));
             o.add("armor", armor);
             o.addProperty("sneaking", p.sneaking);
+            o.addProperty("seated", p.vehicle != null);
         } else if (e instanceof ArrowEntity a) {
             o = base(e);
             o.addProperty("kind", "arrow");
@@ -153,6 +162,10 @@ public final class EntityCodec {
             o = base(e);
             o.addProperty("kind", "falling");
             o.addProperty("block", f.blockId);
+        } else if (e instanceof FishingBobberEntity f) {
+            o = base(e);
+            o.addProperty("kind", "bobber");
+            o.addProperty("owner", f.ownerName);
         } else if (e instanceof FireballEntity f) {
             o = base(e);
             o.addProperty("kind", "fireball");
@@ -221,6 +234,11 @@ public final class EntityCodec {
                 e = t;
             }
             case "tnt" -> e = new TntEntity(o.get("fuse").getAsInt());
+            case "bobber" -> {
+                FishingBobberEntity f = new FishingBobberEntity(owner instanceof Player p ? p : null);
+                if (f.owner == null) f.ownerName = o.get("owner").getAsString();
+                e = f;
+            }
             case "falling" -> e = new FallingBlockEntity(o.get("block").getAsInt());
             case "fireball" -> {
                 FireballEntity f = new FireballEntity(owner);
@@ -258,6 +276,7 @@ public final class EntityCodec {
                 for (int i = 0; i < Math.min(4, a.size()); i++) p.inventory.armor[i] = stack(a.get(i));
             }
             if (o.has("sneaking")) p.sneaking = o.get("sneaking").getAsBoolean();
+            if (o.has("seated")) p.seated = o.get("seated").getAsBoolean();
         }
         if (e instanceof Mob m) {
             if (o.has("color")) m.sheepColor = o.get("color").getAsInt();
@@ -284,6 +303,11 @@ public final class EntityCodec {
         }
         if (e instanceof ArrowEntity a && o.has("ground")) a.inGround = o.get("ground").getAsBoolean();
         if (e instanceof TntEntity t && o.has("fuse")) t.fuse = o.get("fuse").getAsInt();
+        if (e instanceof Vehicle v && o.has("damage")) {
+            v.damageTaken = o.get("damage").getAsFloat();
+            v.hurtTicks = o.get("hurt").getAsInt();
+            v.hurtDir = o.get("hurtDir").getAsInt();
+        }
     }
 
     public static String writeAll(List<Entity> list) {

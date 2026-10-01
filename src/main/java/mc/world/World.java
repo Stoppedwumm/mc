@@ -326,6 +326,7 @@ public final class World implements Shapes.Getter {
             else ok = sturdyTop(x, y - 1, z);
         }
         else if (b == Block.REDSTONE_WIRE || b.shape == Block.Shape.REPEATER) ok = sturdyTop(x, y - 1, z);
+        else if (b.shape == Block.Shape.RAIL) ok = Rails.canStay(this, x, y, z);
         else if (b.shape == Block.Shape.PLATE) ok = below.solid && !below.isLiquid();
         else if (b == Block.LEVER || b.shape == Block.Shape.BUTTON) {
             int m = meta & 7;
@@ -668,7 +669,13 @@ public final class World implements Shapes.Getter {
                     if (d > 128 * 128 || (d > 40 * 40 && random.nextInt(800) == 0)) m.remove();
                 }
             }
-            if (!e.removed && !frozen) e.tick();
+            if (!e.removed && !frozen) {
+                if (e.vehicle != null && !e.vehicle.removed && e.vehicle.passenger == e) e.rideTick();
+                else {
+                    e.vehicle = null;
+                    e.tick();
+                }
+            }
             if (e.removed) it.remove();
         }
         entities.addAll(pendingEntities);

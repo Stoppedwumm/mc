@@ -161,6 +161,14 @@ public final class Item {
     public static final Item GOLDEN_APPLE = item(370, "Golden Apple", 130).food(4, 9.6f);
     public static final Item POTION = item(371, "Potion", 131).stack(1);
     public static final Item SPLASH_POTION = item(372, "Splash Potion", 132).stack(1);
+    public static final Item MINECART = item(373, "Minecart", 136).stack(1);
+    public static final Item BOAT = item(374, "Boat", 137).stack(1);
+    public static final Item RAW_FISH = item(375, "Raw Fish", 138).food(2, 0.4f);
+    public static final Item COOKED_FISH = item(376, "Cooked Fish", 139).food(5, 6f);
+    public static final Item RAW_SALMON = item(377, "Raw Salmon", 140).food(2, 0.4f);
+    public static final Item COOKED_SALMON = item(378, "Cooked Salmon", 141).food(6, 9.6f);
+    public static final Item CLOWNFISH = item(379, "Clownfish", 142).food(1, 0.2f);
+    public static final Item PUFFERFISH = item(380, "Pufferfish", 143).food(1, 0.2f);
     /** Item atlas tile of the coloured liquid drawn over potion bottles. */
     public static final int POTION_LIQUID_ICON = 133;
 

@@ -20,9 +20,13 @@ public final class NetPlayer extends Player {
 
     /** Position reported by the client (no teleport packet back). */
     void moveFromClient(double nx, double ny, double nz, float nyaw, float npitch) {
-        prevX = x; prevY = y; prevZ = z;
         prevYaw = yaw; prevPitch = pitch;
-        x = nx; y = ny; z = nz;
+        if (vehicle != null && (vehicle.removed || vehicle.passenger != this)) vehicle = null;
+        if (vehicle == null) {
+            // While riding, the vehicle decides where we are
+            prevX = x; prevY = y; prevZ = z;
+            x = nx; y = ny; z = nz;
+        }
         yaw = nyaw; pitch = npitch;
         headYaw = nyaw;
         double dx = x - prevX, dz = z - prevZ;

@@ -24,9 +24,11 @@ public enum Enchantment {
     POWER("Power", 5, 10, Kind.BOW, 1, 10, 15),
     PUNCH("Punch", 2, 2, Kind.BOW, 12, 20, 25),
     FLAME("Flame", 1, 2, Kind.BOW, 20, 0, 30),
-    INFINITY("Infinity", 1, 1, Kind.BOW, 20, 0, 30);
+    INFINITY("Infinity", 1, 1, Kind.BOW, 20, 0, 30),
+    LUCK_OF_THE_SEA("Luck of the Sea", 3, 2, Kind.ROD, 15, 9, 50),
+    LURE("Lure", 3, 2, Kind.ROD, 15, 9, 50);
 
-    public enum Kind { ARMOR, HEAD, CHEST, FEET, WEAPON, TOOL, BOW, BREAKABLE }
+    public enum Kind { ARMOR, HEAD, CHEST, FEET, WEAPON, TOOL, BOW, ROD, BREAKABLE }
 
     public final String displayName;
     public final int maxLevel, weight;
@@ -66,6 +68,7 @@ public enum Enchantment {
             case WEAPON -> item.tool == Item.Tool.SWORD || (this == SHARPNESS || this == SMITE) && item.tool == Item.Tool.AXE;
             case TOOL -> item.tool == Item.Tool.PICKAXE || item.tool == Item.Tool.AXE || item.tool == Item.Tool.SHOVEL || item.tool == Item.Tool.HOE;
             case BOW -> item == Item.BOW;
+            case ROD -> item == Item.FISHING_ROD;
             case BREAKABLE -> item.maxDamage > 0;
         };
     }

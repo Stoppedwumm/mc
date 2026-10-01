@@ -176,6 +176,46 @@ class MultiplayerTest {
     }
 
     @Test
+    void playersRideVehiclesOverTheNetwork() throws Exception {
+        Path dir = Files.createTempDirectory("mp3");
+        World w = new World(9, new WorldStorage(dir), Dimension.OVERWORLD);
+        w.headless = true;
+        w.loadAreaBlocking(0, 0, 2);
+        Server srv = new Server(w, 0, dir.resolve("players"), null, s -> { }, "Test", false);
+        Connection c = Net.connect("localhost", srv.port()).get(5, TimeUnit.SECONDS);
+        try {
+            ByteBuf hello = packet(C_HELLO);
+            hello.writeInt(VERSION);
+            hello.writeByte(INTENT_LOGIN);
+            writeString(hello, "Carol");
+            send(c, hello);
+            await(srv, w, c, S_LOGIN, b -> true);
+            NetPlayer carol = srv.players().get(0);
+            mc.entity.MinecartEntity cart = new mc.entity.MinecartEntity();
+            cart.setPos(carol.x + 1, carol.y, carol.z);
+            w.addEntity(cart);
+            ByteBuf use = packet(C_INTERACT);
+            use.writeInt(cart.id);
+            writeStack(use, null);
+            send(c, use);
+            await(srv, w, c, S_RIDE, b -> b.readInt() == cart.id);
+            assertSame(cart, carol.vehicle);
+            ByteBuf off = packet(C_STEER);
+            off.writeFloat(0);
+            off.writeFloat(0);
+            off.writeBoolean(true);
+            send(c, off);
+            await(srv, w, c, S_RIDE, b -> b.readInt() == -1);
+            assertNull(carol.vehicle);
+            assertNull(cart.passenger);
+        } finally {
+            c.close("done");
+            srv.stop();
+            w.shutdown();
+        }
+    }
+
+    @Test
     void secondPlayerWithTheSameNameIsRejected() throws Exception {
         Path dir = Files.createTempDirectory("mp2");
         World w = new World(7, new WorldStorage(dir), Dimension.OVERWORLD);

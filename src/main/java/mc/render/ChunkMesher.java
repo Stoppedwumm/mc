@@ -154,7 +154,10 @@ public final class ChunkMesher {
                         case LIQUID -> liquid(block, x, y, z, block == Block.WATER ? translucent : solid);
                         case CROSS -> cross(block, x, y, z, tint, solid);
                         case TORCH -> torch(block, x, y, z, solid);
-                        case SHAPE -> shaped(block, x, y, z, tint, block.layer == Block.Layer.TRANSLUCENT ? translucent : solid);
+                        case SHAPE -> {
+                            if (block.shape == Block.Shape.RAIL) rail(block, x, y, z, solid);
+                            else shaped(block, x, y, z, tint, block.layer == Block.Layer.TRANSLUCENT ? translucent : solid);
+                        }
                         default -> { }
                     }
                 }
@@ -478,6 +481,54 @@ public final class ChunkMesher {
             else emit(out, f, x, y, z, 7, 0, 7, 9, 10, 9, tex, 0xFFFFFF, false, 0, 0, 0);
         }
         offX = offY = offZ = shearX = shearZ = 0;
+    }
+
+    /** Texture of a rail for its shape and state (curves, powered and detecting rails light up). */
+    public static int railTexture(Block block, int meta) {
+        int shape = mc.world.Rails.shape(block.id, meta);
+        if (block == Block.RAIL) return shape >= 6 ? Block.Tex.RAIL_CORNER : Block.Tex.RAIL;
+        boolean on = (meta & mc.world.Rails.ACTIVE) != 0;
+        if (block == Block.POWERED_RAIL) return on ? Block.Tex.POWERED_RAIL_ON : Block.Tex.POWERED_RAIL;
+        return on ? Block.Tex.DETECTOR_RAIL_ON : Block.Tex.DETECTOR_RAIL;
+    }
+
+    /** A rail: one flat (or sloped) double-sided quad just above the ground, its texture turned to the track's shape. */
+    private void rail(Block block, int x, int y, int z, VertexBuilder out) {
+        flatLight(x, y, z);
+        int meta = metaAt(x, y, z);
+        int shape = mc.world.Rails.shape(block.id, meta);
+        int tex = railTexture(block, meta);
+        // Quarter turns of the texture: straight tiles run north-south, the curve tile joins south and east
+        int turns = shape >= 6 ? shape - 6 : (shape == 1 || shape == 2 || shape == 3) ? 1 : 0;
+        int lx = (x - 16) * 16, ly = y * 16, lz = (z - 16) * 16;
+        int tu = (tex & 15) * 256, tv = (tex >> 4) * 256;
+        int[][] corners = {{0, 0}, {0, 1}, {1, 1}, {1, 0}};
+        int[] hy = new int[4];
+        for (int k = 0; k < 4; k++) {
+            int cx = corners[k][0], cz = corners[k][1];
+            boolean high = switch (shape) {
+                case 2 -> cx == 1;
+                case 3 -> cx == 0;
+                case 4 -> cz == 0;
+                case 5 -> cz == 1;
+                default -> false;
+            };
+            hy[k] = high ? 17 : 1;
+        }
+        int[] us = new int[4], vs = new int[4];
+        for (int k = 0; k < 4; k++) {
+            int u = corners[k][0], v = corners[k][1];
+            // Undo the clockwise turns: (u, v) -> (v, 1 - u) per turn
+            for (int t = 0; t < turns; t++) { int nu = v, nv = 1 - u; u = nu; v = nv; }
+            us[k] = tu + (u == 0 ? 1 : 255);
+            vs[k] = tv + (v == 0 ? 1 : 255);
+        }
+        int s = vSky[0], bl = vBlk[0];
+        int flags = block == Block.POWERED_RAIL && (meta & mc.world.Rails.ACTIVE) != 0 ? F_EMISSIVE : 0;
+        for (int k = 0; k < 4; k++)
+            out.vertex(lx + corners[k][0] * 16, ly + hy[k], lz + corners[k][1] * 16, us[k], vs[k], s, bl, 255, 0xFFFFFFFF, flags);
+        for (int k = 3; k >= 0; k--)
+            out.vertex(lx + corners[k][0] * 16, ly + hy[k], lz + corners[k][1] * 16, us[k], vs[k], s, bl, 200, 0xFFFFFFFF, 1);
     }
 
     /** Multi-part shapes whose parts use different textures (repeater torches, lever handle, piston arm). */

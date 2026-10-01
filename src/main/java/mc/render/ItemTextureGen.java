@@ -10,7 +10,8 @@ import java.util.function.BiPredicate;
 public final class ItemTextureGen {
     public static final int HEART = 96, HEART_HALF = 97, HEART_EMPTY = 98, FOOD = 99, FOOD_HALF = 100, FOOD_EMPTY = 101,
             BUBBLE = 102, FLAME = 103, PROGRESS = 104, PROGRESS_FULL = 105, BUBBLE_POP = 106, HEART_HURT = 107,
-            ARMOR = 108, ARMOR_HALF = 109, ARMOR_EMPTY = 110, XP_ORB = 111, HEART_GOLD = 134, HEART_GOLD_HALF = 135;
+            ARMOR = 108, ARMOR_HALF = 109, ARMOR_EMPTY = 110, XP_ORB = 111, HEART_GOLD = 134, HEART_GOLD_HALF = 135,
+            BOBBER = 144, WHITE = 145;
     /** Base colour per armor material (leather, chainmail, iron, gold, diamond). */
     public static final int[] ARMOR_COLORS = {0xa0653a, 0x8a8a8a, 0xd8d8d8, 0xf8d840, 0x4ae0d8};
     private final int[] px = new int[256 * 256];
@@ -94,6 +95,21 @@ public final class ItemTextureGen {
         tile(130, () -> { apple(); recolor(0xf8d840); });
         tile(131, () -> bottle(true, false));
         tile(132, () -> bottle(true, true));
+        tile(BOBBER, () -> {
+            for (int y = 0; y < 16; y++)
+                for (int x = 0; x < 16; x++)
+                    if (sq((x - 7.5) / 3.5) + sq((y - 8) / 4.5) < 1) set(x, y, y < 8 ? (x < 6 ? 0xff6a5a : 0xd8261a) : (x < 6 ? 0xffffff : 0xd8d8d8));
+            for (int y = 1; y < 4; y++) set(7, y, 0x3a3a3a);
+        });
+        tile(WHITE, () -> { for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) set(x, y, 0xffffff); });
+        tile(136, this::minecart);
+        tile(137, this::boat);
+        tile(138, () -> fish(0x8a9aa8, 0x4a5a68, 0xc0ccd8, 0));
+        tile(139, () -> fish(0xa07850, 0x5a3a20, 0xc8a070, 0));
+        tile(140, () -> fish(0xc85a4a, 0x6a2a20, 0xf09080, 1));
+        tile(141, () -> fish(0xa0583a, 0x5a2a18, 0xc88060, 1));
+        tile(142, () -> fish(0xf07a1a, 0x7a3a08, 0xffb070, 2));
+        tile(143, this::pufferfish);
         tile(133, () -> { for (int y = 7; y <= 13; y++) for (int x = 4; x <= 11; x++) if (dist(x, y, 7.5, 10) < 3.9) set(x, y, (x < 7 && y < 10) ? 0xffffff : 0xd8d8d8 - (y - 7) * 0x080808); });
         tile(HEART_GOLD, () -> heart(0xf0c020, true, 1));
         tile(HEART_GOLD_HALF, () -> heart(0xf0c020, true, 0.5));
@@ -358,6 +374,36 @@ public final class ItemTextureGen {
                 int rr = Math.min(255, (int) ((c >> 16 & 255) * l)), g = Math.min(255, (int) ((c >> 8 & 255) * l)), b = Math.min(255, (int) ((c & 255) * l));
                 px[i] = 0xFF000000 | rr << 16 | g << 8 | b;
             }
+    }
+
+    private void minecart() {
+        shape((x, y) -> y >= 6 && y <= 11 && x >= 1 && x <= 14 && !(y < 10 && x >= 3 && x <= 12 && y > 6), 0x9a9a9a, 0x4a4a4a, 0xd0d0d0);
+        for (int x = 3; x <= 12; x++) for (int y = 7; y <= 9; y++) set(x, y, 0x3a3a3a);
+        shape((x, y) -> dist(x, y, 4, 12.5) < 1.6 || dist(x, y, 11, 12.5) < 1.6, 0x5a5a5a, 0x2a2a2a, 0x8a8a8a);
+    }
+
+    private void boat() {
+        shape((x, y) -> y >= 6 && y <= 11 && x >= 1 + Math.max(0, y - 8) && x <= 14 - Math.max(0, y - 8), WOOD, WOOD_D, 0xb08a52);
+        for (int x = 3; x <= 12; x++) set(x, 7, WOOD_D);
+        for (int x = 2; x <= 13; x++) set(x, 9, 0x6a4e2a);
+    }
+
+    /** A fish facing left: body ellipse, tail fin, eye; kind 1 = salmon stripes, 2 = clownfish bands. */
+    private void fish(int main, int dark, int light, int kind) {
+        shape((x, y) -> sq((x - 7) / 5.5) + sq((y - 8) / 3.2) < 1 || (x >= 11 && x <= 14 && Math.abs(y - 8) <= (x - 10)), main, dark, light);
+        if (kind == 1) for (int x = 3; x <= 11; x++) set(x, 9, 0xe8a090);
+        if (kind == 2) for (int y = 5; y <= 11; y++) for (int x : new int[]{5, 9}) if (opaque(x, y)) set(x, y, 0xf8f8f8);
+        set(3, 7, 0x101010);
+    }
+
+    private void pufferfish() {
+        shape((x, y) -> dist(x, y, 7.5, 8) < 5, 0xe0c040, 0x7a6010, 0xfff090);
+        for (int i = 0; i < 8; i++) {
+            double a = i * Math.PI / 4;
+            set((int) Math.round(7.5 + Math.cos(a) * 6), (int) Math.round(8 + Math.sin(a) * 6), 0xd0d0b0);
+        }
+        set(5, 7, 0x101010);
+        set(10, 7, 0x101010);
     }
 
     private void fishingRod() {

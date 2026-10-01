@@ -251,6 +251,18 @@ public abstract class LivingEntity extends Entity {
     }
 
     @Override
+    public void rideTick() {
+        super.rideTick();
+        prevLimbSwingAmount = limbSwingAmount;
+        prevBodyYaw = bodyYaw;
+        prevHeadYaw = headYaw;
+        limbSwingAmount *= 0.6f;
+        if (hurtTime > 0) hurtTime--;
+        if (invulnerableTime > 0) invulnerableTime--;
+        if (vehicle != null) bodyYaw += wrapDegrees(vehicle.yaw - bodyYaw) * 0.3f;
+    }
+
+    @Override
     public void netTick() {
         prevLimbSwingAmount = limbSwingAmount;
         prevBodyYaw = bodyYaw;
