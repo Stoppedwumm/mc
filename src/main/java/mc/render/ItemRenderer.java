@@ -19,7 +19,7 @@ public final class ItemRenderer {
 
     public ItemRenderer() {
         pixels = new ItemTextureGen().generate();
-        itemAtlas = new Texture(pixels, 256, 256, false, false);
+        itemAtlas = new Texture(pixels, Atlas.SIZE, Atlas.SIZE, false, false);
     }
 
     public boolean usesBlockAtlas(Item item) {
@@ -32,7 +32,7 @@ public final class ItemRenderer {
 
     private boolean opaque(int tile, int x, int y) {
         if (x < 0 || y < 0 || x > 15 || y > 15) return false;
-        return (pixels[((tile >> 4) * 16 + y) * 256 + (tile & 15) * 16 + x] >>> 24) > 0;
+        return (pixels[Atlas.index(tile, x, y)] >>> 24) > 0;
     }
 
     /**
@@ -45,10 +45,10 @@ public final class ItemRenderer {
         if (cached != null) return cached;
         java.util.function.BiPredicate<Integer, Integer> op = (x, y) -> {
             if (x < 0 || y < 0 || x > 15 || y > 15) return false;
-            return (source[((tile >> 4) * 16 + y) * 256 + (tile & 15) * 16 + x] >>> 24) > 64;
+            return (source[Atlas.index(tile, x, y)] >>> 24) > 64;
         };
         FloatList out = new FloatList();
-        float u0 = (tile & 15) / 16f, v0 = (tile >> 4) / 16f, t = 1 / 16f, th = 1 / 32f;
+        float u0 = Atlas.u(tile), v0 = Atlas.v(tile), t = Atlas.STEP, th = Atlas.STEP / 2;
         // Front and back faces
         addQuad(out, 0, 1, th, 0, 0, th, 1, 0, th, 1, 1, th, u0, v0, u0 + t, v0 + t, 1f);
         addQuad(out, 1, 1, -th, 1, 0, -th, 0, 0, -th, 0, 1, -th, u0 + t, v0, u0, v0 + t, 0.8f);
@@ -57,7 +57,7 @@ public final class ItemRenderer {
             for (int x = 0; x < 16; x++) {
                 if (!op.test(x, y)) continue;
                 float px0 = x * p, px1 = (x + 1) * p, py1 = 1 - y * p, py0 = 1 - (y + 1) * p;
-                float cu = u0 + (x + 0.5f) / 256f, cv = v0 + (y + 0.5f) / 256f;
+                float cu = u0 + (x + 0.5f) / Atlas.SIZE, cv = v0 + (y + 0.5f) / Atlas.SIZE;
                 if (!op.test(x, y - 1)) addQuad(out, px0, py1, -th, px0, py1, th, px1, py1, th, px1, py1, -th, cu, cv, cu, cv, 0.95f);
                 if (!op.test(x, y + 1)) addQuad(out, px0, py0, th, px0, py0, -th, px1, py0, -th, px1, py0, th, cu, cv, cu, cv, 0.55f);
                 if (!op.test(x - 1, y)) addQuad(out, px0, py1, -th, px0, py0, -th, px0, py0, th, px0, py1, th, cu, cv, cu, cv, 0.7f);

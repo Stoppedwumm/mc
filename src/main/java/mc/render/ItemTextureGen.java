@@ -4,7 +4,7 @@ import java.util.Random;
 import java.util.function.BiPredicate;
 
 /**
- * Paints item sprites (tools, materials, food) and HUD icons into a 256x256 atlas of 16x16 tiles.
+ * Paints item sprites (tools, materials, food) and HUD icons into an atlas of 16x16 tiles (see {@link Atlas}).
  * Shapes are defined by pixel predicates, then shaded with an outline and highlight like vanilla items.
  */
 public final class ItemTextureGen {
@@ -14,7 +14,7 @@ public final class ItemTextureGen {
             BOBBER = 144, WHITE = 145;
     /** Base colour per armor material (leather, chainmail, iron, gold, diamond). */
     public static final int[] ARMOR_COLORS = {0xa0653a, 0x8a8a8a, 0xd8d8d8, 0xf8d840, 0x4ae0d8};
-    private final int[] px = new int[256 * 256];
+    private final int[] px = new int[Atlas.SIZE * Atlas.SIZE];
     private int tile;
     private Random r;
 
@@ -32,7 +32,7 @@ public final class ItemTextureGen {
 
     /** Reserves an item-atlas tile for a mod texture (16 x 16 ARGB); returns its index. */
     public static synchronized int addTile(int[] argb) {
-        if (nextExtra >= 256) throw new IllegalStateException("The item texture atlas is full");
+        if (nextExtra >= Atlas.TILES) throw new IllegalStateException("The item texture atlas is full");
         EXTRA.put(nextExtra, argb);
         return nextExtra++;
     }
@@ -162,7 +162,7 @@ public final class ItemTextureGen {
             int[] src = e.getValue();
             for (int i = 0; i < 256; i++) {
                 int a = src[i] >>> 24;
-                px[((tile >> 4) * 16 + (i >> 4)) * 256 + (tile & 15) * 16 + (i & 15)] = a >= 128 ? 0xFF000000 | src[i] : 0;
+                px[Atlas.index(tile, i & 15, i >> 4)] = a >= 128 ? 0xFF000000 | src[i] : 0;
             }
         }
         return px;
@@ -176,12 +176,12 @@ public final class ItemTextureGen {
 
     private void set(int x, int y, int rgb) {
         if (x < 0 || y < 0 || x > 15 || y > 15) return;
-        px[((tile >> 4) * 16 + y) * 256 + (tile & 15) * 16 + x] = 0xFF000000 | rgb;
+        px[Atlas.index(tile, x, y)] = 0xFF000000 | rgb;
     }
 
     private boolean opaque(int x, int y) {
         if (x < 0 || y < 0 || x > 15 || y > 15) return false;
-        return (px[((tile >> 4) * 16 + y) * 256 + (tile & 15) * 16 + x] >>> 24) != 0;
+        return (px[Atlas.index(tile, x, y)] >>> 24) != 0;
     }
 
     private static double dist(double x, double y, double cx, double cy) {
@@ -385,7 +385,7 @@ public final class ItemTextureGen {
     private void recolor(int c) {
         for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
-                int i = ((tile >> 4) * 16 + y) * 256 + (tile & 15) * 16 + x;
+                int i = Atlas.index(tile, x, y);
                 if ((px[i] >>> 24) == 0) continue;
                 int v = px[i];
                 double l = ((v >> 16 & 255) * 0.3 + (v >> 8 & 255) * 0.59 + (v & 255) * 0.11) / 160.0;

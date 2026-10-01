@@ -48,7 +48,7 @@ void main() {
     vNormal = NORMALS[min(face, 6)];
     vFlags = flags;
     gl_Position = uProjView * vec4(p, 1.0);
-    vUV = aUV / 4096.0;
+    vUV = aUV / 16384.0; // 1/16 texel units over the 64-tile-wide atlas (render.Atlas)
     vLight = aLight.xy / 240.0;
     vAO = aLight.z / 255.0;
     vColor = aColor;

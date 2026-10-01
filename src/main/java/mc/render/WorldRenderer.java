@@ -316,7 +316,7 @@ public final class WorldRenderer {
         if (breakProgress > 0 && (b.model == Block.Model.CUBE || b.model == Block.Model.SHAPE)) {
             int stage = Math.min(9, (int) (breakProgress * 10));
             int tex = Block.Tex.BREAK_0 + stage;
-            float u0 = (tex & 15) / 16f, v0 = (tex >> 4) / 16f, u1 = u0 + 1 / 16f, v1 = v0 + 1 / 16f;
+            float u0 = Atlas.u(tex), v0 = Atlas.v(tex), u1 = u0 + Atlas.STEP, v1 = v0 + Atlas.STEP;
             setupBasic(projView, true, 0, 0.01f);
             atlas.bind();
             glEnable(GL_BLEND);
@@ -482,7 +482,7 @@ public final class WorldRenderer {
                 tex = f == 0 ? Block.Tex.GRASS_TOP_ITEM : f == 1 ? Block.Tex.DIRT : Block.Tex.GRASS_SIDE_ITEM;
             }
             int c = shade(brightness * FACE_SHADES[f], faceTint);
-            float tu = (tex & 15) / 16f, tv = (tex >> 4) / 16f;
+            float tu = Atlas.u(tex), tv = Atlas.v(tex);
             int[][] q = switch (f) {
                 case 0 -> new int[][]{{b[0], b[4], b[2]}, {b[0], b[4], b[5]}, {b[3], b[4], b[5]}, {b[3], b[4], b[2]}};
                 case 1 -> new int[][]{{b[0], b[1], b[2]}, {b[3], b[1], b[2]}, {b[3], b[1], b[5]}, {b[0], b[1], b[5]}};
@@ -503,7 +503,7 @@ public final class WorldRenderer {
                     default -> { u = 16 - pz; w = 16 - py; }
                 }
                 v[n * 5] = x + px * k; v[n * 5 + 1] = y + py * k; v[n * 5 + 2] = z + pz * k;
-                v[n * 5 + 3] = tu + u / 256f; v[n * 5 + 4] = tv + w / 256f;
+                v[n * 5 + 3] = tu + u / (float) Atlas.SIZE; v[n * 5 + 4] = tv + w / (float) Atlas.SIZE;
             }
             batch.quad(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14],
                     v[15], v[16], v[17], v[18], v[19], c);

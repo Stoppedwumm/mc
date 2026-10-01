@@ -5,11 +5,11 @@ import mc.world.Block.Tex;
 import java.util.Random;
 
 /**
- * Procedurally paints 16x16 pixel-art block textures into a 256x256 atlas (16x16 tiles).
+ * Procedurally paints 16x16 pixel-art block textures into an atlas of 16x16 tiles (see {@link Atlas}).
  * Alpha conventions for opaque blocks: 255 = plain pixel, 153 = biome-tinted pixel (grass), 0 = hole.
  */
 public final class TextureGen {
-    public static final int ATLAS = 256;
+    public static final int ATLAS = Atlas.SIZE;
     private final int[] px = new int[ATLAS * ATLAS];
     private Random r;
     private int tile;
@@ -20,7 +20,8 @@ public final class TextureGen {
 
     /** Reserves an atlas tile for a mod texture (16 x 16 ARGB, row by row); returns its index. */
     public static synchronized int addTile(int[] argb) {
-        if (nextExtra >= Tex.BREAK_0) throw new IllegalStateException("The block texture atlas is full");
+        if (nextExtra == Tex.BREAK_0) nextExtra = Tex.BREAK_0 + 10; // the crack stages
+        if (nextExtra >= Atlas.TILES) throw new IllegalStateException("The block texture atlas is full");
         EXTRA.put(nextExtra, argb);
         return nextExtra++;
     }
@@ -214,14 +215,14 @@ public final class TextureGen {
 
     private void set(int x, int y, int rgb, int a) {
         if (x < 0 || y < 0 || x > 15 || y > 15) return;
-        int ax = (tile & 15) * 16 + x, ay = (tile >> 4) * 16 + y;
+        int ax = (tile % Atlas.ROW) * 16 + x, ay = (tile / Atlas.ROW) * 16 + y;
         px[ay * ATLAS + ax] = (a << 24) | (rgb & 0xFFFFFF);
     }
 
     private void set(int x, int y, int rgb) { set(x, y, rgb, 255); }
 
     private int get(int x, int y) {
-        int ax = (tile & 15) * 16 + (x & 15), ay = (tile >> 4) * 16 + (y & 15);
+        int ax = (tile % Atlas.ROW) * 16 + (x & 15), ay = (tile / Atlas.ROW) * 16 + (y & 15);
         return px[ay * ATLAS + ax];
     }
 

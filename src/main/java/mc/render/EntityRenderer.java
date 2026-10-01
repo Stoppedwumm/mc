@@ -168,7 +168,7 @@ public final class EntityRenderer {
         Matrix4f m = new Matrix4f().translate((float) ex, (float) ey + 0.15f + (float) Math.sin(t * 0.1) * 0.05f, (float) ez)
                 .rotateY((float) Math.toRadians(-wr.camYaw + 180)).rotateX((float) Math.toRadians(-wr.camPitch)).scale(size);
         int tile = ItemTextureGen.XP_ORB;
-        float u0 = (tile & 15) / 16f, v0 = (tile >> 4) / 16f, u1 = u0 + 1 / 16f, v1 = v0 + 1 / 16f;
+        float u0 = Atlas.u(tile), v0 = Atlas.v(tile), u1 = u0 + Atlas.STEP, v1 = v0 + Atlas.STEP;
         org.joml.Vector3f a = m.transformPosition(new org.joml.Vector3f(-1, 1, 0)), b = m.transformPosition(new org.joml.Vector3f(-1, -1, 0));
         org.joml.Vector3f c = m.transformPosition(new org.joml.Vector3f(1, -1, 0)), d = m.transformPosition(new org.joml.Vector3f(1, 1, 0));
         wr.batch.begin(GL_TRIANGLES);
@@ -207,7 +207,7 @@ public final class EntityRenderer {
 
     /** A camera-facing quad of one item-atlas tile. */
     private void iconQuad(WorldRenderer wr, int tile, Matrix4f m, int color) {
-        float u0 = (tile & 15) / 16f, v0 = (tile >> 4) / 16f, u1 = u0 + 1 / 16f, v1 = v0 + 1 / 16f;
+        float u0 = Atlas.u(tile), v0 = Atlas.v(tile), u1 = u0 + Atlas.STEP, v1 = v0 + Atlas.STEP;
         org.joml.Vector3f a = m.transformPosition(new org.joml.Vector3f(-1, 1, 0)), b = m.transformPosition(new org.joml.Vector3f(-1, -1, 0));
         org.joml.Vector3f c = m.transformPosition(new org.joml.Vector3f(1, -1, 0)), d = m.transformPosition(new org.joml.Vector3f(1, 1, 0));
         wr.batch.quad(a.x, a.y, a.z, u0, v0, b.x, b.y, b.z, u0, v1, c.x, c.y, c.z, u1, v1, d.x, d.y, d.z, u1, v0, color);
@@ -251,7 +251,7 @@ public final class EntityRenderer {
             }
             double tx = ex, ty = ey + 0.2, tz = ez;
             double len = Math.sqrt((tx - sx) * (tx - sx) + (ty - sy) * (ty - sy) + (tz - sz) * (tz - sz));
-            float u = (ItemTextureGen.WHITE & 15) / 16f + 1 / 32f, v = (ItemTextureGen.WHITE >> 4) / 16f + 1 / 32f;
+            float u = Atlas.u(ItemTextureGen.WHITE) + Atlas.STEP / 2, v = Atlas.v(ItemTextureGen.WHITE) + Atlas.STEP / 2;
             int n = 16;
             double[] prev = null;
             for (int i = 0; i <= n; i++) {

@@ -25,6 +25,6 @@ void main() {
         float t = uTime * 2.2 + world.x * 0.9 + world.z * 0.7;
         p.xz += vec2(sin(t), cos(t * 1.2)) * 0.07 * windStrength;
     }
-    vUV = aUV / 4096.0;
+    vUV = aUV / 16384.0; // 1/16 texel units over the 64-tile-wide atlas (render.Atlas)
     gl_Position = uShadowMatrix * vec4(p, 1.0);
 }

@@ -45,8 +45,8 @@ public final class Particles {
         p.vy = dy * speed * 2 + random.nextDouble() * 0.12;
         p.vz = dz * speed * 2 + (random.nextDouble() - 0.5) * 0.08;
         int tex = block.texSide;
-        p.u = ((tex & 15) * 16 + random.nextInt(12)) / 256f;
-        p.v = ((tex >> 4) * 16 + random.nextInt(12)) / 256f;
+        p.u = ((tex % Atlas.ROW) * 16 + random.nextInt(12)) / (float) Atlas.SIZE;
+        p.v = ((tex / Atlas.ROW) * 16 + random.nextInt(12)) / (float) Atlas.SIZE;
         p.size = 0.06f + random.nextFloat() * 0.05f;
         p.tint = tint;
         p.brightness = brightness;

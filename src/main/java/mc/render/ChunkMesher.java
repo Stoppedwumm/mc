@@ -312,7 +312,7 @@ public final class ChunkMesher {
     private void emit(VertexBuilder out, int face, int x, int y, int z, int x0, int y0, int z0, int x1, int y1, int z1,
                       int tex, int tint, boolean ao, int uOff, int vOff, int flags) {
         int lx = (x - 16) * 16, ly = y * 16, lz = (z - 16) * 16;
-        int tu = (tex & 15) * 16 * 16, tv = (tex >> 4) * 16 * 16;
+        int tu = (tex % Atlas.ROW) * 256, tv = (tex / Atlas.ROW) * 256;
         boolean flip = ao && vAo[0] + vAo[2] < vAo[1] + vAo[3];
         for (int k = 0; k < 4; k++) {
             int v = flip ? (k + 1) & 3 : k;
@@ -396,7 +396,7 @@ public final class ChunkMesher {
         int flag = block == Block.WATER ? F_WATER : F_EMISSIVE;
         VertexBuilder o = out;
         int tex = block.texTop;
-        int tu = (tex & 15) * 256, tv = (tex >> 4) * 256;
+        int tu = (tex % Atlas.ROW) * 256, tv = (tex / Atlas.ROW) * 256;
         int lx = (x - 16) * 16, ly = y * 16, lz = (z - 16) * 16;
         for (int f = 0; f < 6; f++) {
             int[] d = DIR[f];
@@ -436,7 +436,7 @@ public final class ChunkMesher {
         flatLight(x, y, z);
         int lx = (x - 16) * 16, ly = y * 16, lz = (z - 16) * 16;
         int tex = block.textureForFace(2, metaAt(x, y, z));
-        int tu = (tex & 15) * 256 + 1, tv = (tex >> 4) * 256 + 1;
+        int tu = (tex % Atlas.ROW) * 256 + 1, tv = (tex / Atlas.ROW) * 256 + 1;
         int s = vSky[0], bl = vBlk[0];
         int shade = 255;
         int wave = block == Block.SUGAR_CANE || block == Block.FIRE ? 0 : F_PLANT;
@@ -502,7 +502,7 @@ public final class ChunkMesher {
         // Quarter turns of the texture: straight tiles run north-south, the curve tile joins south and east
         int turns = shape >= 6 ? shape - 6 : (shape == 1 || shape == 2 || shape == 3) ? 1 : 0;
         int lx = (x - 16) * 16, ly = y * 16, lz = (z - 16) * 16;
-        int tu = (tex & 15) * 256, tv = (tex >> 4) * 256;
+        int tu = (tex % Atlas.ROW) * 256, tv = (tex / Atlas.ROW) * 256;
         int[][] corners = {{0, 0}, {0, 1}, {1, 1}, {1, 0}};
         int[] hy = new int[4];
         for (int k = 0; k < 4; k++) {

@@ -141,11 +141,11 @@ public final class Gui {
         } else {
             int tex = block.spriteTex();
             if (block.isCrop()) tex = block.textureForFace(2, 7);
-            float u0 = (tex & 15) / 16f, v0 = (tex >> 4) / 16f;
+            float u0 = Atlas.u(tex), v0 = Atlas.v(tex);
             shader(ortho, true, 0.3f);
             batch.begin(GL_TRIANGLES);
             int t = WorldRenderer.tintFor(block);
-            batch.rect(x, y, size, size, u0, v0, u0 + 1 / 16f, v0 + 1 / 16f, 0xFF000000 | t);
+            batch.rect(x, y, size, size, u0, v0, u0 + Atlas.STEP, v0 + Atlas.STEP, 0xFF000000 | t);
             batch.end();
         }
     }
@@ -181,9 +181,9 @@ public final class Gui {
         glActiveTexture(GL_TEXTURE0);
         items.itemAtlas.bind();
         shader(ortho, true, 0.1f);
-        float u0 = (tile & 15) / 16f, v0 = (tile >> 4) / 16f;
+        float u0 = Atlas.u(tile), v0 = Atlas.v(tile);
         batch.begin(GL_TRIANGLES);
-        batch.rect(x, y, w, h, u0, v0, u0 + 1 / 16f, v0 + 1 / 16f, 0xFFFFFFFF);
+        batch.rect(x, y, w, h, u0, v0, u0 + Atlas.STEP, v0 + Atlas.STEP, 0xFFFFFFFF);
         batch.end();
     }
 
@@ -199,13 +199,13 @@ public final class Gui {
             glActiveTexture(GL_TEXTURE0);
             items.itemAtlas.bind();
             shader(ortho, true, 0.1f);
-            float u0 = (it.icon & 15) / 16f, v0 = (it.icon >> 4) / 16f;
+            float u0 = Atlas.u(it.icon), v0 = Atlas.v(it.icon);
             batch.begin(GL_TRIANGLES);
-            batch.rect(x, y, 16, 16, u0, v0, u0 + 1 / 16f, v0 + 1 / 16f, 0xFFFFFFFF);
+            batch.rect(x, y, 16, 16, u0, v0, u0 + Atlas.STEP, v0 + Atlas.STEP, 0xFFFFFFFF);
             if (it == mc.item.Item.POTION || it == mc.item.Item.SPLASH_POTION) {
                 int li = mc.item.Item.POTION_LIQUID_ICON;
-                float lu = (li & 15) / 16f, lv = (li >> 4) / 16f;
-                batch.rect(x, y, 16, 16, lu, lv, lu + 1 / 16f, lv + 1 / 16f, 0xFF000000 | mc.item.Potions.color(s.damage));
+                float lu = Atlas.u(li), lv = Atlas.v(li);
+                batch.rect(x, y, 16, 16, lu, lv, lu + Atlas.STEP, lv + Atlas.STEP, 0xFF000000 | mc.item.Potions.color(s.damage));
             }
             batch.end();
             if (s.isEnchanted() || it == mc.item.Item.ENCHANTED_BOOK) {
@@ -214,7 +214,7 @@ public final class Gui {
                 int a = (int) (150 + 70 * Math.sin(t * 2.5 + x * 0.05));
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE);
                 batch.begin(GL_TRIANGLES);
-                batch.rect(x, y, 16, 16, u0, v0, u0 + 1 / 16f, v0 + 1 / 16f, a << 24 | 0x9a50ff);
+                batch.rect(x, y, 16, 16, u0, v0, u0 + Atlas.STEP, v0 + Atlas.STEP, a << 24 | 0x9a50ff);
                 batch.end();
                 glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
             }
