@@ -2,7 +2,10 @@ package net.minecraft.resources;
 
 /** A namespaced id such as "minecraft:stone" (reamc-compat). */
 public final class ResourceLocation implements Comparable<ResourceLocation> {
-    public static final String DEFAULT_NAMESPACE = "minecraft";
+    public static final String DEFAULT_NAMESPACE = "minecraft", REALMS_NAMESPACE = "realms";
+    public static final char NAMESPACE_SEPARATOR = ':';
+    public static final com.mojang.serialization.Codec<ResourceLocation> CODEC = com.mojang.serialization.Codec.STRING.comapFlatMap(ResourceLocation::read, ResourceLocation::toString);
+    public static final net.minecraft.network.codec.StreamCodec<io.netty.buffer.ByteBuf, ResourceLocation> STREAM_CODEC = net.minecraft.network.codec.ByteBufCodecs.STRING_UTF8.map(ResourceLocation::parse, ResourceLocation::toString);
     private final String namespace, path;
 
     private ResourceLocation(String namespace, String path) {
@@ -22,6 +25,36 @@ public final class ResourceLocation implements Comparable<ResourceLocation> {
     public static ResourceLocation tryParse(String id) {
         try { return parse(id); } catch (RuntimeException e) { return null; }
     }
+
+    public static ResourceLocation tryBuild(String namespace, String path) {
+        return isValidNamespace(namespace) && isValidPath(path) ? new ResourceLocation(namespace, path) : null;
+    }
+
+    public static ResourceLocation bySeparator(String id, char sep) {
+        int i = id.indexOf(sep);
+        return i < 0 ? withDefaultNamespace(id) : fromNamespaceAndPath(i == 0 ? DEFAULT_NAMESPACE : id.substring(0, i), id.substring(i + 1));
+    }
+
+    public static ResourceLocation tryBySeparator(String id, char sep) {
+        try { return bySeparator(id, sep); } catch (RuntimeException e) { return null; }
+    }
+
+    public static com.mojang.serialization.DataResult<ResourceLocation> read(String id) {
+        ResourceLocation r = tryParse(id);
+        return r != null ? com.mojang.serialization.DataResult.success(r) : com.mojang.serialization.DataResult.error(() -> "Not a valid resource location: " + id);
+    }
+
+    public static boolean validPathChar(char c) { return c == '_' || c == '-' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '/' || c == '.'; }
+
+    public static boolean isAllowedInResourceLocation(char c) { return validPathChar(c) || c == ':'; }
+
+    public static boolean isValidPath(String p) { for (int i = 0; i < p.length(); i++) if (!validPathChar(p.charAt(i))) return false; return true; }
+
+    public static boolean isValidNamespace(String n) { for (int i = 0; i < n.length(); i++) { char c = n.charAt(i); if (!(validPathChar(c) && c != '/')) return false; } return true; }
+
+    public String toShortLanguageKey() { return namespace.equals(DEFAULT_NAMESPACE) ? path : toLanguageKey(""); }
+
+    public String toDebugFileName() { return toString().replace('/', '_').replace(':', '_'); }
 
     public String getNamespace() { return namespace; }
     public String getPath() { return path; }

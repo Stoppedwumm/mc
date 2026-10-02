@@ -81,6 +81,10 @@ public final class ModLoader {
     public record LoadedMod(String id, String version, String name, Path file, boolean loaded, String problem) { }
 
     public static final List<LoadedMod> MODS = new ArrayList<>();
+    private static final Map<String, ModContainer> CONTAINERS = new LinkedHashMap<>();
+
+    /** A constructed mod by id, or null. */
+    public static ModContainer container(String id) { return CONTAINERS.get(id); }
     private static final List<ZipFile> JARS = new ArrayList<>();
     private static final Map<String, ModEventBus> BUSES = new LinkedHashMap<>();
     /** Each loaded mod's class loader, by mod id. */
@@ -134,7 +138,8 @@ public final class ModLoader {
         }
         if (containers.isEmpty()) return MODS;
         // Registration, registry by registry, then the engine gets its blocks and items
-        for (Registry<?> r : BuiltInRegistries.ORDER) {
+        net.neoforged.neoforge.registries.NeoForgeRegistries.init();
+        for (Registry<?> r : new ArrayList<>(BuiltInRegistries.REGISTRY.stream().toList())) {
             post(new RegisterEvent(r));
             if (r == BuiltInRegistries.BLOCK) bindBlocks();
             if (r == BuiltInRegistries.ITEM) bindItems();
@@ -188,6 +193,7 @@ public final class ModLoader {
         ModEventBus bus = new ModEventBus(id);
         BUSES.put(id, bus);
         ModContainer container = new ModContainer(id, version, name, bus);
+        CONTAINERS.put(id, container);
         for (ModAnalyzer.Subscriber s : report.subscribers) {
             if (dist == Dist.CLIENT ? !s.client() : !s.server()) continue;
             Class<?> c = Class.forName(s.className(), true, loader);
@@ -552,7 +558,7 @@ public final class ModLoader {
         if (e.maxDamage <= 0) e.maxDamage = t.getUses();
         e.enchantValue = t.getEnchantmentValue();
         var repair = t.getRepairIngredient();
-        if (repair != null && !repair.isEmpty()) e.repairItem = Bridge.engineItem(repair.reamc$items().get(0).asItem());
+        if (repair != null && !repair.isEmpty()) { var r = repair.reamc$engineItems(); if (!r.isEmpty()) e.repairItem = r.get(0); }
     }
 
     private static mc.item.Item.Tool toolFor(TagKey<Block> mineable) {
@@ -575,7 +581,7 @@ public final class ModLoader {
             e.armorColor = averageColor("assets/" + a.getNamespace() + "/textures/models/armor/" + a.getPath() + "_layer_1.png");
         }
         var repair = m.repairIngredient() == null ? null : m.repairIngredient().get();
-        if (repair != null && !repair.isEmpty()) e.repairItem = Bridge.engineItem(repair.reamc$items().get(0).asItem());
+        if (repair != null && !repair.isEmpty()) { var r = repair.reamc$engineItems(); if (!r.isEmpty()) e.repairItem = r.get(0); }
         if (e.enchantValue < 0) e.enchantValue = m.enchantmentValue();
     }
 

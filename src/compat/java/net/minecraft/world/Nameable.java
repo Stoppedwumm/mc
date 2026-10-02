@@ -7,5 +7,7 @@ public interface Nameable {
 
     default Component getDisplayName() { return getName(); }
 
-    default boolean hasCustomName() { return false; }
+    default boolean hasCustomName() { return getCustomName() != null; }
+
+    default Component getCustomName() { return null; }
 }

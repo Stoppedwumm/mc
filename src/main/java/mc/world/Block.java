@@ -82,6 +82,13 @@ public final class Block {
 
     /** Default namespaced id of a built-in block, derived from its name like Minecraft's ("Block of Gold" -> gold_block). */
     public static String vanillaKey(String name) {
+        // Names that differ from Minecraft's ids
+        String fixed = switch (name) {
+            case "Grass" -> "short_grass"; case "Wheat Crops" -> "wheat"; case "Monster Spawner" -> "spawner";
+            case "Redstone Repeater" -> "repeater"; case "Lapis Lazuli Ore" -> "lapis_ore"; case "Block of Lapis Lazuli" -> "lapis_block";
+            default -> null;
+        };
+        if (fixed != null) return "minecraft:" + fixed;
         String n = name.toLowerCase(java.util.Locale.ROOT);
         if (n.startsWith("block of ")) n = n.substring(9) + " block";
         if (n.equals("planks")) n = "oak planks";
@@ -95,6 +102,7 @@ public final class Block {
         for (Block b : BY_ID) if (b != null && b.key().equals(key)) return b;
         return null;
     }
+
 
     private Block(int id, String name, int tex) {
         this.id = id;
@@ -302,6 +310,16 @@ public final class Block {
     public static final Block RAIL = new Block(139, "Rail", Tex.RAIL).shape(Shape.RAIL).cutout().hardness(0.7f);
     public static final Block POWERED_RAIL = new Block(140, "Powered Rail", Tex.POWERED_RAIL).shape(Shape.RAIL).cutout().hardness(0.7f);
     public static final Block DETECTOR_RAIL = new Block(141, "Detector Rail", Tex.DETECTOR_RAIL).shape(Shape.RAIL).cutout().hardness(0.7f);
+
+    static {
+        // Second blocks for one Minecraft block (its lit or powered state) get keys of their own
+        LIT_FURNACE.key = "minecraft:lit_furnace";
+        UNLIT_REDSTONE_TORCH.key = "minecraft:unlit_redstone_torch";
+        LIT_REDSTONE_LAMP.key = "minecraft:lit_redstone_lamp";
+        LIT_REDSTONE_ORE.key = "minecraft:lit_redstone_ore";
+        POWERED_REPEATER.key = "minecraft:powered_repeater";
+        SNOWY_GRASS.key = "minecraft:snowy_grass_block";
+    }
 
     static {
         AIR.model = Model.NONE; AIR.opaque = false; AIR.solid = false; AIR.replaceable = true; AIR.inCreativeInventory = false; AIR.sound = SoundType.NONE;

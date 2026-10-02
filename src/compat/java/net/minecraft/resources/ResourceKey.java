@@ -26,6 +26,21 @@ public final class ResourceKey<T> {
         return intern(ResourceLocation.withDefaultNamespace("root"), location);
     }
 
+    public static <T> com.mojang.serialization.Codec<ResourceKey<T>> codec(ResourceKey<? extends net.minecraft.core.Registry<T>> registry) {
+        return ResourceLocation.CODEC.xmap(id -> create(registry, id), ResourceKey::location);
+    }
+
+    public static <T> net.minecraft.network.codec.StreamCodec<io.netty.buffer.ByteBuf, ResourceKey<T>> streamCodec(ResourceKey<? extends net.minecraft.core.Registry<T>> registry) {
+        return ResourceLocation.STREAM_CODEC.map(id -> create(registry, id), ResourceKey::location);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <E> java.util.Optional<ResourceKey<E>> cast(ResourceKey<? extends net.minecraft.core.Registry<E>> registry) {
+        return isFor(registry) ? java.util.Optional.of((ResourceKey<E>) this) : java.util.Optional.empty();
+    }
+
+    public <E> ResourceKey<net.minecraft.core.Registry<E>> registryKey() { return createRegistryKey(registryName); }
+
     public ResourceLocation location() { return location; }
     public ResourceLocation registry() { return registryName; }
     public boolean isFor(ResourceKey<? extends net.minecraft.core.Registry<?>> registry) { return registryName.equals(registry.location()); }

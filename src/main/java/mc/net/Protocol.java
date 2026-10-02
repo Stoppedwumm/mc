@@ -16,7 +16,7 @@ import java.util.zip.Inflater;
 public final class Protocol {
     private Protocol() { }
 
-    public static final int VERSION = 5;
+    public static final int VERSION = 6;
 
     /** Handshake intents. */
     public static final int INTENT_STATUS = 0, INTENT_LOGIN = 1;
@@ -58,14 +58,14 @@ public final class Protocol {
 
     /** Item stack as [id, count, damage, enchantments...]; a zero length means empty. */
     public static void writeStack(ByteBuf b, ItemStack s) {
-        if (ItemStack.isEmpty(s)) { b.writeByte(0); return; }
+        if (ItemStack.isEmpty(s)) { b.writeShort(0); return; }
         int[] a = s.toArray();
-        b.writeByte(a.length);
+        b.writeShort(a.length);
         for (int v : a) b.writeInt(v);
     }
 
     public static ItemStack readStack(ByteBuf b) {
-        int n = b.readUnsignedByte();
+        int n = b.readUnsignedShort();
         if (n == 0) return null;
         int[] a = new int[n];
         for (int i = 0; i < n; i++) a[i] = b.readInt();

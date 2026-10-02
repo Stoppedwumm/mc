@@ -163,4 +163,12 @@ public class CompoundTag implements Tag {
         }
         return c;
     }
+
+    /** Any tag as JSON text (reamc's save format), and back. */
+    public static String reamc$toJson(Tag tag) { return encode(tag).toString(); }
+
+    public static Tag reamc$fromJson(String json) {
+        Object v = decode(com.google.gson.JsonParser.parseString(json));
+        return v instanceof Tag t ? t : null;
+    }
 }

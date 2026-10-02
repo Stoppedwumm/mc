@@ -12,4 +12,10 @@ public class ClientboundBlockEntityDataPacket implements Packet<Object> {
     public static ClientboundBlockEntityDataPacket create(BlockEntity be) { return new ClientboundBlockEntityDataPacket(be); }
 
     public BlockEntity reamc$blockEntity() { return blockEntity; }
+
+    public net.minecraft.nbt.CompoundTag getTag() { return blockEntity.getUpdateTag(net.minecraft.core.HolderLookup.Provider.EMPTY); }
+
+    public net.minecraft.core.BlockPos getPos() { return blockEntity.getBlockPos(); }
+
+    public net.minecraft.world.level.block.entity.BlockEntityType<?> getType() { return blockEntity.getType(); }
 }

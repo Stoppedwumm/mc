@@ -73,6 +73,97 @@ public final class Bridge {
 
     public static void setUi(ModUi u) { ui = u; }
 
+    // ------------------------------------------------------------------ registries
+
+    /** Data-driven registries (damage types, biomes, features...): created empty when first asked for, filled from data. */
+    private static final Map<ResourceLocation, MappedRegistry<?>> DYNAMIC = new java.util.concurrent.ConcurrentHashMap<>();
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static <T> MappedRegistry<T> dynamicRegistry(net.minecraft.resources.ResourceKey<? extends net.minecraft.core.Registry<T>> key) {
+        net.minecraft.core.Registry<?> builtIn = BuiltInRegistries.REGISTRY.get(key.location());
+        if (builtIn != null) return (MappedRegistry<T>) builtIn;
+        return (MappedRegistry<T>) DYNAMIC.computeIfAbsent(key.location(), k -> new MappedRegistry<>((net.minecraft.resources.ResourceKey) key));
+    }
+
+    private static final net.minecraft.core.RegistryAccess.Frozen ACCESS = new net.minecraft.core.RegistryAccess.Frozen() {
+        @Override
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        public <E> java.util.Optional<net.minecraft.core.Registry<E>> registry(net.minecraft.resources.ResourceKey<? extends net.minecraft.core.Registry<? extends E>> key) {
+            return java.util.Optional.of((net.minecraft.core.Registry<E>) dynamicRegistry((net.minecraft.resources.ResourceKey) key));
+        }
+
+        @Override
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        public java.util.stream.Stream<RegistryEntry<?>> registries() {
+            java.util.List<RegistryEntry<?>> l = new java.util.ArrayList<>();
+            for (net.minecraft.core.Registry<?> r : BuiltInRegistries.REGISTRY) l.add(new RegistryEntry(r.key(), r));
+            for (MappedRegistry<?> r : DYNAMIC.values()) l.add(new RegistryEntry(r.key(), r));
+            return l.stream();
+        }
+    };
+
+    private static boolean dataRegistriesReady;
+
+    /** Fills the data-driven registries mods look things up in: damage types and reamc's enchantments. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static synchronized void initDataRegistries() {
+        if (dataRegistriesReady) return;
+        dataRegistriesReady = true;
+        MappedRegistry damage = dynamicRegistry((net.minecraft.resources.ResourceKey) net.minecraft.core.registries.Registries.DAMAGE_TYPE);
+        for (java.lang.reflect.Field f : net.minecraft.world.damagesource.DamageTypes.class.getFields()) {
+            try {
+                net.minecraft.resources.ResourceKey<?> k = (net.minecraft.resources.ResourceKey<?>) f.get(null);
+                String path = k.location().getPath();
+                String msg = switch (path) { case "player_attack" -> "player"; case "mob_attack", "mob_attack_no_aggro" -> "mob"; case "out_of_world" -> "outOfWorld"; default -> path; };
+                if (!damage.containsKey(k.location())) damage.register(k.location(), new net.minecraft.world.damagesource.DamageType(msg, 0.1f));
+            } catch (ReflectiveOperationException ignored) { }
+        }
+        for (mc.world.gen.Biome b : mc.world.gen.Biome.values()) biome(b);
+        MappedRegistry ench = dynamicRegistry((net.minecraft.resources.ResourceKey) net.minecraft.core.registries.Registries.ENCHANTMENT);
+        for (mc.item.Enchantment e : mc.item.Enchantment.values()) {
+            ResourceLocation id = ResourceLocation.withDefaultNamespace(e.name().toLowerCase(java.util.Locale.ROOT));
+            if (!ench.containsKey(id)) ench.register(id, new net.minecraft.world.item.enchantment.Enchantment(net.minecraft.network.chat.Component.literal(e.displayName), e));
+        }
+    }
+
+    private static final Map<mc.world.gen.Biome, net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome>> BIOMES = new java.util.EnumMap<>(mc.world.gen.Biome.class);
+
+    /** The biome holder for a reamc biome, registered under Minecraft's id. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static synchronized net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome(mc.world.gen.Biome b) {
+        return BIOMES.computeIfAbsent(b, k -> {
+            String id; float t, d; boolean rain = true;
+            switch (k) {
+                case OCEAN -> { id = "ocean"; t = 0.5f; d = 0.5f; }
+                case FROZEN_OCEAN -> { id = "frozen_ocean"; t = 0; d = 0.5f; }
+                case BEACH -> { id = "beach"; t = 0.8f; d = 0.4f; }
+                case PLAINS -> { id = "plains"; t = 0.8f; d = 0.4f; }
+                case FOREST -> { id = "forest"; t = 0.7f; d = 0.8f; }
+                case BIRCH_FOREST -> { id = "birch_forest"; t = 0.6f; d = 0.6f; }
+                case TAIGA -> { id = "taiga"; t = 0.25f; d = 0.8f; }
+                case SNOWY_TAIGA -> { id = "snowy_taiga"; t = -0.5f; d = 0.4f; }
+                case DESERT -> { id = "desert"; t = 2; d = 0; rain = false; }
+                case MOUNTAINS -> { id = "windswept_hills"; t = 0.2f; d = 0.3f; }
+                case SNOWY_PEAKS -> { id = "snowy_slopes"; t = -0.3f; d = 0.9f; }
+                case RIVER -> { id = "river"; t = 0.5f; d = 0.5f; }
+                case BADLANDS -> { id = "badlands"; t = 2; d = 0; rain = false; }
+                default -> { id = "nether_wastes"; t = 2; d = 0; rain = false; }
+            }
+            MappedRegistry reg = dynamicRegistry((net.minecraft.resources.ResourceKey) net.minecraft.core.registries.Registries.BIOME);
+            ResourceLocation rl = ResourceLocation.withDefaultNamespace(id);
+            if (reg.containsKey(rl)) return (net.minecraft.core.Holder) reg.getHolder(rl).orElseThrow();
+            return reg.register(rl, new net.minecraft.world.level.biome.Biome(k, t, d, rain));
+        });
+    }
+
+    /** The engine enchantment behind an enchantment holder, or null. */
+    public static mc.item.Enchantment engineEnchantment(net.minecraft.core.Holder<?> h) {
+        return h != null && h.value() instanceof net.minecraft.world.item.enchantment.Enchantment e ? e.reamc$engine() : null;
+    }
+
+    /** Every registry, built-in and data-driven. */
+    public static net.minecraft.core.RegistryAccess.Frozen registryAccess() { return ACCESS; }
+
     // ------------------------------------------------------------------ blocks and items
 
     private static final Block[] BLOCKS = new Block[mc.world.Block.MAX];
@@ -115,24 +206,85 @@ public final class Bridge {
         return i;
     }
 
-    public static Block vanillaBlock(String key) {
+    /** Minecraft blocks reamc doesn't have: registered placeholders, so lookups by them never match anything else. */
+    private static final Map<String, Block> MISSING_BLOCKS = new java.util.HashMap<>();
+    private static final Map<String, Item> MISSING_ITEMS = new java.util.HashMap<>();
+
+    public static synchronized Block vanillaBlock(String key) {
         if (key.equals("minecraft:air")) return compatBlock(0);
         mc.world.Block b = mc.world.Block.byKey(key);
-        return b == null ? compatBlock(0) : compatBlock(b.id);
+        if (b != null) return compatBlock(b.id);
+        return MISSING_BLOCKS.computeIfAbsent(key, k -> {
+            Block m = new MissingBlock();
+            ResourceLocation id = ResourceLocation.parse(k);
+            if (!BuiltInRegistries.BLOCK.containsKey(id)) ((MappedRegistry<Block>) BuiltInRegistries.BLOCK).register(id, m);
+            return m;
+        });
     }
 
-    public static Item vanillaItem(String key) {
-        if (key.equals("minecraft:air")) return AIR_ITEM;
+    public static synchronized Item vanillaItem(String key) {
+        if (key.equals("minecraft:air")) return airItem();
         mc.item.Item i = mc.item.Item.byKey(key);
-        return i == null ? AIR_ITEM : compatItem(i);
+        if (i != null) return compatItem(i);
+        return MISSING_ITEMS.computeIfAbsent(key, k -> {
+            Item m = new Item(new Item.Properties());
+            ResourceLocation id = ResourceLocation.parse(k);
+            if (!BuiltInRegistries.ITEM.containsKey(id)) ((MappedRegistry<Item>) BuiltInRegistries.ITEM).register(id, m);
+            return m;
+        });
     }
 
-    private static final Item AIR_ITEM = new Item(new Item.Properties());
+    /** A Minecraft block reamc lacks: it exists for comparisons but is never in a world. */
+    static final class MissingBlock extends Block {
+        MissingBlock() { super(BlockBehaviour.Properties.of()); }
+    }
+
+    private static Item AIR_ITEM_VALUE;
+    private static Item airItem() {
+        if (AIR_ITEM_VALUE == null) {
+            AIR_ITEM_VALUE = new Item(new Item.Properties());
+            ResourceLocation id = ResourceLocation.withDefaultNamespace("air");
+            if (!BuiltInRegistries.ITEM.containsKey(id)) ((MappedRegistry<Item>) BuiltInRegistries.ITEM).register(id, AIR_ITEM_VALUE);
+        }
+        return AIR_ITEM_VALUE;
+    }
+
+    /** Every recipe loaded from mods' data. */
+    public static final net.minecraft.world.item.crafting.RecipeManager RECIPES = new net.minecraft.world.item.crafting.RecipeManager();
+
+    public static net.minecraft.world.item.crafting.RecipeManager recipeManager() { return RECIPES; }
+
+    /** Tells the block at {@code pos} that its neighbour at {@code from} changed. */
+    public static void neighborChanged(Level level, BlockPos pos, Block block, BlockPos from) {
+        BlockState s = level.getBlockState(pos);
+        if (!s.getBlock().reamc$isModded()) return;
+        try {
+            s.handleNeighborChanged(level, pos, block, from, false);
+        } catch (RuntimeException | LinkageError e) {
+            report("neighbour update of " + s, e);
+        }
+    }
+
+    /** A block entity's data changed: it is saved with the world and, if a screen shows it, redrawn. */
+    public static void blockEntityChanged(World w, BlockPos pos) { }
+
+    /** Fire odds set by FireBlock.setFlammable, else 5/20 for blocks reamc burns. */
+    public static final Map<Block, int[]> FLAMMABLE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public static int flammability(Block b) {
+        int[] f = FLAMMABLE.get(b);
+        return f != null ? f[1] : b.reamc$block != null && b.reamc$block.flammable ? 20 : 0;
+    }
+
+    public static int fireSpreadSpeed(Block b) {
+        int[] f = FLAMMABLE.get(b);
+        return f != null ? f[0] : b.reamc$block != null && b.reamc$block.flammable ? 5 : 0;
+    }
 
     public static Item blockItem(Block b) {
-        if (b.reamc$block == null) return AIR_ITEM;
+        if (b.reamc$block == null) return airItem();
         mc.item.Item i = mc.item.Item.get(b.reamc$block.id);
-        return i == null ? AIR_ITEM : compatItem(i);
+        return i == null ? airItem() : compatItem(i);
     }
 
     public static BlockState state(int id, int meta) {
@@ -183,8 +335,82 @@ public final class Bridge {
     public static Player localServerPlayer() { return ui == null ? null : serverPlayer(ui.localPlayer()); }
 
     public static Entity entity(World w, int id) {
+        for (mc.entity.Entity e : w.entities()) if (e.id == id) return wrap(e);
         for (mc.entity.Player p : w.players()) if (p.id == id) return serverPlayer(p);
         return null;
+    }
+
+    /** Compat views of engine entities (mods' own entities register themselves). */
+    private static final Map<mc.entity.Entity, Entity> WRAPPERS = new WeakHashMap<>();
+
+    public static synchronized void registerWrapper(mc.entity.Entity engine, Entity compat) { WRAPPERS.put(engine, compat); }
+
+    public static synchronized Entity wrap(mc.entity.Entity e) {
+        if (e == null) return null;
+        if (e instanceof mc.entity.Player p) return serverPlayer(p);
+        if (e instanceof ModEntityProxy m) return m.mod;
+        Entity w = WRAPPERS.get(e);
+        if (w != null) return w;
+        if (e instanceof mc.entity.ItemEntity i) return new net.minecraft.world.entity.item.ItemEntity(i);
+        if (e instanceof mc.entity.XpOrbEntity o) w = new net.minecraft.world.entity.ExperienceOrb(o);
+        else if (e instanceof mc.entity.Mob m) w = switch (m.type) {
+            case WOLF -> new net.minecraft.world.entity.animal.Wolf(m);
+            case VILLAGER -> new net.minecraft.world.entity.npc.Villager(m);
+            default -> new GenericMob(m);
+        };
+        else if (e instanceof mc.entity.LivingEntity l) w = new GenericLiving(l);
+        else w = new GenericEntity(e);
+        WRAPPERS.put(e, w);
+        return w;
+    }
+
+    private static final class GenericEntity extends Entity { GenericEntity(mc.entity.Entity e) { super(e); } }
+    private static final class GenericLiving extends net.minecraft.world.entity.LivingEntity { GenericLiving(mc.entity.LivingEntity e) { super(e); } }
+    private static final class GenericMob extends net.minecraft.world.entity.Mob { GenericMob(mc.entity.Mob e) { super(e); } }
+
+    // ------------------------------------------------------------------ effects and cooldowns
+
+    /** Effects reamc doesn't have natively, per entity; ticked with the world. */
+    private static final Map<mc.entity.LivingEntity, Map<net.minecraft.world.effect.MobEffect, net.minecraft.world.effect.MobEffectInstance>> MOD_EFFECTS = new WeakHashMap<>();
+
+    public static synchronized Map<net.minecraft.world.effect.MobEffect, net.minecraft.world.effect.MobEffectInstance> modEffects(mc.entity.LivingEntity e) {
+        return MOD_EFFECTS.computeIfAbsent(e, k -> new LinkedHashMap<>());
+    }
+
+    /** Runs the mod effects of every living entity in a world for one tick. */
+    static void tickModEffects(World w) {
+        List<Map.Entry<mc.entity.LivingEntity, Map<net.minecraft.world.effect.MobEffect, net.minecraft.world.effect.MobEffectInstance>>> all;
+        synchronized (Bridge.class) { all = new ArrayList<>(MOD_EFFECTS.entrySet()); }
+        for (var e : all) {
+            if (e.getKey().world != w || e.getValue().isEmpty()) continue;
+            if (e.getKey().isDead() || e.getKey().removed) { e.getValue().clear(); continue; }
+            net.minecraft.world.entity.LivingEntity living = (net.minecraft.world.entity.LivingEntity) wrap(e.getKey());
+            e.getValue().values().removeIf(i -> {
+                try {
+                    return !i.tick(living, () -> { });
+                } catch (RuntimeException ex) {
+                    System.err.println("[mods] effect " + i + " failed: " + ex);
+                    return true;
+                }
+            });
+        }
+    }
+
+    public static net.minecraft.core.Holder<net.minecraft.world.effect.MobEffect> effectHolder(mc.entity.Effect e) {
+        for (var h : BuiltInRegistries.MOB_EFFECT.holders().toList()) {
+            if (h.value() instanceof net.minecraft.world.effect.MobEffect m && m.reamc$engine == e) {
+                @SuppressWarnings({"unchecked", "rawtypes"})
+                net.minecraft.core.Holder<net.minecraft.world.effect.MobEffect> r = (net.minecraft.core.Holder) h;
+                return r;
+            }
+        }
+        return null;
+    }
+
+    private static final Map<mc.entity.Player, net.minecraft.world.item.ItemCooldowns> COOLDOWNS = new WeakHashMap<>();
+
+    public static synchronized net.minecraft.world.item.ItemCooldowns cooldowns(Player p) {
+        return COOLDOWNS.computeIfAbsent(p.reamc$player(), k -> new net.minecraft.world.item.ItemCooldowns());
     }
 
     public static List<Player> players(World w) {
@@ -423,6 +649,7 @@ public final class Bridge {
             WorldData d = data(w);
             SERVER.reamc$tick();
             NeoForge.EVENT_BUS.post(new ServerTickEvent.Pre(SERVER));
+            tickModEffects(w);
             for (BlockEntity be : new ArrayList<>(d.blockEntities.values())) {
                 if (!(be.getBlockState().getBlock() instanceof EntityBlock eb)) continue;
                 try {

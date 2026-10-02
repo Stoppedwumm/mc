@@ -54,6 +54,33 @@ public abstract class AbstractContainerMenu {
                 && player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) <= 64, true);
     }
 
+    /** Synced numbers (progress bars): shared with the screen in reamc. */
+    protected final java.util.List<DataSlot> dataSlots = new java.util.ArrayList<>();
+
+    protected DataSlot addDataSlot(DataSlot slot) { dataSlots.add(slot); return slot; }
+
+    protected void addDataSlots(ContainerData data) { for (int i = 0; i < data.getCount(); i++) addDataSlot(DataSlot.forContainer(data, i)); }
+
+    public void setData(int id, int value) { dataSlots.get(id).set(value); }
+
+    public boolean isValidSlotIndex(int index) { return index == -1 || index == -999 || index < slots.size(); }
+
+    public NonNullList<ItemStack> getItems() {
+        NonNullList<ItemStack> l = NonNullList.create();
+        for (Slot s : slots) l.add(s.getItem());
+        return l;
+    }
+
+    public void setItem(int slot, int stateId, ItemStack stack) { getSlot(slot).set(stack); }
+
+    public int getStateId() { return 0; }
+
+    public int incrementStateId() { return 0; }
+
+    public static int getRedstoneSignalFromBlockEntity(net.minecraft.world.level.block.entity.BlockEntity be) {
+        return be instanceof Container c ? getRedstoneSignalFromContainer(c) : 0;
+    }
+
     public static int getRedstoneSignalFromContainer(Container container) {
         if (container == null) return 0;
         float f = 0;

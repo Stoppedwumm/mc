@@ -67,7 +67,9 @@ public final class Item {
             case "Raw Chicken" -> "chicken"; case "Raw Fish" -> "cod"; case "Cooked Fish" -> "cooked_cod";
             case "Raw Salmon" -> "salmon"; case "Clownfish" -> "tropical_fish"; case "Redstone Dust" -> "redstone";
             case "Nether Quartz" -> "quartz"; case "Bottle o' Enchanting" -> "experience_bottle"; case "Melon Slice" -> "melon_slice";
-            case "Glistering Melon Slice" -> "glistering_melon_slice"; default -> name;
+            case "Glistering Melon Slice" -> "glistering_melon_slice"; case "Leather Cap" -> "leather_helmet";
+            case "Leather Tunic" -> "leather_chestplate"; case "Leather Pants" -> "leather_leggings"; case "Boat" -> "oak_boat";
+            default -> name;
         };
         return key = "minecraft:" + n.toLowerCase(java.util.Locale.ROOT).replace("'", "").replaceAll("[^a-z0-9]+", "_").replaceAll("^_|_$", "");
     }

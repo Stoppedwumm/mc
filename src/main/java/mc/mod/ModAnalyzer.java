@@ -49,6 +49,8 @@ public final class ModAnalyzer {
     public final Map<String, String> missingFrom = new HashMap<>();
     public int checkedReferences;
     public boolean usesMixins;
+    /** Every external reference reachable code makes ("C"lass/"F"ield/"M"ethod + reference), with one user each. */
+    public final Map<String, String> references = new HashMap<>();
     /** Mod classes reachable from the entry points. */
     public final Set<String> reachedClasses = new TreeSet<>();
 
@@ -89,7 +91,9 @@ public final class ModAnalyzer {
             }
             if (e.getName().endsWith(".mixins.json")) a.usesMixins = true;
         }
-        a.check(compat, a.reach(compat));
+        Map<String, String> refs = a.reach(compat);
+        a.references.putAll(refs);
+        a.check(compat, refs);
         return a;
     }
 
@@ -192,7 +196,8 @@ public final class ModAnalyzer {
                     public void visitMethodInsn(int op, String mo, String n2, String d, boolean itf) {
                         if (mo.startsWith("[")) return;
                         type(m, mo);
-                        if (external(mo)) m.methodRefs.add(mo + "." + n2 + " " + d);
+                        // The call kind is part of the reference: "I" interface, "S" static, "V" otherwise
+                        if (external(mo)) m.methodRefs.add(mo + "." + n2 + " " + d + " " + (op == Opcodes.INVOKESTATIC ? "S" : "") + (itf ? "I" : ""));
                         else m.internalMethods.add(mo + "." + n2 + d);
                         for (Type t : Type.getArgumentTypes(d)) type(m, t.getDescriptor());
                         type(m, Type.getReturnType(d).getDescriptor());
@@ -239,7 +244,8 @@ public final class ModAnalyzer {
             return;
         }
         if (h.getTag() <= Opcodes.H_PUTSTATIC) m.fieldRefs.add(h.getOwner() + "." + h.getName() + " " + h.getDesc());
-        else m.methodRefs.add(h.getOwner() + "." + h.getName() + " " + h.getDesc());
+        else m.methodRefs.add(h.getOwner() + "." + h.getName() + " " + h.getDesc() + " "
+                + (h.getTag() == Opcodes.H_INVOKESTATIC ? "S" : "") + (h.isInterface() ? "I" : ""));
     }
 
     // ------------------------------------------------------------------ reachability
@@ -320,15 +326,28 @@ public final class ModAnalyzer {
                 case 'C' -> load(cl, r) == null ? r.replace('/', '.') : null;
                 case 'F' -> {
                     String owner = r.substring(0, r.lastIndexOf('.', r.indexOf(' ')));
-                    String name = r.substring(owner.length() + 1, r.indexOf(' '));
+                    String name = r.substring(owner.length() + 1, r.indexOf(' ')), desc = r.substring(r.indexOf(' ') + 1);
                     Class<?> c = load(cl, owner);
-                    yield c != null && findField(c, name) == null ? owner.replace('/', '.') + "." + name : null;
+                    if (c == null) yield null;
+                    Field f = findField(c, name);
+                    if (f == null) yield owner.replace('/', '.') + "." + name;
+                    // Fields link by name and type
+                    yield Type.getDescriptor(f.getType()).equals(desc) ? null : owner.replace('/', '.') + "." + name + " [type " + desc + "]";
                 }
                 default -> {
                     String owner = r.substring(0, r.lastIndexOf('.', r.indexOf(' ')));
-                    String name = r.substring(owner.length() + 1, r.indexOf(' ')), desc = r.substring(r.indexOf(' ') + 1);
+                    String[] parts = r.substring(r.indexOf(' ') + 1).split(" ", -1);
+                    String name = r.substring(owner.length() + 1, r.indexOf(' ')), desc = parts[0];
+                    String kind = parts.length > 1 ? parts[1] : null;
                     Class<?> c = load(cl, owner);
-                    yield c != null && !hasMethod(c, name, desc) ? owner.replace('/', '.') + "." + name + desc : null;
+                    if (c == null) yield null;
+                    String ref = owner.replace('/', '.') + "." + name + desc;
+                    if (!hasMethod(c, name, desc)) yield ref;
+                    if (kind != null && kind.contains("I") != c.isInterface() && !name.equals("<init>"))
+                        yield ref + " [called as " + (kind.contains("I") ? "interface" : "class") + " method]";
+                    if (kind != null && !name.startsWith("<") && kind.contains("S") != isStatic(c, name, desc))
+                        yield ref + " [called as " + (kind.contains("S") ? "static" : "instance") + " method]";
+                    yield null;
                 }
             };
             if (miss != null) {
@@ -336,6 +355,13 @@ public final class ModAnalyzer {
                 missingFrom.putIfAbsent(miss, e.getValue().replace('/', '.'));
             }
         }
+    }
+
+    private static boolean isStatic(Class<?> c, String name, String desc) {
+        for (Class<?> k = c; k != null; k = k.getSuperclass())
+            for (Method m : k.getDeclaredMethods())
+                if (m.getName().equals(name) && Type.getMethodDescriptor(m).equals(desc)) return java.lang.reflect.Modifier.isStatic(m.getModifiers());
+        return false;
     }
 
     private static Class<?> load(ClassLoader cl, String internal) {

@@ -36,6 +36,9 @@ public class Player extends LivingEntity {
     public FishingBobberEntity fishing;
     /** Arm swing of another player seen over the network (ticks left). */
     public int swingTicks;
+    /** The item being used (eaten, drawn, held up), and ticks until it finishes; null when not using anything. */
+    public mc.item.ItemStack useStack;
+    public int useRemaining;
 
     public boolean inPortal() { return touching(Block.NETHER_PORTAL.id); }
 

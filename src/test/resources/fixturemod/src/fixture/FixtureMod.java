@@ -68,10 +68,15 @@ public class FixtureMod {
 
     /** Faces the player who places it. */
     public static class Lamp extends HorizontalDirectionalBlock {
+        public static final com.mojang.serialization.MapCodec<Lamp> CODEC = simpleCodec(Lamp::new);
+
         public Lamp(Properties p) {
             super(p);
             registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
         }
+
+        @Override
+        protected com.mojang.serialization.MapCodec<Lamp> codec() { return CODEC; }
 
         @Override
         protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) { builder.add(FACING); }

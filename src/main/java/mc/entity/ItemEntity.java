@@ -4,7 +4,7 @@ import mc.item.ItemStack;
 
 /** A dropped item stack that bobs, spins, merges with neighbours and can be picked up. */
 public final class ItemEntity extends Entity {
-    public final ItemStack stack;
+    public ItemStack stack;
     public int pickupDelay = 10;
     public final float spin = (float) (Math.random() * Math.PI * 2);
 
